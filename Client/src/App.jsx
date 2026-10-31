@@ -171,90 +171,645 @@ function Overview({ setPage }) {
   )
 }
 
+
+
 function ReelStock() {
-  const [search, setSearch] = useState('')
-  const [quality, setQuality] = useState('All qualities')
+  const [reels, setReels] = useState(sampleReels);
+  const [search, setSearch] = useState('');
+  const [quality, setQuality] = useState('All qualities');
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [formError, setFormError] = useState('');
+
+  const initialForm = {
+    size: '',
+    bf: '',
+    gsm: '',
+    quality: 'Natural',
+    reelQty: '',
+    weight: '',
+  };
+
+  const [form, setForm] = useState(initialForm);
+
+  const totalReels = reels.reduce(
+    (total, item) => total + Number(item.reels || 0),
+    0
+  );
+
+  const totalWeight = reels.reduce(
+    (total, item) => total + Number(item.weight || 0),
+    0
+  );
+
+  const lowStockCount = reels.filter(
+    (item) => Number(item.reels) <= 3
+  ).length;
 
   const filteredReels = useMemo(() => {
-    const term = search.trim().toLowerCase()
-    return sampleReels.filter((reel) => {
-      const matchesSearch = `${reel.id} ${reel.size} ${reel.bf} ${reel.gsm} ${reel.quality}`.toLowerCase().includes(term)
-      const matchesQuality = quality === 'All qualities' || reel.quality === quality
-      return matchesSearch && matchesQuality
-    })
-  }, [search, quality])
+    const query = search.trim().toLowerCase();
+
+    return reels.filter((item) => {
+      const matchesQuality =
+        quality === 'All qualities' || item.quality === quality;
+
+      const searchableText = [
+        item.id,
+        item.size,
+        item.bf,
+        item.gsm,
+        item.quality,
+        item.quality === 'GY' ? 'Golden Yellow' : '',
+      ]
+        .join(' ')
+        .toLowerCase();
+
+      const matchesSearch =
+        !query || searchableText.includes(query);
+
+      return matchesQuality && matchesSearch;
+    });
+  }, [reels, search, quality]);
+
+  const openAddForm = () => {
+    setForm(initialForm);
+    setFormError('');
+    setShowAddForm(true);
+  };
+
+  const closeAddForm = () => {
+    setShowAddForm(false);
+    setFormError('');
+  };
+
+  const handleAddSpecification = (event) => {
+    event.preventDefault();
+    setFormError('');
+
+    const size = form.size.trim();
+    const bf = Number(form.bf);
+    const gsm = Number(form.gsm);
+    const reelQty = Number(form.reelQty);
+    const weight = Number(form.weight);
+
+    if (!size || !form.bf || !form.gsm ||
+        !form.reelQty || !form.weight) {
+      setFormError('Please fill in all fields.');
+      return;
+    }
+
+    if (
+      !Number.isFinite(bf) ||
+      !Number.isFinite(gsm) ||
+      !Number.isFinite(reelQty) ||
+      !Number.isFinite(weight) ||
+      bf <= 0 ||
+      gsm <= 0 ||
+      reelQty <= 0 ||
+      weight <= 0 ||
+      !Number.isInteger(reelQty)
+    ) {
+      setFormError(
+        'Enter valid positive values. Reel quantity must be a whole number.'
+      );
+      return;
+    }
+
+    const duplicate = reels.some(
+      (item) =>
+        item.size.trim().toLowerCase() === size.toLowerCase() &&
+        Number(item.bf) === bf &&
+        Number(item.gsm) === gsm &&
+        item.quality === form.quality
+    );
+
+    if (duplicate) {
+      setFormError(
+        'This specification already exists. Natural and GY are treated separately.'
+      );
+      return;
+    }
+
+    const nextNumber =
+      reels.reduce((max, item) => {
+        const match = String(item.id).match(/(\d+)$/);
+        return match ? Math.max(max, Number(match[1])) : max;
+      }, 0) + 1;
+
+    const newReel = {
+      id: `SPEC-${String(nextNumber).padStart(3, '0')}`,
+      size,
+      bf,
+      gsm,
+      quality: form.quality,
+      reels: reelQty,
+      weight,
+      status: reelQty <= 3 ? 'Low stock' : 'In stock',
+    };
+
+    setReels((current) => [...current, newReel]);
+    setSearch('');
+    setQuality('All qualities');
+    setShowAddForm(false);
+    setForm(initialForm);
+    setFormError('');
+  };
+
+  const updateForm = (field, value) => {
+    setForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
+
+  const qualityFilters = [
+    { label: 'All', value: 'All qualities' },
+    { label: 'Natural', value: 'Natural' },
+    { label: 'Golden Yellow (GY)', value: 'GY' },
+  ];
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-3">
-        <MetricCard title="Total reels" value="43" unit="reels" change="Sample balance" direction="up" icon={Boxes} tint="bg-blue-50 text-blue-700" />
-        <MetricCard title="Total paper weight" value="1,925" unit="kg" change="Across 6 specifications" direction="up" icon={Layers3} tint="bg-violet-50 text-violet-700" />
-        <MetricCard title="Low-stock items" value="2" unit="specifications" change="Review reorder levels" direction="down" icon={ClipboardList} tint="bg-amber-50 text-amber-700" />
+      {/* Page heading */}
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            Reel Stock
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Manage paper specifications, reel quantities and available weight.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={openAddForm}
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-800"
+        >
+          <Plus size={17} />
+          Add specification
+        </button>
       </div>
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-        <div className="flex flex-col gap-4 border-b border-slate-100 p-5 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h2 className="font-semibold text-slate-900">Paper reel register</h2>
-            <p className="mt-1 text-sm text-slate-500">Search sample specifications and balances</p>
-          </div>
-          <button type="button" disabled title="Will be enabled after transaction workflows are implemented" className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-medium text-white opacity-60">
-            <Plus size={17} /> Add specification
-          </button>
+      {/* Demo mode notice */}
+      <div className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+        <ShieldCheck
+          size={20}
+          className="mt-0.5 shrink-0 text-amber-700"
+        />
+        <div>
+          <p className="text-sm font-semibold text-amber-900">
+            DEMO MODE
+          </p>
+          <p className="mt-1 text-sm text-amber-800">
+            Changes are held in browser memory only. They are not saved
+            to Supabase and will reset when the page reloads.
+          </p>
+        </div>
+      </div>
+
+      {/* Summary cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <p className="text-sm font-medium text-slate-500">
+            Total specifications
+          </p>
+          <p className="mt-2 text-2xl font-bold text-slate-900">
+            {reels.length}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            Distinct paper specifications
+          </p>
         </div>
 
-        <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row">
-          <div className="relative flex-1">
-            <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search size, BF, GSM or ID..." className="w-full rounded-xl border border-slate-200 py-2.5 pl-10 pr-3 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100" />
-          </div>
-          <select value={quality} onChange={(event) => setQuality(event.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-400">
-            <option>All qualities</option>
-            <option value="Natural">Natural</option>
-            <option value="GY">Golden Yellow (GY)</option>
-          </select>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <p className="text-sm font-medium text-slate-500">
+            Reels available
+          </p>
+          <p className="mt-2 text-2xl font-bold text-slate-900">
+            {totalReels.toLocaleString('en-IN')}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            Total reel quantity
+          </p>
         </div>
 
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <p className="text-sm font-medium text-slate-500">
+            Paper weight on hand
+          </p>
+          <p className="mt-2 text-2xl font-bold text-slate-900">
+            {totalWeight.toLocaleString('en-IN', {
+              maximumFractionDigits: 2,
+            })}{' '}
+            <span className="text-base font-medium text-slate-500">
+              kg
+            </span>
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            Combined recorded weight
+          </p>
+        </div>
+      </div>
+
+      {/* Stock table and filters */}
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        <div className="flex flex-col gap-1 border-b border-slate-100 p-5">
+          <h2 className="text-base font-semibold text-slate-900">
+            Paper specifications
+          </h2>
+          <p className="text-sm text-slate-500">
+            Search and filter your paper stock by specification and quality.
+          </p>
+        </div>
+
+        {/* Search and filters */}
+        <div className="space-y-3 border-b border-slate-100 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="relative flex-1">
+              <Search
+                size={17}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+              <input
+                type="text"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search code, size, BF, GSM or quality..."
+                aria-label="Search paper specifications"
+                className="w-full rounded-xl border border-slate-200 py-2.5 pl-10 pr-3 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
+
+            <select
+              value={quality}
+              onChange={(event) => setQuality(event.target.value)}
+              aria-label="Filter by paper quality"
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-400"
+            >
+              <option value="All qualities">All qualities</option>
+              <option value="Natural">Natural</option>
+              <option value="GY">Golden Yellow (GY)</option>
+            </select>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="mr-1 text-xs font-medium text-slate-500">
+              Paper quality:
+            </span>
+
+            {qualityFilters.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setQuality(option.value)}
+                aria-pressed={quality === option.value}
+                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                  quality === option.value
+                    ? 'border-blue-700 bg-blue-700 text-white'
+                    : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:bg-blue-50'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+
+            {(search || quality !== 'All qualities') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch('');
+                  setQuality('All qualities');
+                }}
+                className="ml-auto text-xs font-medium text-blue-700 hover:text-blue-900"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Table */}
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <tr>
-                <th className="px-5 py-3.5 font-medium">Reel ID</th>
-                <th className="px-5 py-3.5 font-medium">Size</th>
-                <th className="px-5 py-3.5 font-medium">BF</th>
-                <th className="px-5 py-3.5 font-medium">GSM</th>
-                <th className="px-5 py-3.5 font-medium">Quality</th>
-                <th className="px-5 py-3.5 text-right font-medium">Reels</th>
-                <th className="px-5 py-3.5 text-right font-medium">Weight</th>
-                <th className="px-5 py-3.5 font-medium">Status</th>
+                <th className="px-5 py-3 font-semibold">Item code</th>
+                <th className="px-5 py-3 font-semibold">Size</th>
+                <th className="px-5 py-3 font-semibold">BF</th>
+                <th className="px-5 py-3 font-semibold">GSM</th>
+                <th className="px-5 py-3 font-semibold">Quality</th>
+                <th className="px-5 py-3 text-right font-semibold">
+                  Reels
+                </th>
+                <th className="px-5 py-3 text-right font-semibold">
+                  Weight (kg)
+                </th>
+                <th className="px-5 py-3 font-semibold">Status</th>
               </tr>
             </thead>
+
             <tbody className="divide-y divide-slate-100">
-              {filteredReels.map((reel) => (
-                <tr key={reel.id} className="hover:bg-slate-50">
-                  <td className="px-5 py-4 font-medium text-slate-500">{reel.id}</td>
-                  <td className="px-5 py-4 font-semibold text-slate-800">{reel.size}</td>
-                  <td className="px-5 py-4 text-slate-600">{reel.bf}</td>
-                  <td className="px-5 py-4 text-slate-600">{reel.gsm}</td>
-                  <td className="px-5 py-4"><Badge tone={reel.quality === 'GY' ? 'blue' : 'slate'}>{reel.quality === 'GY' ? 'Golden Yellow' : 'Natural'}</Badge></td>
-                  <td className="px-5 py-4 text-right tabular-nums text-slate-700">{reel.reels}</td>
-                  <td className="px-5 py-4 text-right font-medium tabular-nums text-slate-900">{reel.weight.toLocaleString('en-IN')} kg</td>
-                  <td className="px-5 py-4"><Badge tone={reel.status === 'Low stock' ? 'amber' : 'green'}>{reel.status}</Badge></td>
+              {filteredReels.map((item) => (
+                <tr
+                  key={item.id}
+                  className="transition hover:bg-slate-50"
+                >
+                  <td className="whitespace-nowrap px-5 py-4 font-medium text-slate-900">
+                    {item.id}
+                  </td>
+
+                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">
+                    {item.size}
+                  </td>
+
+                  <td className="px-5 py-4 text-slate-700">
+                    {item.bf}
+                  </td>
+
+                  <td className="px-5 py-4 text-slate-700">
+                    {item.gsm}
+                  </td>
+
+                  <td className="px-5 py-4">
+                    <span
+                      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
+                        item.quality === 'GY'
+                          ? 'bg-amber-100 text-amber-800'
+                          : 'bg-slate-100 text-slate-700'
+                      }`}
+                    >
+                      {item.quality === 'GY'
+                        ? 'Golden Yellow (GY)'
+                        : item.quality}
+                    </span>
+                  </td>
+
+                  <td className="px-5 py-4 text-right tabular-nums text-slate-700">
+                    {Number(item.reels).toLocaleString('en-IN')}
+                  </td>
+
+                  <td className="px-5 py-4 text-right tabular-nums text-slate-700">
+                    {Number(item.weight).toLocaleString('en-IN', {
+                      maximumFractionDigits: 2,
+                    })}
+                  </td>
+
+                  <td className="px-5 py-4">
+                    <span
+                      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
+                        Number(item.reels) <= 3
+                          ? 'bg-amber-100 text-amber-800'
+                          : 'bg-emerald-100 text-emerald-800'
+                      }`}
+                    >
+                      {Number(item.reels) <= 3
+                        ? 'Low stock'
+                        : 'In stock'}
+                    </span>
+                  </td>
                 </tr>
               ))}
+
               {filteredReels.length === 0 && (
-                <tr><td colSpan={8} className="px-5 py-12 text-center text-slate-500">No sample specifications match your search.</td></tr>
+                <tr>
+                  <td
+                    colSpan={8}
+                    className="px-5 py-12 text-center"
+                  >
+                    <p className="font-medium text-slate-700">
+                      No matching specifications found
+                    </p>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Try another search or clear your filters.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearch('');
+                        setQuality('All qualities');
+                      }}
+                      className="mt-3 text-sm font-semibold text-blue-700 hover:text-blue-900"
+                    >
+                      Clear filters
+                    </button>
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
         </div>
-        <div className="border-t border-slate-100 px-5 py-3 text-xs text-slate-500">
-          Showing {filteredReels.length} of {sampleReels.length} illustrative specifications · Not live stock
+
+        {/* Table footer */}
+        <div className="flex flex-col gap-1 border-t border-slate-100 px-5 py-3 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+          <span>
+            Showing {filteredReels.length} of {reels.length} specifications
+          </span>
+          <span>
+            Low-stock threshold: 3 reels or fewer (demo rule)
+          </span>
         </div>
-      </section>
+      </div>
+
+      {/* Add specification modal */}
+      {showAddForm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/40 p-4"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              closeAddForm();
+            }
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="add-specification-title"
+            className="my-auto w-full max-w-lg rounded-2xl bg-white shadow-xl"
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 p-5">
+              <div>
+                <h2
+                  id="add-specification-title"
+                  className="text-lg font-semibold text-slate-900"
+                >
+                  Add paper specification
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Add a demo specification and its initial quantity.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={closeAddForm}
+                aria-label="Close form"
+                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddSpecification} className="space-y-4 p-5">
+              <div>
+                <label
+                  htmlFor="paper-size"
+                  className="mb-1.5 block text-sm font-medium text-slate-700"
+                >
+                  Paper size
+                </label>
+                <input
+                  id="paper-size"
+                  type="text"
+                  value={form.size}
+                  onChange={(event) => updateForm('size', event.target.value)}
+                  placeholder="e.g. 18 × 24"
+                  required
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label
+                    htmlFor="paper-bf"
+                    className="mb-1.5 block text-sm font-medium text-slate-700"
+                  >
+                    BF
+                  </label>
+                  <input
+                    id="paper-bf"
+                    type="number"
+                    min="1"
+                    step="any"
+                    value={form.bf}
+                    onChange={(event) => updateForm('bf', event.target.value)}
+                    placeholder="e.g. 16"
+                    required
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="paper-gsm"
+                    className="mb-1.5 block text-sm font-medium text-slate-700"
+                  >
+                    GSM
+                  </label>
+                  <input
+                    id="paper-gsm"
+                    type="number"
+                    min="1"
+                    step="any"
+                    value={form.gsm}
+                    onChange={(event) => updateForm('gsm', event.target.value)}
+                    placeholder="e.g. 120"
+                    required
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="paper-quality"
+                  className="mb-1.5 block text-sm font-medium text-slate-700"
+                >
+                  Paper quality
+                </label>
+                <select
+                  id="paper-quality"
+                  value={form.quality}
+                  onChange={(event) =>
+                    updateForm('quality', event.target.value)
+                  }
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                >
+                  <option value="Natural">Natural</option>
+                  <option value="GY">Golden Yellow (GY)</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label
+                    htmlFor="reel-quantity"
+                    className="mb-1.5 block text-sm font-medium text-slate-700"
+                  >
+                    Reel quantity
+                  </label>
+                  <input
+                    id="reel-quantity"
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={form.reelQty}
+                    onChange={(event) =>
+                      updateForm('reelQty', event.target.value)
+                    }
+                    placeholder="e.g. 5"
+                    required
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="reel-weight"
+                    className="mb-1.5 block text-sm font-medium text-slate-700"
+                  >
+                    Total weight (kg)
+                  </label>
+                  <input
+                    id="reel-weight"
+                    type="number"
+                    min="0.01"
+                    step="any"
+                    value={form.weight}
+                    onChange={(event) =>
+                      updateForm('weight', event.target.value)
+                    }
+                    placeholder="e.g. 205"
+                    required
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
+              </div>
+
+              {formError && (
+                <p
+                  role="alert"
+                  className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
+                >
+                  {formError}
+                </p>
+              )}
+
+              <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
+                <button
+                  type="button"
+                  onClick={closeAddForm}
+                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  className="rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800"
+                >
+                  Add specification
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
-  )
+  );
 }
+
+
 
 export default function App() {
   const [page, setPage] = useState('Overview')
