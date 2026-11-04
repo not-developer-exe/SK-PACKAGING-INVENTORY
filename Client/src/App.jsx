@@ -20,7 +20,11 @@ import {
   Settings,
   ShieldCheck,
   CalendarDays,
+  LogOut,
+  Loader2,
 } from 'lucide-react'
+import { AuthProvider, useAuth } from './context/AuthContext'
+import StockInwardPage from './pages/StockInward/StockInwardPage';
 
 const navigation = [
   { label: 'Overview', icon: LayoutDashboard, section: 'MAIN' },
@@ -1049,7 +1053,103 @@ function ReelStock() {
   )
 }
 
-export default function App() {
+function LoginPage() {
+  const { login } = useAuth()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setError('')
+    setIsSubmitting(true)
+    try {
+      await login(email, password)
+    } catch (err) {
+      setError(err.response?.data?.message || 'Invalid email or password.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
+      <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-xl shadow-slate-200/50">
+        <div className="mb-8 flex flex-col items-center justify-center text-center">
+          <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-600/20">
+            <Boxes size={28} />
+          </div>
+          <h2 className="text-2xl font-bold tracking-tight text-slate-900">
+            SK Packaging
+          </h2>
+          <p className="mt-2 text-sm text-slate-500">
+            Sign in to access your inventory and operations dashboard.
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div>
+            <label
+              htmlFor="email"
+              className="mb-1.5 block text-sm font-medium text-slate-700"
+            >
+              Email address
+            </label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              placeholder="admin@skpackaging.com"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="password"
+              className="mb-1.5 block text-sm font-medium text-slate-700"
+            >
+              Password
+            </label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              placeholder="••••••••"
+            />
+          </div>
+
+          {error && (
+            <div className="rounded-xl bg-red-50 p-3 text-sm text-red-600">
+              {error}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="flex w-full items-center justify-center rounded-xl bg-blue-600 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-70"
+          >
+            {isSubmitting ? (
+              <Loader2 className="animate-spin" size={20} />
+            ) : (
+              'Sign in to workspace'
+            )}
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function DashboardShell() {
+  const { user, logout } = useAuth()
   const [page, setPage] = useState('Overview')
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
@@ -1131,17 +1231,25 @@ export default function App() {
 
           <div className="flex items-center gap-3 rounded-xl bg-slate-800/80 p-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-800">
-              SK
+              {user?.name ? user.name.substring(0, 2).toUpperCase() : 'SK'}
             </div>
 
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium text-white">
-                Development user
+                {user?.name || 'Authorized User'}
               </p>
-              <p className="text-xs text-slate-400">Sample workspace</p>
+              <p className="text-xs text-slate-400 capitalize">
+                {user?.role || 'Staff'} Access
+              </p>
             </div>
 
-            <Settings size={16} className="text-slate-400" />
+            <button
+              onClick={logout}
+              title="Sign out"
+              className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-700 hover:text-white"
+            >
+              <LogOut size={16} />
+            </button>
           </div>
         </div>
       </>
@@ -1204,10 +1312,10 @@ export default function App() {
           <div className="flex items-center gap-2 sm:gap-4">
             <div className="hidden text-right sm:block">
               <p className="text-xs font-medium text-slate-700">
-                Development workspace
+                {user?.name || 'Development workspace'}
               </p>
-              <p className="mt-0.5 text-[11px] text-slate-400">
-                Sample data only
+              <p className="mt-0.5 text-[11px] text-slate-400 capitalize">
+                {user?.role ? `${user.role} Access` : 'Sample data only'}
               </p>
             </div>
 
@@ -1251,6 +1359,8 @@ export default function App() {
             <Overview setPage={setPage} />
           ) : page === 'Reel Stock' ? (
             <ReelStock />
+          ) : page === 'Stock Inward' ? (
+            <StockInwardPage />
           ) : (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-500">
@@ -1287,5 +1397,27 @@ export default function App() {
         </main>
       </div>
     </div>
+  )
+}
+
+function AppRoot() {
+  const { user, loading } = useAuth()
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <Loader2 className="animate-spin text-blue-600" size={32} />
+      </div>
+    )
+  }
+
+  return user ? <DashboardShell /> : <LoginPage />
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppRoot />
+    </AuthProvider>
   )
 }
