@@ -1,4 +1,3 @@
-
 import { useMemo, useState } from 'react'
 import {
   LayoutDashboard,
@@ -20,6 +19,7 @@ import {
   CircleHelp,
   Settings,
   ShieldCheck,
+  CalendarDays,
 } from 'lucide-react'
 
 const navigation = [
@@ -32,40 +32,143 @@ const navigation = [
   { label: 'Stock Ledger', icon: ClipboardList, section: 'REPORTS' },
 ]
 
+// These are illustrative records only. Replace them with actual stock
+// when the opening stock process is implemented.
 const sampleReels = [
-  { id: 'RL-001', size: '18 × 24', bf: 16, gsm: 120, quality: 'Natural', reels: 12, weight: 486, status: 'In stock' },
-  { id: 'RL-002', size: '20 × 30', bf: 18, gsm: 140, quality: 'Natural', reels: 8, weight: 392, status: 'In stock' },
-  { id: 'RL-003', size: '18 × 24', bf: 16, gsm: 120, quality: 'GY', reels: 6, weight: 241, status: 'In stock' },
-  { id: 'RL-004', size: '22 × 28', bf: 20, gsm: 150, quality: 'Natural', reels: 4, weight: 186, status: 'Low stock' },
-  { id: 'RL-005', size: '20 × 30', bf: 18, gsm: 140, quality: 'GY', reels: 10, weight: 508, status: 'In stock' },
-  { id: 'RL-006', size: '16 × 22', bf: 14, gsm: 100, quality: 'Natural', reels: 3, weight: 112, status: 'Low stock' },
+  {
+    id: 'RL-001',
+    width: 32,
+    bf: 16,
+    gsm: 120,
+    quality: 'Natural',
+    reels: 12,
+    weight: 486,
+    dateAdded: '2026-10-01',
+  },
+  {
+    id: 'RL-002',
+    width: 36,
+    bf: 18,
+    gsm: 140,
+    quality: 'Natural',
+    reels: 8,
+    weight: 392,
+    dateAdded: '2026-10-05',
+  },
+  {
+    id: 'RL-003',
+    width: 40,
+    bf: 16,
+    gsm: 120,
+    quality: 'GY',
+    reels: 6,
+    weight: 241,
+    dateAdded: '2026-10-08',
+  },
+  {
+    id: 'RL-004',
+    width: 44,
+    bf: 20,
+    gsm: 150,
+    quality: 'Natural',
+    reels: 4,
+    weight: 186,
+    dateAdded: '2026-10-12',
+  },
+  {
+    id: 'RL-005',
+    width: 36,
+    bf: 18,
+    gsm: 140,
+    quality: 'GY',
+    reels: 10,
+    weight: 508,
+    dateAdded: '2026-10-15',
+  },
+  {
+    id: 'RL-006',
+    width: 32,
+    bf: 14,
+    gsm: 100,
+    quality: 'Natural',
+    reels: 3,
+    weight: 112,
+    dateAdded: '2026-10-20',
+  },
 ]
 
 const activities = [
-  { title: 'Sample stock receipt', detail: 'Natural paper · 20 × 30 · BF 18', time: 'Today, 10:30 AM', type: 'inward' },
-  { title: 'Sample production run', detail: 'Corrugated boxes · 1,200 pieces', time: 'Today, 9:15 AM', type: 'production' },
-  { title: 'Sample waste entry', detail: 'Paper trim waste · 8.5 kg', time: 'Yesterday', type: 'waste' },
+  {
+    title: 'Sample stock receipt',
+    detail: 'Natural paper · 36 inch · BF 18',
+    time: 'Today, 10:30 AM',
+    type: 'inward',
+  },
+  {
+    title: 'Sample production run',
+    detail: 'Corrugated boxes · 1,200 pieces',
+    time: 'Today, 9:15 AM',
+    type: 'production',
+  },
+  {
+    title: 'Sample waste entry',
+    detail: 'Paper trim waste · 8.5 kg',
+    time: 'Yesterday',
+    type: 'waste',
+  },
 ]
 
-function MetricCard({ title, value, unit, change, direction, icon: Icon, tint }) {
+function getLocalDate() {
+  const today = new Date()
+  const year = today.getFullYear()
+  const month = String(today.getMonth() + 1).padStart(2, '0')
+  const day = String(today.getDate()).padStart(2, '0')
+
+  return `${year}-${month}-${day}`
+}
+
+function formatDate(dateString) {
+  if (!dateString) return '—'
+
+  const [year, month, day] = dateString.split('-')
+  return `${day}/${month}/${year}`
+}
+
+function MetricCard({
+  title,
+  value,
+  unit,
+  change,
+  direction,
+  icon: Icon,
+  tint,
+}) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-medium text-slate-500">{title}</p>
+
           <div className="mt-3 flex flex-wrap items-baseline gap-1.5">
-            <span className="text-3xl font-semibold tracking-tight text-slate-900">{value}</span>
+            <span className="text-3xl font-semibold tracking-tight text-slate-900">
+              {value}
+            </span>
             <span className="text-sm text-slate-500">{unit}</span>
           </div>
         </div>
+
         <div className={`rounded-xl p-3 ${tint}`}>
           <Icon size={20} />
         </div>
       </div>
+
       <div className="mt-4 flex items-center gap-1.5 text-xs text-slate-500">
-        {direction === 'up'
-          ? <ArrowUpRight size={15} className="text-emerald-600" />
-          : <ArrowDownRight size={15} className="text-amber-600" />}
+        {direction === 'up' ? (
+          <ArrowUpRight size={15} className="text-emerald-600" />
+        ) : (
+          <ArrowDownRight size={15} className="text-amber-600" />
+        )}
+
         <span className="font-medium text-slate-700">{change}</span>
         <span>sample data</span>
       </div>
@@ -80,8 +183,11 @@ function Badge({ children, tone = 'slate' }) {
     amber: 'bg-amber-50 text-amber-700',
     blue: 'bg-blue-50 text-blue-700',
   }
+
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${styles[tone]}`}>
+    <span
+      className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${styles[tone]}`}
+    >
       {children}
     </span>
   )
@@ -91,23 +197,67 @@ function Overview({ setPage }) {
   return (
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard title="Paper on hand" value="1,925" unit="kg" change="6 specifications" direction="up" icon={Layers3} tint="bg-blue-50 text-blue-700" />
-        <MetricCard title="Reels available" value="43" unit="reels" change="Across all qualities" direction="up" icon={Boxes} tint="bg-violet-50 text-violet-700" />
-        <MetricCard title="Finished goods" value="8,450" unit="pieces" change="Sample balance" direction="up" icon={Package} tint="bg-emerald-50 text-emerald-700" />
-        <MetricCard title="Waste recorded" value="24.5" unit="kg" change="Sample entries" direction="down" icon={Trash2} tint="bg-amber-50 text-amber-700" />
+        <MetricCard
+          title="Paper on hand"
+          value="1,925"
+          unit="kg"
+          change="6 specifications"
+          direction="up"
+          icon={Layers3}
+          tint="bg-blue-50 text-blue-700"
+        />
+
+        <MetricCard
+          title="Reels available"
+          value="43"
+          unit="reels"
+          change="Across all qualities"
+          direction="up"
+          icon={Boxes}
+          tint="bg-violet-50 text-violet-700"
+        />
+
+        <MetricCard
+          title="Finished goods"
+          value="8,450"
+          unit="pieces"
+          change="Sample balance"
+          direction="up"
+          icon={Package}
+          tint="bg-emerald-50 text-emerald-700"
+        />
+
+        <MetricCard
+          title="Waste recorded"
+          value="24.5"
+          unit="kg"
+          change="Sample entries"
+          direction="down"
+          icon={Trash2}
+          tint="bg-amber-50 text-amber-700"
+        />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
         <section className="rounded-2xl border border-slate-200 bg-white">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-5">
             <div>
-              <h2 className="font-semibold text-slate-900">Reel stock overview</h2>
-              <p className="mt-1 text-sm text-slate-500">Illustrative balances by paper specification</p>
+              <h2 className="font-semibold text-slate-900">
+                Reel stock overview
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Illustrative balances by reel specification
+              </p>
             </div>
-            <button onClick={() => setPage('Reel Stock')} className="text-sm font-semibold text-blue-700 hover:text-blue-800">
+
+            <button
+              onClick={() => setPage('Reel Stock')}
+              className="text-sm font-semibold text-blue-700 hover:text-blue-800"
+            >
               View all <span aria-hidden="true">→</span>
             </button>
           </div>
+
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
@@ -118,16 +268,34 @@ function Overview({ setPage }) {
                   <th className="px-5 py-3 text-right font-medium">Weight</th>
                 </tr>
               </thead>
+
               <tbody className="divide-y divide-slate-100">
                 {sampleReels.slice(0, 4).map((reel) => (
                   <tr key={reel.id} className="hover:bg-slate-50">
                     <td className="px-5 py-4">
-                      <div className="font-medium text-slate-800">{reel.size}</div>
-                      <div className="mt-1 text-xs text-slate-500">BF {reel.bf} · {reel.gsm} GSM</div>
+                      <div className="font-medium text-slate-800">
+                        {reel.width} inch
+                      </div>
+                      <div className="mt-1 text-xs text-slate-500">
+                        BF {reel.bf} · {reel.gsm} GSM
+                      </div>
                     </td>
-                    <td className="px-5 py-4"><Badge tone={reel.quality === 'GY' ? 'blue' : 'slate'}>{reel.quality === 'GY' ? 'Golden Yellow' : reel.quality}</Badge></td>
-                    <td className="px-5 py-4 text-right tabular-nums text-slate-700">{reel.reels}</td>
-                    <td className="px-5 py-4 text-right font-medium tabular-nums text-slate-900">{reel.weight} kg</td>
+
+                    <td className="px-5 py-4">
+                      <Badge tone={reel.quality === 'GY' ? 'blue' : 'slate'}>
+                        {reel.quality === 'GY'
+                          ? 'Golden Yellow'
+                          : reel.quality}
+                      </Badge>
+                    </td>
+
+                    <td className="px-5 py-4 text-right tabular-nums text-slate-700">
+                      {reel.reels}
+                    </td>
+
+                    <td className="px-5 py-4 text-right font-medium tabular-nums text-slate-900">
+                      {reel.weight} kg
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -138,18 +306,42 @@ function Overview({ setPage }) {
         <section className="rounded-2xl border border-slate-200 bg-white">
           <div className="border-b border-slate-100 p-5">
             <h2 className="font-semibold text-slate-900">Recent activity</h2>
-            <p className="mt-1 text-sm text-slate-500">Examples of inventory events</p>
+            <p className="mt-1 text-sm text-slate-500">
+              Examples of inventory events
+            </p>
           </div>
+
           <div className="divide-y divide-slate-100">
             {activities.map((activity) => (
               <div key={activity.title} className="flex gap-3 p-5">
-                <div className={`mt-0.5 rounded-xl p-2.5 ${activity.type === 'inward' ? 'bg-blue-50 text-blue-700' : activity.type === 'production' ? 'bg-violet-50 text-violet-700' : 'bg-amber-50 text-amber-700'}`}>
-                  {activity.type === 'inward' ? <ArrowDownToLine size={18} /> : activity.type === 'production' ? <Factory size={18} /> : <Trash2 size={18} />}
+                <div
+                  className={`mt-0.5 rounded-xl p-2.5 ${
+                    activity.type === 'inward'
+                      ? 'bg-blue-50 text-blue-700'
+                      : activity.type === 'production'
+                        ? 'bg-violet-50 text-violet-700'
+                        : 'bg-amber-50 text-amber-700'
+                  }`}
+                >
+                  {activity.type === 'inward' ? (
+                    <ArrowDownToLine size={18} />
+                  ) : activity.type === 'production' ? (
+                    <Factory size={18} />
+                  ) : (
+                    <Trash2 size={18} />
+                  )}
                 </div>
+
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-slate-800">{activity.title}</p>
-                  <p className="mt-1 text-xs text-slate-500">{activity.detail}</p>
-                  <p className="mt-2 text-xs text-slate-400">{activity.time}</p>
+                  <p className="text-sm font-medium text-slate-800">
+                    {activity.title}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {activity.detail}
+                  </p>
+                  <p className="mt-2 text-xs text-slate-400">
+                    {activity.time}
+                  </p>
                 </div>
               </div>
             ))}
@@ -159,109 +351,135 @@ function Overview({ setPage }) {
 
       <div className="flex flex-col gap-3 rounded-2xl border border-blue-100 bg-blue-50/70 p-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex gap-3">
-          <ShieldCheck className="mt-0.5 shrink-0 text-blue-700" size={21} />
+          <ShieldCheck
+            className="mt-0.5 shrink-0 text-blue-700"
+            size={21}
+          />
           <div>
-            <h3 className="font-semibold text-slate-900">Development mode</h3>
-            <p className="mt-1 text-sm text-slate-600">All figures are illustrative. No live stock transactions have been made.</p>
+            <h3 className="font-semibold text-slate-900">
+              Development mode
+            </h3>
+            <p className="mt-1 text-sm text-slate-600">
+              All figures are illustrative. No live stock transactions have
+              been made.
+            </p>
           </div>
         </div>
+
         <Badge tone="blue">Sample data only</Badge>
       </div>
     </div>
   )
 }
 
-
-
 function ReelStock() {
-  const [reels, setReels] = useState(sampleReels);
-  const [search, setSearch] = useState('');
-  const [quality, setQuality] = useState('All qualities');
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [formError, setFormError] = useState('');
+  const [reels, setReels] = useState(sampleReels)
+  const [search, setSearch] = useState('')
+  const [quality, setQuality] = useState('All qualities')
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [formError, setFormError] = useState('')
 
   const initialForm = {
-    size: '',
+    width: '',
     bf: '',
     gsm: '',
     quality: 'Natural',
     reelQty: '',
     weight: '',
-  };
+    dateAdded: getLocalDate(),
+  }
 
-  const [form, setForm] = useState(initialForm);
+  const [form, setForm] = useState(initialForm)
 
   const totalReels = reels.reduce(
     (total, item) => total + Number(item.reels || 0),
-    0
-  );
+    0,
+  )
 
   const totalWeight = reels.reduce(
     (total, item) => total + Number(item.weight || 0),
-    0
-  );
+    0,
+  )
 
   const lowStockCount = reels.filter(
-    (item) => Number(item.reels) <= 3
-  ).length;
+    (item) => Number(item.reels) <= 3,
+  ).length
 
   const filteredReels = useMemo(() => {
-    const query = search.trim().toLowerCase();
+    const query = search.trim().toLowerCase()
 
     return reels.filter((item) => {
       const matchesQuality =
-        quality === 'All qualities' || item.quality === quality;
+        quality === 'All qualities' || item.quality === quality
 
       const searchableText = [
         item.id,
-        item.size,
+        item.width,
         item.bf,
         item.gsm,
         item.quality,
         item.quality === 'GY' ? 'Golden Yellow' : '',
+        item.dateAdded,
       ]
         .join(' ')
-        .toLowerCase();
+        .toLowerCase()
 
-      const matchesSearch =
-        !query || searchableText.includes(query);
+      const matchesSearch = !query || searchableText.includes(query)
 
-      return matchesQuality && matchesSearch;
-    });
-  }, [reels, search, quality]);
+      return matchesQuality && matchesSearch
+    })
+  }, [reels, search, quality])
 
   const openAddForm = () => {
-    setForm(initialForm);
-    setFormError('');
-    setShowAddForm(true);
-  };
+    setForm({
+      ...initialForm,
+      dateAdded: getLocalDate(),
+    })
+    setFormError('')
+    setShowAddForm(true)
+  }
 
   const closeAddForm = () => {
-    setShowAddForm(false);
-    setFormError('');
-  };
+    setShowAddForm(false)
+    setFormError('')
+  }
+
+  const updateForm = (field, value) => {
+    setForm((current) => ({
+      ...current,
+      [field]: value,
+    }))
+  }
 
   const handleAddSpecification = (event) => {
-    event.preventDefault();
-    setFormError('');
+    event.preventDefault()
+    setFormError('')
 
-    const size = form.size.trim();
-    const bf = Number(form.bf);
-    const gsm = Number(form.gsm);
-    const reelQty = Number(form.reelQty);
-    const weight = Number(form.weight);
+    const width = Number(form.width)
+    const bf = Number(form.bf)
+    const gsm = Number(form.gsm)
+    const reelQty = Number(form.reelQty)
+    const weight = Number(form.weight)
 
-    if (!size || !form.bf || !form.gsm ||
-        !form.reelQty || !form.weight) {
-      setFormError('Please fill in all fields.');
-      return;
+    if (
+      !form.width ||
+      !form.bf ||
+      !form.gsm ||
+      !form.reelQty ||
+      !form.weight ||
+      !form.dateAdded
+    ) {
+      setFormError('Please fill in all fields.')
+      return
     }
 
     if (
+      !Number.isFinite(width) ||
       !Number.isFinite(bf) ||
       !Number.isFinite(gsm) ||
       !Number.isFinite(reelQty) ||
       !Number.isFinite(weight) ||
+      width <= 0 ||
       bf <= 0 ||
       gsm <= 0 ||
       reelQty <= 0 ||
@@ -269,74 +487,75 @@ function ReelStock() {
       !Number.isInteger(reelQty)
     ) {
       setFormError(
-        'Enter valid positive values. Reel quantity must be a whole number.'
-      );
-      return;
+        'Enter valid positive values. Reel quantity must be a whole number.',
+      )
+      return
+    }
+
+    if (form.dateAdded > getLocalDate()) {
+      setFormError('Date Added cannot be in the future.')
+      return
     }
 
     const duplicate = reels.some(
       (item) =>
-        item.size.trim().toLowerCase() === size.toLowerCase() &&
+        Number(item.width) === width &&
         Number(item.bf) === bf &&
         Number(item.gsm) === gsm &&
-        item.quality === form.quality
-    );
+        item.quality === form.quality,
+    )
 
     if (duplicate) {
       setFormError(
-        'This specification already exists. Natural and GY are treated separately.'
-      );
-      return;
+        'This specification already exists. Natural and GY are treated separately.',
+      )
+      return
     }
 
     const nextNumber =
       reels.reduce((max, item) => {
-        const match = String(item.id).match(/(\d+)$/);
-        return match ? Math.max(max, Number(match[1])) : max;
-      }, 0) + 1;
+        const match = String(item.id).match(/(\d+)$/)
+        return match ? Math.max(max, Number(match[1])) : max
+      }, 0) + 1
 
     const newReel = {
-      id: `SPEC-${String(nextNumber).padStart(3, '0')}`,
-      size,
+      id: `RL-${String(nextNumber).padStart(3, '0')}`,
+      width,
       bf,
       gsm,
       quality: form.quality,
       reels: reelQty,
       weight,
-      status: reelQty <= 3 ? 'Low stock' : 'In stock',
-    };
+      dateAdded: form.dateAdded,
+    }
 
-    setReels((current) => [...current, newReel]);
-    setSearch('');
-    setQuality('All qualities');
-    setShowAddForm(false);
-    setForm(initialForm);
-    setFormError('');
-  };
-
-  const updateForm = (field, value) => {
-    setForm((current) => ({
-      ...current,
-      [field]: value,
-    }));
-  };
+    setReels((current) => [...current, newReel])
+    setSearch('')
+    setQuality('All qualities')
+    setShowAddForm(false)
+    setForm({
+      ...initialForm,
+      dateAdded: getLocalDate(),
+    })
+    setFormError('')
+  }
 
   const qualityFilters = [
     { label: 'All', value: 'All qualities' },
     { label: 'Natural', value: 'Natural' },
     { label: 'Golden Yellow (GY)', value: 'GY' },
-  ];
+  ]
 
   return (
     <div className="space-y-6">
-      {/* Page heading */}
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">
             Reel Stock
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Manage paper specifications, reel quantities and available weight.
+            Manage reel widths, paper specifications, quantities and available
+            weight.
           </p>
         </div>
 
@@ -350,25 +569,18 @@ function ReelStock() {
         </button>
       </div>
 
-      {/* Demo mode notice */}
       <div className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
-        <ShieldCheck
-          size={20}
-          className="mt-0.5 shrink-0 text-amber-700"
-        />
+        <ShieldCheck size={20} className="mt-0.5 shrink-0 text-amber-700" />
         <div>
-          <p className="text-sm font-semibold text-amber-900">
-            DEMO MODE
-          </p>
+          <p className="text-sm font-semibold text-amber-900">DEMO MODE</p>
           <p className="mt-1 text-sm text-amber-800">
-            Changes are held in browser memory only. They are not saved
-            to Supabase and will reset when the page reloads.
+            Changes are held in browser memory only. They are not saved to
+            Supabase and will reset when the page reloads.
           </p>
         </div>
       </div>
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
           <p className="text-sm font-medium text-slate-500">
             Total specifications
@@ -401,28 +613,37 @@ function ReelStock() {
             {totalWeight.toLocaleString('en-IN', {
               maximumFractionDigits: 2,
             })}{' '}
-            <span className="text-base font-medium text-slate-500">
-              kg
-            </span>
+            <span className="text-base font-medium text-slate-500">kg</span>
           </p>
           <p className="mt-1 text-xs text-slate-500">
             Combined recorded weight
           </p>
         </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <p className="text-sm font-medium text-slate-500">
+            Low-stock specifications
+          </p>
+          <p className="mt-2 text-2xl font-bold text-amber-700">
+            {lowStockCount}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            Three reels or fewer
+          </p>
+        </div>
       </div>
 
-      {/* Stock table and filters */}
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <div className="flex flex-col gap-1 border-b border-slate-100 p-5">
           <h2 className="text-base font-semibold text-slate-900">
-            Paper specifications
+            Reel specifications
           </h2>
           <p className="text-sm text-slate-500">
-            Search and filter your paper stock by specification and quality.
+            Search and filter your reel stock by width, BF, GSM, quality or
+            date added.
           </p>
         </div>
 
-        {/* Search and filters */}
         <div className="space-y-3 border-b border-slate-100 p-4">
           <div className="flex flex-col gap-3 sm:flex-row">
             <div className="relative flex-1">
@@ -434,8 +655,8 @@ function ReelStock() {
                 type="text"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search code, size, BF, GSM or quality..."
-                aria-label="Search paper specifications"
+                placeholder="Search code, width, BF, GSM, quality or date..."
+                aria-label="Search reel specifications"
                 className="w-full rounded-xl border border-slate-200 py-2.5 pl-10 pr-3 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
               />
             </div>
@@ -477,8 +698,8 @@ function ReelStock() {
               <button
                 type="button"
                 onClick={() => {
-                  setSearch('');
-                  setQuality('All qualities');
+                  setSearch('')
+                  setQuality('All qualities')
                 }}
                 className="ml-auto text-xs font-medium text-blue-700 hover:text-blue-900"
               >
@@ -488,47 +709,38 @@ function ReelStock() {
           </div>
         </div>
 
-        {/* Table */}
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left text-sm">
+          <table className="w-full min-w-[950px] text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="px-5 py-3 font-semibold">Item code</th>
-                <th className="px-5 py-3 font-semibold">Size</th>
+                <th className="px-5 py-3 font-semibold">Reel width</th>
                 <th className="px-5 py-3 font-semibold">BF</th>
                 <th className="px-5 py-3 font-semibold">GSM</th>
                 <th className="px-5 py-3 font-semibold">Quality</th>
-                <th className="px-5 py-3 text-right font-semibold">
-                  Reels
-                </th>
+                <th className="px-5 py-3 text-right font-semibold">Reels</th>
                 <th className="px-5 py-3 text-right font-semibold">
                   Weight (kg)
                 </th>
+                <th className="px-5 py-3 font-semibold">Date added</th>
                 <th className="px-5 py-3 font-semibold">Status</th>
               </tr>
             </thead>
 
             <tbody className="divide-y divide-slate-100">
               {filteredReels.map((item) => (
-                <tr
-                  key={item.id}
-                  className="transition hover:bg-slate-50"
-                >
+                <tr key={item.id} className="transition hover:bg-slate-50">
                   <td className="whitespace-nowrap px-5 py-4 font-medium text-slate-900">
                     {item.id}
                   </td>
 
                   <td className="whitespace-nowrap px-5 py-4 text-slate-700">
-                    {item.size}
+                    {item.width} inch
                   </td>
 
-                  <td className="px-5 py-4 text-slate-700">
-                    {item.bf}
-                  </td>
+                  <td className="px-5 py-4 text-slate-700">{item.bf}</td>
 
-                  <td className="px-5 py-4 text-slate-700">
-                    {item.gsm}
-                  </td>
+                  <td className="px-5 py-4 text-slate-700">{item.gsm}</td>
 
                   <td className="px-5 py-4">
                     <span
@@ -554,6 +766,13 @@ function ReelStock() {
                     })}
                   </td>
 
+                  <td className="whitespace-nowrap px-5 py-4 text-slate-700">
+                    <span className="inline-flex items-center gap-2">
+                      <CalendarDays size={14} className="text-slate-400" />
+                      {formatDate(item.dateAdded)}
+                    </span>
+                  </td>
+
                   <td className="px-5 py-4">
                     <span
                       className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
@@ -562,9 +781,7 @@ function ReelStock() {
                           : 'bg-emerald-100 text-emerald-800'
                       }`}
                     >
-                      {Number(item.reels) <= 3
-                        ? 'Low stock'
-                        : 'In stock'}
+                      {Number(item.reels) <= 3 ? 'Low stock' : 'In stock'}
                     </span>
                   </td>
                 </tr>
@@ -572,10 +789,7 @@ function ReelStock() {
 
               {filteredReels.length === 0 && (
                 <tr>
-                  <td
-                    colSpan={8}
-                    className="px-5 py-12 text-center"
-                  >
+                  <td colSpan={9} className="px-5 py-12 text-center">
                     <p className="font-medium text-slate-700">
                       No matching specifications found
                     </p>
@@ -585,8 +799,8 @@ function ReelStock() {
                     <button
                       type="button"
                       onClick={() => {
-                        setSearch('');
-                        setQuality('All qualities');
+                        setSearch('')
+                        setQuality('All qualities')
                       }}
                       className="mt-3 text-sm font-semibold text-blue-700 hover:text-blue-900"
                     >
@@ -599,24 +813,20 @@ function ReelStock() {
           </table>
         </div>
 
-        {/* Table footer */}
         <div className="flex flex-col gap-1 border-t border-slate-100 px-5 py-3 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
           <span>
             Showing {filteredReels.length} of {reels.length} specifications
           </span>
-          <span>
-            Low-stock threshold: 3 reels or fewer (demo rule)
-          </span>
+          <span>Low-stock threshold: 3 reels or fewer (demo rule)</span>
         </div>
       </div>
 
-      {/* Add specification modal */}
       {showAddForm && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/40 p-4"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) {
-              closeAddForm();
+              closeAddForm()
             }
           }}
         >
@@ -632,10 +842,10 @@ function ReelStock() {
                   id="add-specification-title"
                   className="text-lg font-semibold text-slate-900"
                 >
-                  Add paper specification
+                  Add reel specification
                 </h2>
                 <p className="mt-1 text-sm text-slate-500">
-                  Add a demo specification and its initial quantity.
+                  Enter the reel details and its initial stock.
                 </p>
               </div>
 
@@ -649,20 +859,27 @@ function ReelStock() {
               </button>
             </div>
 
-            <form onSubmit={handleAddSpecification} className="space-y-4 p-5">
+            <form
+              onSubmit={handleAddSpecification}
+              className="space-y-4 p-5"
+            >
               <div>
                 <label
-                  htmlFor="paper-size"
+                  htmlFor="reel-width"
                   className="mb-1.5 block text-sm font-medium text-slate-700"
                 >
-                  Paper size
+                  Reel width (inches)
                 </label>
                 <input
-                  id="paper-size"
-                  type="text"
-                  value={form.size}
-                  onChange={(event) => updateForm('size', event.target.value)}
-                  placeholder="e.g. 18 × 24"
+                  id="reel-width"
+                  type="number"
+                  min="0.01"
+                  step="any"
+                  value={form.width}
+                  onChange={(event) =>
+                    updateForm('width', event.target.value)
+                  }
+                  placeholder="e.g. 36"
                   required
                   className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                 />
@@ -776,6 +993,29 @@ function ReelStock() {
                 </div>
               </div>
 
+              <div>
+                <label
+                  htmlFor="date-added"
+                  className="mb-1.5 block text-sm font-medium text-slate-700"
+                >
+                  Date Added
+                </label>
+                <input
+                  id="date-added"
+                  type="date"
+                  value={form.dateAdded}
+                  max={getLocalDate()}
+                  onChange={(event) =>
+                    updateForm('dateAdded', event.target.value)
+                  }
+                  required
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                />
+                <p className="mt-1.5 text-xs text-slate-500">
+                  Enter the date the reels were physically received.
+                </p>
+              </div>
+
               {formError && (
                 <p
                   role="alert"
@@ -806,10 +1046,8 @@ function ReelStock() {
         </div>
       )}
     </div>
-  );
+  )
 }
-
-
 
 export default function App() {
   const [page, setPage] = useState('Overview')
@@ -817,7 +1055,8 @@ export default function App() {
 
   const pageDescriptions = {
     Overview: 'A quick view of your inventory and operations.',
-    'Reel Stock': 'Track paper specifications, reel counts and remaining weight.',
+    'Reel Stock':
+      'Track reel widths, paper specifications, reel counts and remaining weight.',
     'Stock Inward': 'Record paper received from suppliers.',
     Production: 'Track production runs and paper consumption.',
     'Finished Goods': 'Monitor finished box quantities.',
@@ -832,45 +1071,76 @@ export default function App() {
 
   function SidebarContent() {
     let currentSection = ''
+
     return (
       <>
         <div className="flex h-[76px] items-center gap-3 border-b border-slate-800 px-5">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white">
             <Boxes size={22} />
           </div>
+
           <div>
-            <p className="font-semibold tracking-tight text-white">SK Packaging</p>
-            <p className="mt-0.5 text-xs text-slate-400">Inventory management</p>
+            <p className="font-semibold tracking-tight text-white">
+              SK Packaging
+            </p>
+            <p className="mt-0.5 text-xs text-slate-400">
+              Inventory management
+            </p>
           </div>
         </div>
+
         <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-5">
           {navigation.map((item) => {
             const Icon = item.icon
             const showSection = currentSection !== item.section
             currentSection = item.section
+
             return (
               <div key={item.label}>
-                {showSection && <p className="mb-2 px-3 text-[10px] font-semibold tracking-[0.16em] text-slate-500">{item.section}</p>}
-                <button onClick={() => selectPage(item.label)} className={`mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition ${page === item.label ? 'bg-blue-600 font-medium text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+                {showSection && (
+                  <p className="mb-2 px-3 text-[10px] font-semibold tracking-[0.16em] text-slate-500">
+                    {item.section}
+                  </p>
+                )}
+
+                <button
+                  onClick={() => selectPage(item.label)}
+                  className={`mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition ${
+                    page === item.label
+                      ? 'bg-blue-600 font-medium text-white'
+                      : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  }`}
+                >
                   <Icon size={18} />
                   <span>{item.label}</span>
-                  {page === item.label && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-white" />}
+
+                  {page === item.label && (
+                    <span className="ml-auto h-1.5 w-1.5 rounded-full bg-white" />
+                  )}
                 </button>
               </div>
             )
           })}
         </nav>
+
         <div className="border-t border-slate-800 p-3">
           <div className="mb-3 flex items-center gap-3 rounded-xl px-3 py-3 text-slate-300">
             <CircleHelp size={18} />
             <span className="text-sm">Help & support</span>
           </div>
+
           <div className="flex items-center gap-3 rounded-xl bg-slate-800/80 p-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-800">SK</div>
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-800">
+              SK
+            </div>
+
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-white">Development user</p>
+              <p className="truncate text-sm font-medium text-white">
+                Development user
+              </p>
               <p className="text-xs text-slate-400">Sample workspace</p>
             </div>
+
             <Settings size={16} className="text-slate-400" />
           </div>
         </div>
@@ -882,9 +1152,21 @@ export default function App() {
     <div className="min-h-screen bg-slate-50">
       {mobileNavOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
-          <button aria-label="Close navigation overlay" onClick={() => setMobileNavOpen(false)} className="absolute inset-0 bg-slate-950/50" />
+          <button
+            aria-label="Close navigation overlay"
+            onClick={() => setMobileNavOpen(false)}
+            className="absolute inset-0 bg-slate-950/50"
+          />
+
           <aside className="relative flex h-full w-[280px] flex-col bg-slate-950">
-            <button aria-label="Close navigation" onClick={() => setMobileNavOpen(false)} className="absolute right-3 top-6 z-10 rounded-lg p-2 text-slate-300 hover:bg-slate-800"><X size={18} /></button>
+            <button
+              aria-label="Close navigation"
+              onClick={() => setMobileNavOpen(false)}
+              className="absolute right-3 top-6 z-10 rounded-lg p-2 text-slate-300 hover:bg-slate-800"
+            >
+              <X size={18} />
+            </button>
+
             <SidebarContent />
           </aside>
         </div>
@@ -897,24 +1179,46 @@ export default function App() {
       <div className="min-h-screen lg:pl-[250px]">
         <header className="sticky top-0 z-20 flex h-[76px] items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur sm:px-7">
           <div className="flex min-w-0 items-center gap-3">
-            <button onClick={() => setMobileNavOpen(true)} aria-label="Open navigation" className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 lg:hidden"><Menu size={20} /></button>
+            <button
+              onClick={() => setMobileNavOpen(true)}
+              aria-label="Open navigation"
+              className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 lg:hidden"
+            >
+              <Menu size={20} />
+            </button>
+
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h1 className="truncate text-lg font-semibold tracking-tight text-slate-900">{page}</h1>
+                <h1 className="truncate text-lg font-semibold tracking-tight text-slate-900">
+                  {page}
+                </h1>
                 <Badge tone="blue">DEMO</Badge>
               </div>
-              <p className="hidden truncate text-xs text-slate-500 sm:block">SK Packaging / {page}</p>
+
+              <p className="hidden truncate text-xs text-slate-500 sm:block">
+                SK Packaging / {page}
+              </p>
             </div>
           </div>
+
           <div className="flex items-center gap-2 sm:gap-4">
             <div className="hidden text-right sm:block">
-              <p className="text-xs font-medium text-slate-700">Development workspace</p>
-              <p className="mt-0.5 text-[11px] text-slate-400">Sample data only</p>
+              <p className="text-xs font-medium text-slate-700">
+                Development workspace
+              </p>
+              <p className="mt-0.5 text-[11px] text-slate-400">
+                Sample data only
+              </p>
             </div>
-            <button aria-label="Notifications" className="relative rounded-xl border border-slate-200 p-2.5 text-slate-600 hover:bg-slate-50">
+
+            <button
+              aria-label="Notifications"
+              className="relative rounded-xl border border-slate-200 p-2.5 text-slate-600 hover:bg-slate-50"
+            >
               <Bell size={18} />
               <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-blue-600" />
             </button>
+
             <button className="hidden items-center gap-1 rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-600 sm:flex">
               Demo <ChevronDown size={15} />
             </button>
@@ -924,10 +1228,19 @@ export default function App() {
         <main className="mx-auto max-w-[1600px] space-y-6 p-4 sm:p-7">
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
-              <p className="text-sm font-medium text-blue-700">SK PACKAGING INVENTORY</p>
-              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">{page === 'Overview' ? 'Good morning' : page}</h2>
-              <p className="mt-2 text-sm text-slate-500">{pageDescriptions[page]}</p>
+              <p className="text-sm font-medium text-blue-700">
+                SK PACKAGING INVENTORY
+              </p>
+
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
+                {page === 'Overview' ? 'Good morning' : page}
+              </h2>
+
+              <p className="mt-2 text-sm text-slate-500">
+                {pageDescriptions[page]}
+              </p>
             </div>
+
             <div className="flex items-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 sm:self-auto">
               <span className="h-2 w-2 rounded-full bg-amber-400" />
               Development mode
@@ -941,10 +1254,28 @@ export default function App() {
           ) : (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-500">
-                {page === 'Stock Inward' ? <ArrowDownToLine size={25} /> : page === 'Production' ? <Factory size={25} /> : page === 'Finished Goods' ? <Package size={25} /> : page === 'Waste Register' ? <Trash2 size={25} /> : <ClipboardList size={25} />}
+                {page === 'Stock Inward' ? (
+                  <ArrowDownToLine size={25} />
+                ) : page === 'Production' ? (
+                  <Factory size={25} />
+                ) : page === 'Finished Goods' ? (
+                  <Package size={25} />
+                ) : page === 'Waste Register' ? (
+                  <Trash2 size={25} />
+                ) : (
+                  <ClipboardList size={25} />
+                )}
               </div>
-              <h3 className="mt-4 text-lg font-semibold text-slate-900">{page} module</h3>
-              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">This screen is planned for a later development stage. No live inventory actions are available here yet.</p>
+
+              <h3 className="mt-4 text-lg font-semibold text-slate-900">
+                {page} module
+              </h3>
+
+              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
+                This screen is planned for a later development stage. No live
+                inventory actions are available here yet.
+              </p>
+
               <Badge tone="blue">Not implemented yet</Badge>
             </div>
           )}
