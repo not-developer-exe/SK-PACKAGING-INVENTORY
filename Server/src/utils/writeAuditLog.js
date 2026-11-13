@@ -13,8 +13,14 @@ async function writeAuditLog(req, event, session) {
     metadata: event.metadata || {}
   };
   const options = session ? { session } : {};
-  const [entry] = await AuditLog.create([payload], options);
-  return entry;
+  try {
+    const [entry] = await AuditLog.create([payload], options);
+    return entry;
+  } catch (error) {
+    if (session) throw error;
+    console.error('[AUDIT] Non-transactional event could not be recorded:', error.message);
+    return null;
+  }
 }
 
 module.exports = writeAuditLog;
