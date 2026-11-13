@@ -165,21 +165,37 @@ exports.addTransaction = async (req, res) => {
 };
 
 exports.deleteTransaction = async (req, res) => {
+  const session = await mongoose.startSession();
   try {
-    const party = await Party.findById(req.params.partyId);
-    if (!party) return res.status(404).json({ message: 'Party not found' });
-    const txn = party.ledger.id(req.params.txnId);
-    if (!txn) return res.status(404).json({ message: 'Transaction not found' });
-    if (txn.type === 'Opening Balance') return res.status(409).json({ message: 'Opening balance entries cannot be deleted.' });
+    let updatedParty;
+    await session.withTransaction(async () => {
+      const party = await Party.findById(req.params.partyId).session(session);
+      if (!party) throw Object.assign(new Error('Party not found.'), { statusCode: 404 });
+      const txn = party.ledger.id(req.params.txnId);
+      if (!txn) throw Object.assign(new Error('Transaction not found.'), { statusCode: 404 });
+      if (txn.type === 'Opening Balance') {
+        throw Object.assign(new Error('Opening balance entries cannot be deleted.'), { statusCode: 409 });
+      }
 
-    const removedEntry = { type: txn.type, ref: txn.ref, debit: txn.debit, credit: txn.credit };
-    party.balance += (txn.credit || 0) - (txn.debit || 0);
-    party.ledger.pull({ _id: req.params.txnId });
-    await party.save();
-    await auditPartyChange(req, 'party.transaction_deleted', party, 'Ledger entry deleted for ' + party.name, { removedEntry, resultingBalance: party.balance });
-    return res.json(party);
+      const removedEntry = { type: txn.type, ref: txn.ref, debit: txn.debit, credit: txn.credit };
+      party.balance += (txn.credit || 0) - (txn.debit || 0);
+      party.ledger.pull({ _id: req.params.txnId });
+      await party.save({ session });
+      await writeAuditLog(req, {
+        action: 'party.transaction_deleted',
+        entityType: 'Party',
+        entityId: party._id,
+        entityLabel: party.name,
+        summary: 'Ledger entry deleted for ' + party.name,
+        metadata: { removedEntry, resultingBalance: party.balance }
+      }, session);
+      updatedParty = party;
+    });
+    return res.json(updatedParty);
   } catch (error) {
     console.error('[PARTIES] Ledger deletion failed:', error.message);
-    return res.status(500).json({ message: 'Unable to delete ledger entry.' });
+    return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Unable to delete ledger entry.' });
+  } finally {
+    await session.endSession();
   }
 };
