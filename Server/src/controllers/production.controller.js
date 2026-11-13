@@ -64,6 +64,7 @@ exports.recordProduction = async (req, res) => {
       await StockMovement.create([{
         movementType: 'production_issue',
         referenceId: reel._id,
+        referenceModel: 'ReelUnit',
         itemType: 'reel',
         specificationSummary: `Reel ${reel.reelCode} consumed for ${runNumber}`,
         quantityChange: newWeight <= 2 ? -1 : 0,
@@ -93,7 +94,7 @@ exports.recordProduction = async (req, res) => {
 
     const productionRunId = run[0]._id;
 
-    for (const output of outputSheets) {
+    for (const output of outputs) {
       // ADDED ordered: true
       const sheet = await CorrugatedSheet.create([{
         productionRunId,
@@ -109,6 +110,7 @@ exports.recordProduction = async (req, res) => {
       await StockMovement.create([{
         movementType: 'sheet_cutting',
         referenceId: sheet[0]._id,
+        referenceModel: 'CorrugatedSheet',
         itemType: 'sheet',
         specificationSummary: `${output.ply}Ply | ${output.lengthInches}"x${output.widthInches}"`,
         quantityChange: output.sheetCount,
@@ -119,7 +121,6 @@ exports.recordProduction = async (req, res) => {
     }
 
     await session.commitTransaction();
-    session.endSession();
 
     res.status(201).json({ message: 'Production run recorded successfully', runNumber, wasteGeneratedKg });
   } catch (error) {
