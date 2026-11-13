@@ -13,6 +13,7 @@ export default function ProductionPage() {
   // Form State
   const [shift, setShift] = useState('Day');
   const [operatorName, setOperatorName] = useState('');
+  const [recoverableWasteKg, setRecoverableWasteKg] = useState('');
   
   const [inputReels, setInputReels] = useState([
     { reelId: '', weightConsumedKg: '' }
@@ -41,15 +42,21 @@ export default function ProductionPage() {
   // Calculations
   const totalInputWeight = inputReels.reduce((sum, r) => sum + Number(r.weightConsumedKg || 0), 0);
   const totalOutputWeight = outputSheets.reduce((sum, s) => sum + Number(s.totalWeightKg || 0), 0);
-  const calculatedWaste = totalInputWeight - totalOutputWeight;
+  const massDifference = totalInputWeight - totalOutputWeight;
+  const measuredScrap = Number(recoverableWasteKg || 0);
+  const calculatedProcessLoss = massDifference - measuredScrap;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
 
-    if (calculatedWaste < 0) {
+    if (massDifference < 0) {
       setError('Output weight cannot be greater than input weight. Check your measurements.');
+      return;
+    }
+    if (!Number.isFinite(measuredScrap) || measuredScrap < 0 || measuredScrap > massDifference) {
+      setError('Measured recoverable scrap must be non-negative and cannot exceed the input-output weight difference.');
       return;
     }
 
@@ -58,6 +65,7 @@ export default function ProductionPage() {
       const res = await productionService.recordRun({
         shift,
         operatorName,
+        recoverableWasteKg: measuredScrap,
         inputReels: inputReels.map(r => ({ ...r, weightConsumedKg: Number(r.weightConsumedKg) })),
         outputSheets: outputSheets.map(s => ({
           ...s,
@@ -69,10 +77,11 @@ export default function ProductionPage() {
         }))
       });
 
-      setSuccess(`Success! ${res.runNumber} recorded. Waste generated: ${res.wasteGeneratedKg}kg`);
+      setSuccess(`Success! ${res.runNumber} recorded. Verified scrap: ${Number(res.recoverableWasteKg || 0).toFixed(2)}kg; process loss: ${Number(res.processLossKg || 0).toFixed(2)}kg.`);
       
       // Reset form
       setOperatorName('');
+      setRecoverableWasteKg('');
       setInputReels([{ reelId: '', weightConsumedKg: '' }]);
       setOutputSheets([{ ply: 3, lengthInches: '', widthInches: '', sheetCount: '', totalWeightKg: '' }]);
       fetchReels(); // Refresh physical reels drop-down
@@ -212,6 +221,26 @@ export default function ProductionPage() {
           </div>
         </div>
 
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-5">
+          <label className="mb-2 block text-sm font-semibold text-amber-900">Measured Recoverable Scrap (kg)</label>
+          <input
+            type="number"
+            min="0"
+            max={Math.max(0, massDifference)}
+            step="0.001"
+            value={recoverableWasteKg}
+            onChange={e => setRecoverableWasteKg(e.target.value)}
+            placeholder="Enter only scrap physically weighed and recoverable"
+            className="w-full max-w-sm rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm outline-none focus:border-amber-400"
+          />
+          <p className="mt-2 text-xs text-amber-800">
+            Do not enter the full input-output difference here. Moisture loss, dust, and other unaccounted process loss are tracked separately and are not available for scrap sale.
+          </p>
+          <p className="mt-1 text-sm font-medium text-slate-700">
+            Remaining process loss / variance: {Number.isFinite(calculatedProcessLoss) ? calculatedProcessLoss.toFixed(2) : '—'} kg
+          </p>
+        </div>
+
         {/* Footer Summary & Submit */}
         <div className="flex flex-col sm:flex-row items-center justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex gap-6 mb-4 sm:mb-0">
@@ -224,10 +253,12 @@ export default function ProductionPage() {
               <p className="text-lg font-bold text-blue-600">{totalOutputWeight.toFixed(2)} kg</p>
             </div>
             <div className="text-center border-l border-slate-200 pl-6">
-              <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Machine Waste</p>
-              <p className={`text-lg font-bold ${calculatedWaste < 0 ? 'text-red-600' : 'text-slate-800'}`}>
-                {calculatedWaste.toFixed(2)} kg
-              </p>
+              <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Verified Scrap</p>
+              <p className="text-lg font-bold text-amber-700">{measuredScrap.toFixed(2)} kg</p>
+            </div>
+            <div className="text-center border-l border-slate-200 pl-6">
+              <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Process Loss</p>
+              <p className="text-lg font-bold text-slate-800">{calculatedProcessLoss.toFixed(2)} kg</p>
             </div>
           </div>
 
