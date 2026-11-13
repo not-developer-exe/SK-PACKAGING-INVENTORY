@@ -1,45 +1,32 @@
-const mongoose = require("mongoose");
-const User = require("../models/User.model");
+const mongoose = require('mongoose');
+const User = require('../models/User.model');
 
 const connectDB = async () => {
-  try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI);
-    console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
+  if (!process.env.MONGODB_URI) throw new Error('MONGODB_URI is required');
 
-    // Ensure default Admin exists
-    const adminEmail = "admin@skpackaging.com";
-    const existingAdmin = await User.findOne({ email: adminEmail });
+  const conn = await mongoose.connect(process.env.MONGODB_URI, {
+    serverSelectionTimeoutMS: 10000
+  });
+  console.info(`MongoDB connected: ${conn.connection.host}`);
 
+  // Optional one-time bootstrap. Never ship a default credential.
+  const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  const password = process.env.ADMIN_PASSWORD;
+  if (email && password) {
+    const existingAdmin = await User.findOne({ email });
     if (!existingAdmin) {
       await User.create({
-        name: "Stark",
-        email: adminEmail,
-        password: "password123",
-        role: "admin",
-        isActive: true,
+        name: process.env.ADMIN_NAME?.trim() || 'System Administrator',
+        email,
+        password,
+        role: 'admin',
+        isActive: true
       });
-      console.log(`🔐 Default Admin created: ${adminEmail} / password123`);
-    } else {
-      console.log(`🔐 Admin account verified in DB: ${adminEmail}`);
+      console.info('Initial administrator account created from environment configuration.');
     }
-  } catch (error) {
-    console.error(`Error connecting to MongoDB: ${error.message}`);
-    process.exit(1);
   }
 
-  // Ensure a default Supplier exists
-  const Party = require("../models/Party.model");
-  const defaultSupplier = await Party.findOne({ name: "Shree Paper Mills" });
-  if (!defaultSupplier) {
-    await Party.create({
-      name: "Shree Paper Mills",
-      partyType: "supplier",
-      gstin: "23AABCS1429B1Z8",
-      phone: "9827098270",
-      address: "Industrial Area, Gwalior (M.P.)",
-    });
-    console.log("🏭 Default Supplier created: Shree Paper Mills");
-  }
+  return conn;
 };
 
 module.exports = connectDB;

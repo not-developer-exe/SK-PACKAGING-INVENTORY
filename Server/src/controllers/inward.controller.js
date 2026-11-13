@@ -14,7 +14,7 @@ exports.createDraftReceipt = async (req, res) => {
     }
 
     const supplier = await Party.findById(supplierId);
-    if (!supplier || !['supplier', 'both'].includes(supplier.partyType)) {
+    if (!supplier || !['Supplier', 'Both'].includes(supplier.type)) {
       return res.status(400).json({ message: 'Invalid or non-supplier party selected.' });
     }
 
@@ -105,6 +105,7 @@ exports.postReceipt = async (req, res) => {
       await StockMovement.create([{
         movementType: 'inward_receipt',
         referenceId: receipt._id,
+        referenceModel: 'InwardReceipt',
         itemType: 'reel',
         specificationSummary: `${line.reelWidthInches}" | BF ${line.bf} | ${line.gsm} GSM | ${line.quality}`,
         quantityChange: qty,

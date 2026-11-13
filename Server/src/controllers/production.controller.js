@@ -5,15 +5,37 @@ const ReelUnit = require('../models/ReelUnit.model');
 const StockMovement = require('../models/StockMovement.model');
 
 exports.recordProduction = async (req, res) => {
+  const { shift, operatorName, inputReels, outputSheets } = req.body || {};
+
+  if (!Array.isArray(inputReels) || inputReels.length === 0 || !Array.isArray(outputSheets) || outputSheets.length === 0) {
+    return res.status(400).json({ message: 'Both input reels and output sheets are required.' });
+  }
+
+  const inputs = inputReels.map((item) => ({ ...item, weightConsumedKg: Number(item.weightConsumedKg) }));
+  const outputs = outputSheets.map((item) => ({
+    ...item,
+    totalWeightKg: Number(item.totalWeightKg),
+    sheetCount: Number(item.sheetCount),
+    lengthInches: Number(item.lengthInches),
+    widthInches: Number(item.widthInches)
+  }));
+
+  if (inputs.some((item) => !mongoose.isValidObjectId(item.reelId) || !Number.isFinite(item.weightConsumedKg) || item.weightConsumedKg <= 0)) {
+    return res.status(400).json({ message: 'Every input reel must have a valid ID and a positive consumed weight.' });
+  }
+  if (outputs.some((item) => !Number.isFinite(item.totalWeightKg) || item.totalWeightKg <= 0 || !Number.isInteger(item.sheetCount) || item.sheetCount <= 0 || !Number.isFinite(item.lengthInches) || item.lengthInches <= 0 || !Number.isFinite(item.widthInches) || item.widthInches <= 0)) {
+    return res.status(400).json({ message: 'Every output line must have positive dimensions, weight and a whole-number sheet count.' });
+  }
+  const totalInputWeight = inputs.reduce((sum, item) => sum + item.weightConsumedKg, 0);
+  const totalOutputWeight = outputs.reduce((sum, item) => sum + item.totalWeightKg, 0);
+  if (totalOutputWeight > totalInputWeight) {
+    return res.status(400).json({ message: 'Output sheet weight cannot exceed total input reel weight.' });
+  }
+
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
-    const { shift, operatorName, inputReels, outputSheets } = req.body;
-
-    if (!inputReels?.length || !outputSheets?.length) {
-      return res.status(400).json({ message: 'Both input reels and output sheets are required.' });
-    }
 
     const count = await ProductionRun.countDocuments();
     const runNumber = `PR-${String(count + 1).padStart(5, '0')}`;
@@ -21,8 +43,8 @@ exports.recordProduction = async (req, res) => {
     let totalInputWeightKg = 0;
     let totalOutputWeightKg = 0;
 
-    for (const input of inputReels) {
-      const consumedWeight = parseFloat(input.weightConsumedKg);
+    for (const input of inputs) {
+      const consumedWeight = input.weightConsumedKg;
       totalInputWeightKg += consumedWeight;
 
       const reel = await ReelUnit.findById(input.reelId).session(session);
@@ -42,6 +64,7 @@ exports.recordProduction = async (req, res) => {
       await StockMovement.create([{
         movementType: 'production_issue',
         referenceId: reel._id,
+        referenceModel: 'ReelUnit',
         itemType: 'reel',
         specificationSummary: `Reel ${reel.reelCode} consumed for ${runNumber}`,
         quantityChange: newWeight <= 2 ? -1 : 0,
@@ -51,8 +74,8 @@ exports.recordProduction = async (req, res) => {
       }], { session, ordered: true });
     }
 
-    for (const output of outputSheets) {
-      totalOutputWeightKg += parseFloat(output.totalWeightKg);
+    for (const output of outputs) {
+      totalOutputWeightKg += output.totalWeightKg;
     }
     const wasteGeneratedKg = totalInputWeightKg - totalOutputWeightKg;
 
@@ -61,7 +84,7 @@ exports.recordProduction = async (req, res) => {
       runNumber,
       shift,
       operatorName,
-      inputReels,
+      inputReels: inputs,
       totalInputWeightKg,
       totalOutputWeightKg,
       wasteGeneratedKg,
@@ -71,7 +94,7 @@ exports.recordProduction = async (req, res) => {
 
     const productionRunId = run[0]._id;
 
-    for (const output of outputSheets) {
+    for (const output of outputs) {
       // ADDED ordered: true
       const sheet = await CorrugatedSheet.create([{
         productionRunId,
@@ -87,6 +110,7 @@ exports.recordProduction = async (req, res) => {
       await StockMovement.create([{
         movementType: 'sheet_cutting',
         referenceId: sheet[0]._id,
+        referenceModel: 'CorrugatedSheet',
         itemType: 'sheet',
         specificationSummary: `${output.ply}Ply | ${output.lengthInches}"x${output.widthInches}"`,
         quantityChange: output.sheetCount,
@@ -97,13 +121,13 @@ exports.recordProduction = async (req, res) => {
     }
 
     await session.commitTransaction();
-    session.endSession();
 
     res.status(201).json({ message: 'Production run recorded successfully', runNumber, wasteGeneratedKg });
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
-    console.error('[PRODUCTION ERROR]', error);
-    res.status(500).json({ message: error.message || 'Error recording production' });
+    if (session.inTransaction()) await session.abortTransaction();
+    console.error('[PRODUCTION ERROR]', error.message);
+    res.status(error.statusCode || (error.name === 'ValidationError' ? 400 : 500)).json({ message: error.message || 'Error recording production' });
+  } finally {
+    await session.endSession();
   }
 };

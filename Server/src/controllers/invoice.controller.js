@@ -1,85 +1,158 @@
 const mongoose = require('mongoose');
-const Invoice = require('../models/Invoice'); // Ensure your model names match
-const Dispatch = require('../models/Dispatch');
-const Party = require('../models/party.model');
+const crypto = require('crypto');
+const Invoice = require('../models/Invoice.model');
+const Dispatch = require('../models/Dispatch.model');
+const Party = require('../models/Party.model');
 
-// Fetch Dispatches that haven't been billed yet
 exports.getUninvoicedDispatches = async (req, res) => {
   try {
     const { customerId } = req.params;
-    const dispatches = await Dispatch.find({
-      customer: customerId,
-      status: { $ne: 'Invoiced' } // Adjust to match your exact Dispatch schema field
-    }).populate('boxes.boxId');
-    
-    res.json(dispatches);
+    if (!mongoose.isValidObjectId(customerId)) {
+      return res.status(400).json({ message: 'Invalid customer ID' });
+    }
+
+    const [dispatches, billed] = await Promise.all([
+      Dispatch.find({ customerId }).populate('boxes.boxId').sort({ createdAt: -1 }).lean(),
+      Invoice.find({ customerId }).select('dispatchId').lean()
+    ]);
+    const billedIds = new Set(billed.map((invoice) => String(invoice.dispatchId)));
+    return res.json(dispatches.filter((dispatch) => !billedIds.has(String(dispatch._id))));
   } catch (error) {
-    res.status(500).json({ message: 'Failed to fetch challans', error: error.message });
+    console.error('[INVOICE] Unable to list unbilled challans:', error.message);
+    return res.status(500).json({ message: 'Unable to fetch unbilled delivery challans' });
   }
 };
 
-// Create Invoice using Mongoose Transactions
 exports.createInvoice = async (req, res) => {
   const session = await mongoose.startSession();
-  session.startTransaction();
+  let createdInvoice;
 
   try {
-    const { invoiceDate, customerId, dispatchId, items, gstPercent, subTotal, cgstAmount, sgstAmount, grandTotal } = req.body;
-
-    // 1. Generate Invoice Number (e.g., INV-26-XXXX)
-    const count = await Invoice.countDocuments();
-    const invoiceNumber = `INV-${new Date().getFullYear().toString().slice(-2)}-${String(count + 1).padStart(4, '0')}`;
-
-    // 2. Create the Invoice Document
-    const newInvoice = new Invoice({
-      invoiceNumber,
-      date: invoiceDate,
-      customer: customerId,
-      dispatchRef: dispatchId,
-      items,
-      gstPercent,
-      subTotal,
-      cgstAmount,
-      sgstAmount,
-      grandTotal
-    });
-    
-    await newInvoice.save({ session });
-
-    // 3. Update the Dispatch to mark it as billed
-    await Dispatch.findByIdAndUpdate(
+    const {
+      invoiceDate,
+      customerId,
       dispatchId,
-      { status: 'Invoiced', invoiceRef: newInvoice._id },
-      { session }
-    );
+      items,
+      gstPercent
+    } = req.body || {};
 
-    // 4. Update the Customer's Khata (Ledger)
-    const party = await Party.findById(customerId).session(session);
-    if (!party) throw new Error('Customer not found in Party Master');
+    if (![customerId, dispatchId].every(mongoose.isValidObjectId)) {
+      return res.status(400).json({ message: 'A valid customer and delivery challan are required' });
+    }
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: 'At least one invoice line is required' });
+    }
 
-    const newBalance = party.balance + grandTotal; // Adding to what they owe us
-    
-    party.ledger.push({
-      date: invoiceDate,
-      type: 'Tax Invoice',
-      ref: invoiceNumber,
-      debit: grandTotal, // Debit customer account (they owe us)
-      credit: 0,
-      balance: newBalance
+    const date = new Date(invoiceDate);
+    const gst = Number(gstPercent);
+    if (Number.isNaN(date.getTime()) || !Number.isFinite(gst) || gst < 0 || gst > 40) {
+      return res.status(400).json({ message: 'Invoice date or GST rate is invalid' });
+    }
+
+    const cleanItems = items.map((item) => ({
+      boxId: item.boxId,
+      quantity: Number(item.quantity),
+      rate: Number(item.rate)
+    }));
+    if (cleanItems.some((item) =>
+      !mongoose.isValidObjectId(item.boxId) ||
+      !Number.isInteger(item.quantity) || item.quantity <= 0 ||
+      !Number.isFinite(item.rate) || item.rate < 0
+    )) {
+      return res.status(400).json({ message: 'Invoice lines contain invalid box, quantity or rate values' });
+    }
+
+    await session.withTransaction(async () => {
+      const [customer, dispatch, existingInvoice] = await Promise.all([
+        Party.findById(customerId).session(session),
+        Dispatch.findOne({ _id: dispatchId, customerId }).session(session),
+        Invoice.findOne({ dispatchId }).session(session)
+      ]);
+
+      if (!customer || !['Customer', 'Both'].includes(customer.type)) {
+        const error = new Error('Selected customer was not found or is not a customer');
+        error.statusCode = 400;
+        throw error;
+      }
+      if (!dispatch) {
+        const error = new Error('Delivery challan does not belong to the selected customer');
+        error.statusCode = 400;
+        throw error;
+      }
+      if (existingInvoice) {
+        const error = new Error('This delivery challan has already been invoiced');
+        error.statusCode = 409;
+        throw error;
+      }
+
+      const dispatchedByBox = new Map();
+      for (const line of dispatch.boxes) {
+        const key = String(line.boxId);
+        dispatchedByBox.set(key, (dispatchedByBox.get(key) || 0) + Number(line.dispatchQuantity));
+      }
+
+      const invoicedByBox = new Map();
+      for (const item of cleanItems) {
+        const key = String(item.boxId);
+        invoicedByBox.set(key, (invoicedByBox.get(key) || 0) + item.quantity);
+      }
+      for (const [boxId, quantity] of invoicedByBox) {
+        if (!dispatchedByBox.has(boxId) || quantity > dispatchedByBox.get(boxId)) {
+          const error = new Error('Invoice quantities must not exceed the selected challan quantities');
+          error.statusCode = 400;
+          throw error;
+        }
+      }
+
+      const invoiceItems = cleanItems.map((item) => ({
+        boxId: item.boxId,
+        quantity: item.quantity,
+        rate: item.rate,
+        taxableAmount: Number((item.quantity * item.rate).toFixed(2))
+      }));
+      const subTotal = Number(invoiceItems.reduce((sum, item) => sum + item.taxableAmount, 0).toFixed(2));
+      const cgstAmount = Number((subTotal * gst / 200).toFixed(2));
+      const sgstAmount = Number((subTotal * gst / 200).toFixed(2));
+      const grandTotal = Number((subTotal + cgstAmount + sgstAmount).toFixed(2));
+      const dateKey = date.toISOString().slice(2, 10).replace(/-/g, '');
+      const invoiceNumber = `INV-${dateKey}-${Date.now()}-${crypto.randomInt(1000, 10000)}`;
+
+      const [created] = await Invoice.create([{
+        invoiceNumber,
+        invoiceDate: date,
+        customerId,
+        dispatchId,
+        items: invoiceItems,
+        subTotal,
+        gstPercent: gst,
+        cgstAmount,
+        sgstAmount,
+        grandTotal,
+        balanceDue: grandTotal
+      }], { session });
+
+      const newBalance = Number((Number(customer.balance || 0) + grandTotal).toFixed(2));
+      customer.ledger.push({
+        date,
+        type: 'Tax Invoice',
+        ref: invoiceNumber,
+        debit: grandTotal,
+        credit: 0,
+        balance: newBalance
+      });
+      customer.balance = newBalance;
+      await customer.save({ session });
+      createdInvoice = created;
     });
-    party.balance = newBalance;
-    await party.save({ session });
 
-    // COMMIT ALL CHANGES
-    await session.commitTransaction();
-    res.status(201).json(newInvoice);
-
+    return res.status(201).json(createdInvoice);
   } catch (error) {
-    // IF ANYTHING FAILS, REVERT ALL DB CHANGES
-    await session.abortTransaction();
-    console.error('Transaction Aborted:', error);
-    res.status(400).json({ message: 'Transaction Failed, DB state reverted', error: error.message });
+    console.error('[INVOICE] Creation failed:', error.message);
+    if (!res.headersSent) {
+      res.status(error.statusCode || (error.name === 'ValidationError' ? 400 : 500))
+        .json({ message: error.message || 'Unable to create invoice' });
+    }
   } finally {
-    session.endSession();
+    await session.endSession();
   }
 };

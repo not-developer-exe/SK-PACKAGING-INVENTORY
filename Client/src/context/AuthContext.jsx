@@ -1,47 +1,58 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import axiosClient from '../api/axiosClient';
 
-const AuthContext = createContext();
+const AuthContext = createContext(null);
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
+  return context;
+};
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let mounted = true;
     const checkAuth = async () => {
       try {
         const { data } = await axiosClient.get('/auth/me');
-        setUser(data.user);
-      } catch (error) {
-        setUser(null); 
+        if (mounted) setUser(data.user ?? null);
+      } catch {
+        if (mounted) setUser(null);
       } finally {
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
     };
-    
-    checkAuth();
 
     const handleUnauthorized = () => setUser(null);
     window.addEventListener('auth-unauthorized', handleUnauthorized);
-    
-    return () => window.removeEventListener('auth-unauthorized', handleUnauthorized);
+    checkAuth();
+
+    return () => {
+      mounted = false;
+      window.removeEventListener('auth-unauthorized', handleUnauthorized);
+    };
   }, []);
 
-  const login = async (email, password) => {
-    const { data } = await axiosClient.post('/auth/login', { email, password });
+  const login = useCallback(async (email, password) => {
+    const { data } = await axiosClient.post('/auth/login', {
+      email: email.trim().toLowerCase(),
+      password
+    });
     setUser(data.user);
-  };
+    return data.user;
+  }, []);
 
-  const logout = async () => {
-    await axiosClient.post('/auth/logout');
-    setUser(null);
-  };
+  const logout = useCallback(async () => {
+    try {
+      await axiosClient.post('/auth/logout');
+    } finally {
+      setUser(null);
+    }
+  }, []);
 
-  return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  const value = { user, login, logout, loading, isAuthenticated: Boolean(user) };
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
