@@ -25,6 +25,7 @@ exports.getUninvoicedDispatches = async (req, res) => {
 
 exports.createInvoice = async (req, res) => {
   const session = await mongoose.startSession();
+  let createdInvoice;
 
   try {
     const {
@@ -141,9 +142,10 @@ exports.createInvoice = async (req, res) => {
       });
       customer.balance = newBalance;
       await customer.save({ session });
-
-      res.status(201).json(created);
+      createdInvoice = created;
     });
+
+    return res.status(201).json(createdInvoice);
   } catch (error) {
     console.error('[INVOICE] Creation failed:', error.message);
     if (!res.headersSent) {
