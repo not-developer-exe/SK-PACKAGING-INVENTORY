@@ -9,6 +9,18 @@ const numericValue = (field) => ({
 
 exports.getDashboardStats = async (req, res) => {
   try {
+    const monthParts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit'
+    }).formatToParts(new Date());
+    const year = monthParts.find((part) => part.type === 'year').value;
+    const month = monthParts.find((part) => part.type === 'month').value;
+    const startOfMonth = new Date(`${year}-${month}-01T00:00:00+05:30`);
+    const nextMonth = new Date(Number(month) === 12
+      ? `${Number(year) + 1}-01-01T00:00:00+05:30`
+      : `${year}-${String(Number(month) + 1).padStart(2, '0')}-01T00:00:00+05:30`);
+
     const [reelStats, boxStats, wasteStats, recentDispatches] = await Promise.all([
       ReelUnit.aggregate([
         { $match: { status: { $in: ['available', 'partial'] } } },
@@ -30,8 +42,8 @@ exports.getDashboardStats = async (req, res) => {
         {
           $match: {
             runDate: {
-              $gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-              $lt: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1)
+              $gte: startOfMonth,
+              $lt: nextMonth
             }
           }
         },
