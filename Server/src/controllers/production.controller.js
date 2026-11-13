@@ -3,6 +3,7 @@ const ProductionRun = require('../models/ProductionRun.model');
 const CorrugatedSheet = require('../models/CorrugatedSheet.model');
 const ReelUnit = require('../models/ReelUnit.model');
 const StockMovement = require('../models/StockMovement.model');
+const Sequence = require('../models/Sequence.model');
 
 exports.recordProduction = async (req, res) => {
   const { shift, operatorName, inputReels, outputSheets } = req.body || {};
@@ -37,8 +38,13 @@ exports.recordProduction = async (req, res) => {
 
   try {
 
-    const count = await ProductionRun.countDocuments();
-    const runNumber = `PR-${String(count + 1).padStart(5, '0')}`;
+    const existingCount = await ProductionRun.countDocuments().session(session);
+    const sequence = await Sequence.findOneAndUpdate(
+      { _id: 'production-run' },
+      { $max: { value: existingCount }, $inc: { value: 1 } },
+      { new: true, upsert: true, setDefaultsOnInsert: true, session }
+    );
+    const runNumber = `PR-${String(sequence.value).padStart(5, '0')}`;
 
     let totalInputWeightKg = 0;
     let totalOutputWeightKg = 0;
