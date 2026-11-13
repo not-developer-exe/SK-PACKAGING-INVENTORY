@@ -61,6 +61,7 @@ exports.recordDispatch = async (req, res) => {
         await StockMovement.create([{
           movementType: 'dispatch',
           referenceId: box._id,
+          referenceModel: 'FinishedBox',
           itemType: 'finished_good',
           specificationSummary: `${box.itemName} | ${box.dimensions.length}x${box.dimensions.width}x${box.dimensions.height}`,
           quantityChange: -dispatchQuantity,
