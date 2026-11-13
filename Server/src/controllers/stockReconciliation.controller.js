@@ -4,6 +4,7 @@ const StockReconciliation = require('../models/StockReconciliation.model');
 const StockMovement = require('../models/StockMovement.model');
 const Sequence = require('../models/Sequence.model');
 const AuditLog = require('../models/AuditLog.model');
+const { calculateReelReconciliation } = require('../utils/reelReconciliation');
 
 const asNumber = (value) => {
   if (value === '' || value === null || value === undefined) return NaN;
@@ -83,10 +84,13 @@ exports.postStockReconciliation = async (req, res) => {
         const reel = reelMap.get(line.reelId);
         const systemWeight = Number(reel.remainingWeightKg.toString());
         const originalWeight = Number(reel.originalWeightKg.toString());
-        if (line.countedWeightKg > originalWeight) {
-          throw new Error('Counted weight cannot exceed original weight for reel ' + reel.reelCode + '.');
+        let calculation;
+        try {
+          calculation = calculateReelReconciliation({ originalWeightKg: originalWeight, systemWeightKg: systemWeight, countedWeightKg: line.countedWeightKg });
+        } catch (error) {
+          throw new Error(error.message + ' Reel: ' + reel.reelCode + '.');
         }
-        const variance = line.countedWeightKg - systemWeight;
+        const variance = calculation.varianceKg;
         totalVariance += variance;
         linesToSave.push({
           reelId: reel._id,
@@ -124,7 +128,7 @@ exports.postStockReconciliation = async (req, res) => {
             {
               $set: {
                 remainingWeightKg: newWeight,
-                status: newWeight === 0 ? 'consumed' : newWeight < Number(reel.originalWeightKg.toString()) ? 'partial' : 'available'
+                status: calculateReelReconciliation({ originalWeightKg: reel.originalWeightKg.toString(), systemWeightKg: oldWeight, countedWeightKg: newWeight }).status
               }
             },
             { session }
