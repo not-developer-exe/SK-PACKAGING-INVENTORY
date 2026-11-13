@@ -35,8 +35,8 @@ exports.recordDispatch = async (req, res) => {
       const existingCount = await Dispatch.countDocuments().session(session);
       const sequence = await Sequence.findOneAndUpdate(
         { _id: 'dispatch-challan' },
-        { $max: { value: existingCount }, $inc: { value: 1 } },
-        { new: true, upsert: true, setDefaultsOnInsert: true, session }
+        [{ $set: { value: { $add: [{ $max: [{ $ifNull: ['$value', existingCount] }, existingCount] }, 1] } }],
+        { new: true, upsert: true, session }
       );
       challanNumber = `DC-${String(sequence.value).padStart(6, '0')}`;
 
