@@ -2,14 +2,14 @@ const User = require('../models/User.model');
 const jwt = require('jsonwebtoken');
 
 const generateToken = (id, res) => {
-  const token = jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '12h' });
-  res.cookie('jwt', token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV !== 'development', // Use secure cookies in production
-    sameSite: 'strict',
-    maxAge: 12 * 60 * 60 * 1000 // 12 hours
-  });
-};
+    const token = jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '12h' });
+    res.cookie('jwt', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production', // MUST be false in development (http://localhost)
+      sameSite: 'lax',                             // 'lax' allows proxied local dev requests
+      maxAge: 12 * 60 * 60 * 1000                   // 12 hours
+    });
+  };
 
 exports.login = async (req, res) => {
     const { email, password } = req.body;

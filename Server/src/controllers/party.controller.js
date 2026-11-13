@@ -2,24 +2,27 @@ const Party = require('./../models/Party.model');
 
 // Get all parties with optional filtering
 exports.getParties = async (req, res) => {
-  try {
-    const { type, search } = req.query;
-    let query = {};
-
-    if (type && type !== 'all') {
-      query.partyType = type;
+    try {
+      const { type } = req.query;
+      
+      // Default: only fetch active parties
+      let query = { isActive: true };
+  
+      // Smart filtering: include 'both' in case a party buys AND sells
+      if (type === 'supplier') {
+        query.partyType = { $in: ['supplier', 'both'] };
+      } else if (type === 'customer') {
+        query.partyType = { $in: ['customer', 'both'] };
+      }
+      // If type === 'all', the query remains just { isActive: true }
+  
+      const parties = await require('../models/Party.model').find(query).sort({ name: 1 });
+      res.json({ parties });
+    } catch (error) {
+      console.error('[PARTY ERROR]', error);
+      res.status(500).json({ message: 'Error fetching parties', error: error.message });
     }
-
-    if (search) {
-      query.name = { $regex: search, $options: 'i' };
-    }
-
-    const parties = await Party.find(query).sort({ name: 1 });
-    res.json({ parties });
-  } catch (error) {
-    res.status(500).json({ message: 'Error fetching parties', error: error.message });
-  }
-};
+  };
 
 // Create a new party
 exports.createParty = async (req, res) => {
