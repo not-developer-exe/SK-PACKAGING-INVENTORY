@@ -21,7 +21,7 @@ async function auditPartyChange(req, action, party, summary, metadata = {}) {
 
 exports.getParties = async (req, res) => {
   try {
-    const parties = await Party.find().sort({ name: 1 }).lean();
+    const parties = await Party.find({ isActive: { $ne: false } }).sort({ name: 1 }).lean();
     return res.json(parties);
   } catch (error) {
     console.error('[PARTIES] List failed:', error.message);
@@ -39,7 +39,7 @@ exports.createParty = async (req, res) => {
   }
 
   try {
-    const duplicate = await Party.findOne({ name: new RegExp('^' + name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') });
+    const duplicate = await Party.findOne({ isActive: { $ne: false }, name: new RegExp('^' + name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') });
     if (duplicate) return res.status(409).json({ message: 'A party with this name already exists.' });
 
     const newParty = new Party({
@@ -84,6 +84,9 @@ exports.updateParty = async (req, res) => {
     if (name !== undefined) party.name = name.trim();
     if (phone !== undefined) party.phone = phone.trim();
     if (city !== undefined) party.city = city.trim();
+    if (type !== undefined && type !== party.type && party.ledger.some((entry) => entry.type !== 'Opening Balance')) {
+      return res.status(409).json({ message: 'Party type cannot be changed after financial transactions have been recorded.' });
+    }
     if (type !== undefined) party.type = type;
     await party.save();
     await auditPartyChange(req, 'party.updated', party, 'Party details updated: ' + party.name, { before, after: { name: party.name, type: party.type, phone: party.phone, city: party.city } });
@@ -102,11 +105,12 @@ exports.deleteParty = async (req, res) => {
       return res.status(400).json({ message: 'Cannot delete. Settle balance to ₹0 first.' });
     }
     if (party.ledger.some(entry => entry.type !== 'Opening Balance')) {
-      return res.status(409).json({ message: 'This party has transaction history. Archive it instead of deleting it.' });
+      return res.status(409).json({ message: 'This party has transaction history. It cannot be archived or deleted.' });
     }
-    await party.deleteOne();
-    await auditPartyChange(req, 'party.deleted', party, 'Party deleted: ' + party.name, { type: party.type });
-    return res.json({ message: 'Party deleted successfully' });
+    party.isActive = false;
+    await party.save();
+    await auditPartyChange(req, 'party.archived', party, 'Party archived: ' + party.name, { type: party.type });
+    return res.json({ message: 'Party archived successfully' });
   } catch (error) {
     console.error('[PARTIES] Delete failed:', error.message);
     return res.status(500).json({ message: 'Unable to delete party.' });
