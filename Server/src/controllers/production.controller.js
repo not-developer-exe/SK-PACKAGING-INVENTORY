@@ -4,6 +4,7 @@ const CorrugatedSheet = require('../models/CorrugatedSheet.model');
 const ReelUnit = require('../models/ReelUnit.model');
 const StockMovement = require('../models/StockMovement.model');
 const Sequence = require('../models/Sequence.model');
+const { calculateProductionBalance } = require('../utils/productionAccounting');
 
 exports.recordProduction = async (req, res) => {
   const {
@@ -51,15 +52,13 @@ exports.recordProduction = async (req, res) => {
 
   const totalInputWeight = inputs.reduce((sum, item) => sum + item.weightConsumedKg, 0);
   const totalOutputWeight = outputs.reduce((sum, item) => sum + item.totalWeightKg, 0);
-  const massDifference = totalInputWeight - totalOutputWeight;
-  if (massDifference < 0) {
-    return res.status(400).json({ message: 'Output sheet weight cannot exceed total input reel weight.' });
+  let productionBalance;
+  try {
+    productionBalance = calculateProductionBalance(totalInputWeight, totalOutputWeight, recoverableWasteKg);
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
   }
-  if (recoverableWasteKg > massDifference) {
-    return res.status(400).json({ message: 'Measured recoverable scrap cannot exceed the input-output weight difference.' });
-  }
-
-  const processLossKg = massDifference - recoverableWasteKg;
+  const processLossKg = productionBalance.processLossKg;
   const session = await mongoose.startSession();
   session.startTransaction();
 
