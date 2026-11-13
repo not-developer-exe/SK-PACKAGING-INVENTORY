@@ -1,4 +1,23 @@
-const Party = require('../models/party.model');
+const Party = require('../models/Party.model');
+const AuditLog = require('../models/AuditLog.model');
+
+async function auditPartyChange(req, action, party, summary, metadata = {}) {
+  try {
+    await AuditLog.create({
+      action,
+      entityType: 'Party',
+      entityId: party._id,
+      entityLabel: party.name,
+      actorId: req.user._id,
+      actorName: req.user.name,
+      actorRole: req.user.role,
+      summary,
+      metadata
+    });
+  } catch (error) {
+    console.error('[AUDIT] Party event could not be recorded:', error.message);
+  }
+}
 
 exports.getParties = async (req, res) => {
   try {
@@ -25,6 +44,7 @@ exports.createParty = async (req, res) => {
     });
 
     await newParty.save();
+    await auditPartyChange(req, 'party.created', newParty, 'Party created: ' + newParty.name, { type: newParty.type, openingBalance });
     res.status(201).json(newParty);
   } catch (error) {
     res.status(400).json({ message: 'Failed to create party', error: error.message });
@@ -42,6 +62,7 @@ exports.deleteParty = async (req, res) => {
     }
 
     await party.deleteOne();
+    await auditPartyChange(req, 'party.deleted', party, 'Party deleted: ' + party.name, { type: party.type });
     res.json({ message: 'Party deleted successfully' });
   } catch (error) {
     res.status(500).json({ message: 'Server Error', error: error.message });
@@ -69,6 +90,7 @@ exports.addTransaction = async (req, res) => {
     party.ledger.push(newTxn);
     party.balance = newBalance;
     await party.save();
+    await auditPartyChange(req, 'party.payment_recorded', party, newTxn.type + ' recorded for ' + party.name, { amount, mode, ref, direction, resultingBalance: newBalance });
 
     res.json(party);
   } catch (error) {
@@ -88,8 +110,10 @@ exports.deleteTransaction = async (req, res) => {
     const impact = (txn.credit || 0) - (txn.debit || 0);
     party.balance = party.balance + impact;
     
+    const removedEntry = { type: txn.type, ref: txn.ref, debit: txn.debit, credit: txn.credit };
     party.ledger.pull({ _id: req.params.txnId });
     await party.save();
+    await auditPartyChange(req, 'party.transaction_deleted', party, 'Ledger entry deleted for ' + party.name, { removedEntry, resultingBalance: party.balance });
 
     res.json(party);
   } catch (error) {
