@@ -5,31 +5,55 @@ const StockMovement = require('../models/StockMovement.model');
 const Party = require('../models/Party.model');
 const Sequence = require('../models/Sequence.model');
 
+const toFiniteNumber = (value) => {
+  if (value === null || value === undefined || value === '') return NaN;
+  return Number(value);
+};
+
 // 1. Create Draft Receipt
 exports.createDraftReceipt = async (req, res) => {
   try {
     const { supplierId, invoiceReference, receiptDate, notes, lines } = req.body || {};
 
-    if (!mongoose.isValidObjectId(supplierId) || typeof invoiceReference !== 'string' || !invoiceReference.trim() || !Array.isArray(lines) || lines.length === 0) {
+    if (!mongoose.isValidObjectId(supplierId) ||
+        typeof invoiceReference !== 'string' ||
+        !invoiceReference.trim() ||
+        !Array.isArray(lines) ||
+        lines.length === 0) {
       return res.status(400).json({ message: 'A valid supplier, invoice reference and at least one line item are required.' });
     }
 
+    const parsedReceiptDate = receiptDate ? new Date(receiptDate) : new Date();
+    if (Number.isNaN(parsedReceiptDate.getTime())) {
+      return res.status(400).json({ message: 'Receipt date must be a valid date.' });
+    }
+
     const invalidLine = lines.some((line) => {
-      const width = Number(line.reelWidthInches);
-      const bf = Number(line.bf);
-      const gsm = Number(line.gsm);
-      const count = Number(line.reelCount);
-      const weight = Number(line.totalWeightKg);
-      const rate = Number(line.ratePerKg);
+      if (!line || typeof line !== 'object' || Array.isArray(line)) return true;
+
+      const width = toFiniteNumber(line.reelWidthInches);
+      const bf = toFiniteNumber(line.bf);
+      const gsm = toFiniteNumber(line.gsm);
+      const count = toFiniteNumber(line.reelCount);
+      const weight = toFiniteNumber(line.totalWeightKg);
+      const rate = toFiniteNumber(line.ratePerKg);
+      const freight = line.freightCharges === undefined ? 0 : toFiniteNumber(line.freightCharges);
+      const other = line.otherCharges === undefined ? 0 : toFiniteNumber(line.otherCharges);
+
       return !Number.isFinite(width) || width <= 0 ||
         !Number.isFinite(bf) || bf <= 0 ||
         !Number.isFinite(gsm) || gsm <= 0 ||
         !Number.isInteger(count) || count <= 0 ||
         !Number.isFinite(weight) || weight <= 0 ||
-        !Number.isFinite(rate) || rate < 0;
+        !Number.isFinite(rate) || rate < 0 ||
+        !Number.isFinite(freight) || freight < 0 ||
+        !Number.isFinite(other) || other < 0;
     });
+
     if (invalidLine) {
-      return res.status(400).json({ message: 'Each inward line needs positive reel dimensions, a whole reel count, positive total weight and a non-negative rate.' });
+      return res.status(400).json({
+        message: 'Each inward line needs positive reel dimensions, a whole reel count, positive total weight, and non-negative rate and charges.'
+      });
     }
 
     const supplier = await Party.findById(supplierId);
@@ -37,26 +61,35 @@ exports.createDraftReceipt = async (req, res) => {
       return res.status(400).json({ message: 'Invalid or non-supplier party selected.' });
     }
 
-    // Generate unique receipt number
-    const count = await InwardReceipt.countDocuments();
-    const receiptNumber = `IR-${String(count + 1).padStart(5, '0')}`;
+    // Allocate receipt numbers through the shared atomic sequence, not count + 1.
+    const existingCount = await InwardReceipt.countDocuments();
+    const sequence = await Sequence.findOneAndUpdate(
+      { _id: 'inward-receipt' },
+      [{ $set: { value: { $add: [{ $max: [{ $ifNull: ['$value', existingCount] }, existingCount] }, 1] } } }],
+      { new: true, upsert: true }
+    );
+    const receiptNumber = `IR-${String(sequence.value).padStart(5, '0')}`;
 
     const receipt = await InwardReceipt.create({
       receiptNumber,
-      receiptDate: receiptDate || Date.now(),
+      receiptDate: parsedReceiptDate,
       supplierId,
-      invoiceReference,
+      invoiceReference: invoiceReference.trim(),
       notes,
       lines,
       status: 'draft'
     });
 
-    res.status(201).json({ message: 'Inward receipt draft saved successfully', receipt });
+    return res.status(201).json({ message: 'Inward receipt draft saved successfully', receipt });
   } catch (error) {
     if (error.code === 11000) {
-      return res.status(400).json({ message: 'An inward receipt with this supplier and invoice reference already exists.' });
+      return res.status(409).json({ message: 'An inward receipt with this supplier and invoice reference already exists, or a receipt number was allocated concurrently. Please retry.' });
     }
-    res.status(500).json({ message: 'Error creating inward receipt draft', error: error.message });
+    if (error.name === 'ValidationError' || error.name === 'CastError') {
+      return res.status(400).json({ message: 'Inward receipt contains invalid data.' });
+    }
+    console.error('[INWARD] Draft creation failed:', error.message);
+    return res.status(500).json({ message: 'Error creating inward receipt draft' });
   }
 };
 
@@ -64,9 +97,10 @@ exports.createDraftReceipt = async (req, res) => {
 exports.getReceipts = async (req, res) => {
   try {
     const receipts = await InwardReceipt.find().populate('supplierId', 'name gstin').sort({ createdAt: -1 });
-    res.json({ receipts });
+    return res.json({ receipts });
   } catch (error) {
-    res.status(500).json({ message: 'Error fetching receipts', error: error.message });
+    console.error('[INWARD] Receipt query failed:', error.message);
+    return res.status(500).json({ message: 'Error fetching receipts' });
   }
 };
 
@@ -97,9 +131,15 @@ exports.postReceipt = async (req, res) => {
         const qty = Number(line.reelCount);
         const weightNum = Number(line.totalWeightKg.toString());
         const width = Number(line.reelWidthInches);
+        const bf = Number(line.bf);
+        const gsm = Number(line.gsm);
         const rate = Number(line.ratePerKg.toString());
-        if (!Number.isInteger(qty) || qty <= 0 || !Number.isFinite(weightNum) || weightNum <= 0 ||
-            !Number.isFinite(width) || width <= 0 || !Number.isFinite(rate) || rate < 0) {
+        if (!Number.isInteger(qty) || qty <= 0 ||
+            !Number.isFinite(weightNum) || weightNum <= 0 ||
+            !Number.isFinite(width) || width <= 0 ||
+            !Number.isFinite(bf) || bf <= 0 ||
+            !Number.isFinite(gsm) || gsm <= 0 ||
+            !Number.isFinite(rate) || rate < 0) {
           const error = new Error('Receipt contains an invalid line. Correct the draft before posting.');
           error.statusCode = 400;
           throw error;
