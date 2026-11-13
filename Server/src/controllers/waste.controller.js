@@ -2,22 +2,47 @@ const mongoose = require('mongoose');
 const ProductionRun = require('../models/ProductionRun.model');
 const ScrapSale = require('../models/ScrapSale.model');
 const WasteInventory = require('../models/WasteInventory.model');
+const { calculateScrapAvailability } = require('../utils/productionAccounting');
+
+const asNumber = (value) => {
+  if (value === null || value === undefined) return 0;
+  return Number(value.toString());
+};
 
 exports.getWasteStats = async (req, res) => {
   try {
-    const [productionWaste, scrapSales] = await Promise.all([
-      ProductionRun.find({ wasteGeneratedKg: { $gt: 0 } })
+    const [productionWaste, scrapSales, legacyRows] = await Promise.all([
+      ProductionRun.find({ recoverableWasteKg: { $gt: 0 } })
         .sort({ createdAt: -1 })
-        .select('runNumber createdAt wasteGeneratedKg operatorName')
+        .select('runNumber createdAt recoverableWasteKg processLossKg operatorName')
         .lean(),
-      ScrapSale.find().sort({ createdAt: -1 }).lean()
+      ScrapSale.find().sort({ createdAt: -1 }).lean(),
+      ProductionRun.aggregate([
+        { $match: { recoverableWasteKg: { $exists: false }, wasteGeneratedKg: { $gt: 0 } } },
+        { $group: { _id: null, total: { $sum: '$wasteGeneratedKg' } } }
+      ])
     ]);
 
-    const totalWasteGenerated = productionWaste.reduce((sum, run) => sum + Number(run.wasteGeneratedKg || 0), 0);
-    const totalWasteSold = scrapSales.reduce((sum, sale) => sum + Number(sale.weightSoldKg || 0), 0);
-    const currentWasteInventory = Math.max(0, totalWasteGenerated - totalWasteSold);
+    const totalWasteGenerated = productionWaste.reduce((sum, run) => sum + asNumber(run.recoverableWasteKg), 0);
+    const totalWasteSold = scrapSales.reduce((sum, sale) => sum + asNumber(sale.weightSoldKg), 0);
+    const legacyUnverifiedWasteKg = asNumber(legacyRows[0] && legacyRows[0].total);
+    // Keep negative balances visible: historical sales may exceed newly verified scrap.
+    const currentWasteInventory = calculateScrapAvailability(totalWasteGenerated, totalWasteSold);
 
-    return res.json({ currentWasteInventory, totalWasteGenerated, totalWasteSold, productionWaste, scrapSales });
+    const verifiedRuns = productionWaste.map((run) => ({
+      ...run,
+      recoverableWasteKg: asNumber(run.recoverableWasteKg),
+      processLossKg: asNumber(run.processLossKg)
+    }));
+
+    return res.json({
+      currentWasteInventory,
+      totalWasteGenerated,
+      totalWasteSold,
+      legacyUnverifiedWasteKg,
+      productionWaste: verifiedRuns,
+      scrapSales
+    });
   } catch (error) {
     console.error('[WASTE] Stats query failed:', error.message);
     return res.status(500).json({ message: 'Error fetching waste statistics' });
@@ -37,8 +62,6 @@ exports.recordScrapSale = async (req, res) => {
   try {
     let createdSale;
     await session.withTransaction(async () => {
-      // Touch one shared document inside the transaction. Concurrent sales
-      // contend on this write, preventing overselling under parallel requests.
       await WasteInventory.findOneAndUpdate(
         { _id: 'waste-stock' },
         { $inc: { revision: 1 } },
@@ -47,20 +70,19 @@ exports.recordScrapSale = async (req, res) => {
 
       const [generatedRows, soldRows] = await Promise.all([
         ProductionRun.aggregate([
-          { $match: { wasteGeneratedKg: { $gt: 0 } } },
-          { $group: { _id: null, total: { $sum: '$wasteGeneratedKg' } } }
+          { $group: { _id: null, total: { $sum: { $ifNull: ['$recoverableWasteKg', 0] } } } }
         ]).session(session),
         ScrapSale.aggregate([
           { $group: { _id: null, total: { $sum: '$weightSoldKg' } } }
         ]).session(session)
       ]);
 
-      const generated = Number(generatedRows[0]?.total || 0);
-      const sold = Number(soldRows[0]?.total || 0);
-      const available = Math.max(0, generated - sold);
+      const generated = asNumber(generatedRows[0] && generatedRows[0].total);
+      const sold = asNumber(soldRows[0] && soldRows[0].total);
+      const available = calculateScrapAvailability(generated, sold);
 
       if (weightSoldKg > available) {
-        const error = new Error(`Insufficient waste stock. Available: ${available.toFixed(2)} kg; requested: ${weightSoldKg.toFixed(2)} kg.`);
+        const error = new Error('Insufficient verified scrap stock. Available: ' + available.toFixed(2) + ' kg; requested: ' + weightSoldKg.toFixed(2) + ' kg. Legacy unverified production variance is excluded until reconciled.');
         error.statusCode = 409;
         throw error;
       }

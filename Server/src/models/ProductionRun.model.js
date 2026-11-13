@@ -10,19 +10,15 @@ const productionRunSchema = new mongoose.Schema({
   runDate: { type: Date, required: true, default: Date.now },
   shift: { type: String, enum: ['Day', 'Night'], default: 'Day' },
   operatorName: { type: String, trim: true },
-  
-  // What went in:
   inputReels: [consumedReelSchema],
-  
-  // Total raw material weight used
   totalInputWeightKg: { type: mongoose.Schema.Types.Decimal128, required: true },
-  
-  // Total weight of the sheets produced (used to calculate waste)
   totalOutputWeightKg: { type: mongoose.Schema.Types.Decimal128, required: true },
-  
-  // Calculated trim/core waste for this run
+  // Only physically measured, recoverable scrap is saleable waste inventory.
+  recoverableWasteKg: { type: mongoose.Schema.Types.Decimal128, default: 0 },
+  // Input/output variance not accounted for by sheets or measured recoverable scrap.
+  processLossKg: { type: mongoose.Schema.Types.Decimal128, default: 0 },
+  // Kept for compatibility; new records store recoverable scrap here.
   wasteGeneratedKg: { type: mongoose.Schema.Types.Decimal128, required: true },
-  
   status: { type: String, enum: ['draft', 'completed'], default: 'draft' },
   recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });

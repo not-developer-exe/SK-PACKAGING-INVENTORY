@@ -61,20 +61,35 @@ export default function WasteRegisterPage() {
       </div>
 
       {/* Top Metrics */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-amber-800">Current Scrap Inventory</h2>
-          <p className="mt-2 text-3xl font-bold text-amber-900">{data.currentWasteInventory.toLocaleString('en-IN', { maximumFractionDigits: 1 })} <span className="text-base font-medium">kg</span></p>
+          <p className="mt-2 text-3xl font-bold text-amber-900">{Number(data.currentWasteInventory || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })} <span className="text-base font-medium">kg</span></p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-slate-600">Total Waste Generated</h2>
-          <p className="mt-2 text-3xl font-bold text-slate-900">{data.totalWasteGenerated.toLocaleString('en-IN', { maximumFractionDigits: 1 })} <span className="text-base font-medium">kg</span></p>
+          <h2 className="text-sm font-semibold text-slate-600">Verified Scrap Generated</h2>
+          <p className="mt-2 text-3xl font-bold text-slate-900">{Number(data.totalWasteGenerated || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })} <span className="text-base font-medium">kg</span></p>
         </div>
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-emerald-800">Total Scrap Sold</h2>
-          <p className="mt-2 text-3xl font-bold text-emerald-900">{data.totalWasteSold.toLocaleString('en-IN', { maximumFractionDigits: 1 })} <span className="text-base font-medium">kg</span></p>
+          <p className="mt-2 text-3xl font-bold text-emerald-900">{Number(data.totalWasteSold || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })} <span className="text-base font-medium">kg</span></p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="text-sm font-semibold text-slate-600">Legacy Unverified Variance</h2>
+          <p className="mt-2 text-3xl font-bold text-slate-900">{Number(data.legacyUnverifiedWasteKg || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })} <span className="text-base font-medium">kg</span></p>
         </div>
       </div>
+
+      {Number(data.legacyUnverifiedWasteKg || 0) > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          {Number(data.legacyUnverifiedWasteKg).toFixed(2)} kg of historical production variance is unverified. It is shown for reconciliation but is not counted as saleable scrap stock.
+        </div>
+      )}
+      {Number(data.currentWasteInventory || 0) < 0 && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          Scrap stock is below zero by {Math.abs(Number(data.currentWasteInventory)).toFixed(2)} kg because historical scrap sales exceed verified scrap entries. New scrap sales are blocked until this is reconciled.
+        </div>
+      )}
 
       {/* Record Sale Form */}
       <form onSubmit={handleSaleSubmit} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -101,7 +116,7 @@ export default function WasteRegisterPage() {
 
       {/* Tabs */}
       <div className="flex gap-2 border-b border-slate-200 pb-2">
-        <button onClick={() => setActiveTab('inventory')} className={`px-4 py-2 text-sm font-medium transition ${activeTab === 'inventory' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}>Production Waste Log</button>
+        <button onClick={() => setActiveTab('inventory')} className={`px-4 py-2 text-sm font-medium transition ${activeTab === 'inventory' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}>Verified Scrap Log</button>
         <button onClick={() => setActiveTab('sales')} className={`px-4 py-2 text-sm font-medium transition ${activeTab === 'sales' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}>Scrap Sales History</button>
       </div>
 
@@ -113,7 +128,7 @@ export default function WasteRegisterPage() {
               <tr>
                 <th className="px-5 py-3 font-semibold">Date</th>
                 <th className="px-5 py-3 font-semibold">Source</th>
-                <th className="px-5 py-3 text-right font-semibold">Waste Generated (kg)</th>
+                <th className="px-5 py-3 text-right font-semibold">Recoverable Scrap (kg)</th>
                 <th className="px-5 py-3 font-semibold">Operator</th>
               </tr>
             </thead>
@@ -122,11 +137,11 @@ export default function WasteRegisterPage() {
                 <tr key={run._id} className="hover:bg-slate-50">
                   <td className="px-5 py-4 text-slate-600">{new Date(run.createdAt).toLocaleString('en-IN')}</td>
                   <td className="px-5 py-4 font-medium text-slate-900">Run {run.runNumber}</td>
-                  <td className="px-5 py-4 text-right font-medium text-amber-600">+{parseFloat(run.wasteGeneratedKg).toFixed(1)}</td>
+                  <td className="px-5 py-4 text-right font-medium text-amber-600">+{Number(run.recoverableWasteKg || 0).toFixed(2)}</td>
                   <td className="px-5 py-4 text-slate-700">{run.operatorName}</td>
                 </tr>
               ))}
-              {data.productionWaste.length === 0 && (<tr><td colSpan={4} className="p-6 text-center text-slate-500">No machine waste generated yet.</td></tr>)}
+              {data.productionWaste.length === 0 && (<tr><td colSpan={4} className="p-6 text-center text-slate-500">No measured recoverable scrap recorded yet.</td></tr>)}
             </tbody>
           </table>
         ) : (
