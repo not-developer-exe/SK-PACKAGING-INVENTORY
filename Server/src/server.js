@@ -17,6 +17,7 @@ const dashboardRoutes = require('./routes/dashboard.routes');
 const wasteRoutes = require('./routes/waste.routes');
 const invoiceRoutes = require('./routes/invoice.routes');
 const controlRoutes = require('./routes/control.routes');
+const usersRoutes = require('./routes/users.routes');
 
 const app = express();
 const allowedOrigins = (process.env.CLIENT_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174')
@@ -54,6 +55,7 @@ app.use('/api/parties', partyRoutes);
 app.use('/api/inward', inwardRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/controls', controlRoutes);
+app.use('/api/users', usersRoutes);
 app.use('/api/production', productionRoutes);
 app.use('/api/conversion', conversionRoutes);
 app.use('/api/ledger', ledgerRoutes);
