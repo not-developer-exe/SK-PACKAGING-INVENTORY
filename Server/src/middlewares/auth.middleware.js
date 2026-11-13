@@ -3,32 +3,23 @@ const User = require('../models/User.model');
 
 exports.protect = async (req, res, next) => {
   try {
-    console.log(`\n[AUTH CHECK] Route: ${req.originalUrl}`);
-    
-    let token = req.cookies?.jwt;
-    if (!token) {
-      console.log('[AUTH FAILED] No JWT cookie found in the request.');
-      return res.status(401).json({ message: 'Not authorized, no token' });
-    }
+    const token = req.cookies?.jwt;
+    if (!token) return res.status(401).json({ message: 'Authentication required' });
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (!decoded?.id) return res.status(401).json({ message: 'Invalid session' });
+
     const user = await User.findById(decoded.id).select('-password');
-    
-    if (!user) {
-      console.log(`[AUTH FAILED] Token is valid, but User ID ${decoded.id} no longer exists in DB.`);
-      return res.status(401).json({ message: 'User not found' });
+    if (!user || !user.isActive) {
+      return res.status(401).json({ message: 'Session is no longer valid' });
     }
 
-    if (!user.isActive) {
-      console.log(`[AUTH FAILED] User ${user.email} is deactivated.`);
-      return res.status(401).json({ message: 'User deactivated' });
-    }
-
-    console.log(`[AUTH SUCCESS] Access granted to: ${user.email}`);
     req.user = user;
-    next();
+    return next();
   } catch (error) {
-    console.error('[AUTH ERROR] Token verification failed:', error.message);
-    res.status(401).json({ message: 'Not authorized, token failed' });
+    if (error.name !== 'JsonWebTokenError' && error.name !== 'TokenExpiredError') {
+      console.error('[AUTH] Middleware error:', error.message);
+    }
+    return res.status(401).json({ message: 'Authentication required' });
   }
 };
