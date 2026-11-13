@@ -4,6 +4,7 @@ const FinishedBox = require('../models/FinishedBox.model');
 const StockMovement = require('../models/StockMovement.model');
 const Party = require('../models/Party.model');
 const Sequence = require('../models/Sequence.model');
+const writeAuditLog = require('../utils/writeAuditLog');
 
 exports.recordDispatch = async (req, res) => {
   const { customerId, vehicleNumber, driverName, boxes } = req.body || {};
@@ -78,7 +79,7 @@ exports.recordDispatch = async (req, res) => {
         dispatchLines.push({ boxId: box._id, dispatchQuantity });
       }
 
-      await Dispatch.create([{
+      const [dispatch] = await Dispatch.create([{
         challanNumber,
         customerId,
         vehicleNumber: typeof vehicleNumber === 'string' ? vehicleNumber.trim() : '',
@@ -86,6 +87,7 @@ exports.recordDispatch = async (req, res) => {
         boxes: dispatchLines,
         recordedBy: req.user._id
       }], { session });
+      await writeAuditLog(req, { action: 'dispatch.recorded', entityType: 'Dispatch', entityId: dispatch._id, entityLabel: challanNumber, summary: 'Dispatch recorded: ' + challanNumber, metadata: { customerId: String(customerId), batchCount: dispatchLines.length, boxes: dispatchLines } }, session);
     });
 
     return res.status(201).json({ message: 'Dispatch recorded successfully', challanNumber });

@@ -2,7 +2,7 @@ import React from 'react';
 import { Routes, Route, Link, useLocation, Navigate, Outlet, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, FileText, Package, ArrowDownToLine, Factory,
-  Scissors, Truck, LogOut, FilePlus2, BookOpen, Trash2
+  Scissors, Truck, LogOut, FilePlus2, BookOpen, Trash2, ShieldCheck
 } from 'lucide-react';
 
 import { useAuth } from './context/AuthContext';
@@ -18,6 +18,7 @@ import ConversionPage from './pages/Conversion/ConversionPage';
 import DispatchPage from './pages/Operations/DispatchPage';
 import StockLedgerPage from './pages/Reports/StockLedgerPage';
 import WasteRegisterPage from './pages/Reports/WasteRegisterPage';
+import OpeningStockPage from './pages/Reports/OpeningStockPage';
 
 function RequireAuth() {
   const { user, loading } = useAuth();
@@ -43,6 +44,9 @@ function Sidebar() {
       { name: 'Stock Inward', path: '/inventory/inward', icon: ArrowDownToLine },
       { name: 'Stock Ledger', path: '/inventory/ledger', icon: BookOpen }
     ] },
+    ...(user?.role === 'admin' ? [{ group: 'Administration', items: [
+      { name: 'Opening Stock & Audit', path: '/admin/opening-stock', icon: ShieldCheck }
+    ] }] : []),
     { group: 'Factory Operations', items: [
       { name: 'Production', path: '/operations/production', icon: Factory },
       { name: 'Conversion', path: '/operations/conversion', icon: Scissors },
@@ -100,6 +104,7 @@ export default function App() {
           <Route path="operations/conversion" element={<ConversionPage />} />
           <Route path="operations/dispatch" element={<DispatchPage />} />
           <Route path="operations/waste" element={<WasteRegisterPage />} />
+          <Route path="admin/opening-stock" element={user?.role === 'admin' ? <OpeningStockPage /> : <Navigate to="/" replace />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to={user ? '/' : '/login'} replace />} />

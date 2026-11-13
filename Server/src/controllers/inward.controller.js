@@ -4,6 +4,7 @@ const ReelUnit = require('../models/ReelUnit.model');
 const StockMovement = require('../models/StockMovement.model');
 const Party = require('../models/Party.model');
 const Sequence = require('../models/Sequence.model');
+const writeAuditLog = require('../utils/writeAuditLog');
 
 const toFiniteNumber = (value) => {
   if (value === null || value === undefined || value === '') return NaN;
@@ -80,6 +81,7 @@ exports.createDraftReceipt = async (req, res) => {
       status: 'draft'
     });
 
+    await writeAuditLog(req, { action: 'inward.draft_created', entityType: 'InwardReceipt', entityId: receipt._id, entityLabel: receipt.receiptNumber, summary: 'Inward receipt draft created: ' + receipt.receiptNumber, metadata: { supplierId: String(supplierId), invoiceReference: invoiceReference.trim(), lineCount: lines.length } });
     return res.status(201).json({ message: 'Inward receipt draft saved successfully', receipt });
   } catch (error) {
     if (error.code === 11000) {
@@ -192,6 +194,7 @@ exports.postReceipt = async (req, res) => {
         }], { session });
       }
 
+      await writeAuditLog(req, { action: 'inward.posted', entityType: 'InwardReceipt', entityId: receipt._id, entityLabel: receipt.receiptNumber, summary: 'Inward receipt posted: ' + receipt.receiptNumber, metadata: { supplierId: String(receipt.supplierId), invoiceReference: receipt.invoiceReference, reelCount: totalReelsToCreate } }, session);
       postedReceipt = receipt;
     });
 

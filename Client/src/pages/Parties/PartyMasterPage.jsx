@@ -1,7 +1,10 @@
 import React, { useState, useMemo } from 'react';
+import { useAuth } from '../../context/AuthContext';
 import { Search, Plus, Trash2, ArrowLeft, Phone, MapPin, Receipt, IndianRupee, User, Calendar, UserPlus, X, CheckCircle2, ArrowDownRight, ArrowUpRight, Save } from 'lucide-react';
 
 export default function PartyMasterPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [activeView, setActiveView] = useState('directory'); 
   const [selectedParty, setSelectedParty] = useState(null);
   
@@ -238,7 +241,7 @@ export default function PartyMasterPage() {
                     <td className="px-5 py-4 text-right font-medium text-slate-700">{txn.credit > 0 ? `₹${txn.credit.toLocaleString('en-IN')}` : '-'}</td>
                     <td className="px-5 py-4 text-right font-bold text-slate-900">₹{txn.balance.toLocaleString('en-IN')}</td>
                     <td className="px-5 py-4 text-center">
-                      {txn.type !== 'Opening Balance' && (
+                      {isAdmin && txn.type !== 'Opening Balance' && (
                         <button 
                           onClick={() => handleDeleteTransaction(txn)}
                           className="p-1.5 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition opacity-0 group-hover:opacity-100"
@@ -405,13 +408,13 @@ export default function PartyMasterPage() {
                       >
                         <User size={16} />
                       </button>
-                      <button 
+                      {isAdmin && <button 
                         onClick={(e) => handleDeleteParty(party, e)} 
                         className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition" 
                         title="Delete Party"
                       >
                         <Trash2 size={16} />
-                      </button>
+                      </button>}
                     </div>
                   </td>
                 </tr>

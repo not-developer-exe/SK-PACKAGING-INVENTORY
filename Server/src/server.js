@@ -16,6 +16,7 @@ const dispatchRoutes = require('./routes/dispatch.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
 const wasteRoutes = require('./routes/waste.routes');
 const invoiceRoutes = require('./routes/invoice.routes');
+const controlRoutes = require('./routes/control.routes');
 
 const app = express();
 const allowedOrigins = (process.env.CLIENT_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174')
@@ -44,7 +45,7 @@ app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(cookieParser());
 
 app.use((req, res, next) => {
-  console.info(`[API] ${req.method} ${req.path}`);
+  console.info('[API] ' + req.method + ' ' + req.path);
   next();
 });
 
@@ -52,6 +53,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/parties', partyRoutes);
 app.use('/api/inward', inwardRoutes);
 app.use('/api/inventory', inventoryRoutes);
+app.use('/api/controls', controlRoutes);
 app.use('/api/production', productionRoutes);
 app.use('/api/conversion', conversionRoutes);
 app.use('/api/ledger', ledgerRoutes);
@@ -89,9 +91,9 @@ const PORT = Number(process.env.PORT) || 5001;
 async function startServer() {
   if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET is required');
   await connectDB();
-  const server = app.listen(PORT, () => console.info(`SK Packaging ERP API listening on port ${PORT}`));
+  const server = app.listen(PORT, () => console.info('SK Packaging ERP API listening on port ' + PORT));
   const shutdown = (signal) => {
-    console.info(`${signal} received; shutting down gracefully`);
+    console.info(signal + ' received; shutting down gracefully');
     server.close(async () => {
       await mongoose.connection.close();
       process.exit(0);

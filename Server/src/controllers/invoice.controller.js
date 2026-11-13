@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const Invoice = require('../models/Invoice.model');
 const Dispatch = require('../models/Dispatch.model');
 const Party = require('../models/Party.model');
+const writeAuditLog = require('../utils/writeAuditLog');
 
 exports.getUninvoicedDispatches = async (req, res) => {
   try {
@@ -142,6 +143,7 @@ exports.createInvoice = async (req, res) => {
       });
       customer.balance = newBalance;
       await customer.save({ session });
+      await writeAuditLog(req, { action: 'invoice.created', entityType: 'Invoice', entityId: created._id, entityLabel: invoiceNumber, summary: 'Sales invoice created: ' + invoiceNumber, metadata: { customerId: String(customerId), dispatchId: String(dispatchId), subTotal, gstPercent: gst, grandTotal } }, session);
       createdInvoice = created;
     });
 

@@ -1,20 +1,19 @@
 const mongoose = require('mongoose');
 
 const stockMovementSchema = new mongoose.Schema({
-  movementType: { 
-    type: String, 
+  movementType: {
+    type: String,
     required: true,
-    // Added 'adjustment' and 'dispatch' to the VIP list
-    enum: ['inward_receipt', 'production_issue', 'sheet_cutting', 'adjustment', 'dispatch'] 
+    enum: ['inward_receipt', 'production_issue', 'sheet_cutting', 'adjustment', 'dispatch']
   },
-  referenceId: { 
-    type: mongoose.Schema.Types.ObjectId, 
+  referenceId: {
+    type: mongoose.Schema.Types.ObjectId,
     required: true,
     refPath: 'referenceModel'
   },
   referenceModel: {
     type: String,
-    enum: ['InwardReceipt', 'ProductionRun', 'CorrugatedSheet', 'FinishedBox', 'Dispatch', 'ReelUnit']
+    enum: ['InwardReceipt', 'ProductionRun', 'CorrugatedSheet', 'FinishedBox', 'Dispatch', 'ReelUnit', 'OpeningStockAdjustment']
   },
   itemType: {
     type: String,
