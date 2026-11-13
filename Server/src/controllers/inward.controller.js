@@ -3,14 +3,33 @@ const InwardReceipt = require('../models/InwardReceipt.model');
 const ReelUnit = require('../models/ReelUnit.model');
 const StockMovement = require('../models/StockMovement.model');
 const Party = require('../models/Party.model');
+const Sequence = require('../models/Sequence.model');
 
 // 1. Create Draft Receipt
 exports.createDraftReceipt = async (req, res) => {
   try {
-    const { supplierId, invoiceReference, receiptDate, notes, lines } = req.body;
+    const { supplierId, invoiceReference, receiptDate, notes, lines } = req.body || {};
 
-    if (!supplierId || !invoiceReference || !lines || lines.length === 0) {
-      return res.status(400).json({ message: 'Supplier, invoice reference, and at least one line item are required.' });
+    if (!mongoose.isValidObjectId(supplierId) || typeof invoiceReference !== 'string' || !invoiceReference.trim() || !Array.isArray(lines) || lines.length === 0) {
+      return res.status(400).json({ message: 'A valid supplier, invoice reference and at least one line item are required.' });
+    }
+
+    const invalidLine = lines.some((line) => {
+      const width = Number(line.reelWidthInches);
+      const bf = Number(line.bf);
+      const gsm = Number(line.gsm);
+      const count = Number(line.reelCount);
+      const weight = Number(line.totalWeightKg);
+      const rate = Number(line.ratePerKg);
+      return !Number.isFinite(width) || width <= 0 ||
+        !Number.isFinite(bf) || bf <= 0 ||
+        !Number.isFinite(gsm) || gsm <= 0 ||
+        !Number.isInteger(count) || count <= 0 ||
+        !Number.isFinite(weight) || weight <= 0 ||
+        !Number.isFinite(rate) || rate < 0;
+    });
+    if (invalidLine) {
+      return res.status(400).json({ message: 'Each inward line needs positive reel dimensions, a whole reel count, positive total weight and a non-negative rate.' });
     }
 
     const supplier = await Party.findById(supplierId);
@@ -53,75 +72,96 @@ exports.getReceipts = async (req, res) => {
 
 // 2. Post Draft Receipt (Atomic Transaction)
 exports.postReceipt = async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    return res.status(400).json({ message: 'Invalid inward receipt ID.' });
+  }
+
   const session = await mongoose.startSession();
-  session.startTransaction();
-
   try {
-    const receiptId = req.params.id;
+    let postedReceipt;
+    await session.withTransaction(async () => {
+      const receipt = await InwardReceipt.findOneAndUpdate(
+        { _id: req.params.id, status: 'draft' },
+        { $set: { status: 'posted', postedAt: new Date(), postedBy: req.user._id } },
+        { new: true, session }
+      );
 
-    // Atomically find and lock the draft receipt
-    const receipt = await InwardReceipt.findOneAndUpdate(
-      { _id: receiptId, status: 'draft' },
-      { $set: { status: 'posted', postedAt: new Date(), postedBy: req.user._id } },
-      { new: true, session }
-    );
+      if (!receipt) {
+        const error = new Error('Receipt not found or already posted.');
+        error.statusCode = 409;
+        throw error;
+      }
 
-    if (!receipt) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({ message: 'Receipt not found or already posted.' });
-    }
+      // Validate stored draft data again before stock is created.
+      for (const line of receipt.lines) {
+        const qty = Number(line.reelCount);
+        const weightNum = Number(line.totalWeightKg.toString());
+        const width = Number(line.reelWidthInches);
+        const rate = Number(line.ratePerKg.toString());
+        if (!Number.isInteger(qty) || qty <= 0 || !Number.isFinite(weightNum) || weightNum <= 0 ||
+            !Number.isFinite(width) || width <= 0 || !Number.isFinite(rate) || rate < 0) {
+          const error = new Error('Receipt contains an invalid line. Correct the draft before posting.');
+          error.statusCode = 400;
+          throw error;
+        }
+      }
 
-    let reelCounter = await ReelUnit.countDocuments();
+      const existingReelCount = await ReelUnit.countDocuments().session(session);
+      const totalReelsToCreate = receipt.lines.reduce((sum, line) => sum + Number(line.reelCount), 0);
+      const reelSequence = await Sequence.findOneAndUpdate(
+        { _id: 'reel-unit' },
+        [{ $set: { value: { $add: [{ $max: [{ $ifNull: ['$value', existingReelCount] }, existingReelCount] }, totalReelsToCreate] } } }],
+        { new: true, upsert: true, session }
+      );
+      let reelCounter = reelSequence.value - totalReelsToCreate;
 
-    // Process each line item
-    for (const line of receipt.lines) {
-      const weightNum = parseFloat(line.totalWeightKg.toString());
-      const qty = line.reelCount;
-      const weightPerReel = weightNum / qty;
+      for (const line of receipt.lines) {
+        const weightNum = Number(line.totalWeightKg.toString());
+        const qty = Number(line.reelCount);
+        const weightPerReel = weightNum / qty;
 
-      for (let i = 0; i < qty; i++) {
-        reelCounter++;
-        const reelCode = `RL-${String(reelCounter).padStart(6, '0')}`;
+        for (let i = 0; i < qty; i++) {
+          reelCounter += 1;
+          const reelCode = `RL-${String(reelCounter).padStart(6, '0')}`;
+          await ReelUnit.create([{
+            reelCode,
+            reelWidthInches: line.reelWidthInches,
+            bf: line.bf,
+            gsm: line.gsm,
+            quality: line.quality,
+            supplierId: receipt.supplierId,
+            inwardReceiptId: receipt._id,
+            batchReference: line.supplierBatchRef || receipt.invoiceReference,
+            originalWeightKg: weightPerReel,
+            remainingWeightKg: weightPerReel,
+            ratePerKg: line.ratePerKg,
+            status: 'available'
+          }], { session });
+        }
 
-        // Create individual physical reel unit
-        await ReelUnit.create([{
-          reelCode,
-          reelWidthInches: line.reelWidthInches,
-          bf: line.bf,
-          gsm: line.gsm,
-          quality: line.quality,
-          supplierId: receipt.supplierId,
-          inwardReceiptId: receipt._id,
-          batchReference: line.supplierBatchRef || receipt.invoiceReference,
-          originalWeightKg: weightPerReel,
-          remainingWeightKg: weightPerReel,
-          ratePerKg: line.ratePerKg,
-          status: 'available'
+        await StockMovement.create([{
+          movementType: 'inward_receipt',
+          referenceId: receipt._id,
+          referenceModel: 'InwardReceipt',
+          itemType: 'reel',
+          specificationSummary: `${line.reelWidthInches}" | BF ${line.bf} | ${line.gsm} GSM | ${line.quality}`,
+          quantityChange: qty,
+          weightChangeKg: weightNum,
+          notes: `Inward Receipt ${receipt.receiptNumber} - Inv: ${receipt.invoiceReference}`,
+          performedBy: req.user._id
         }], { session });
       }
 
-      // Append to immutable Stock Movement Ledger
-      await StockMovement.create([{
-        movementType: 'inward_receipt',
-        referenceId: receipt._id,
-        referenceModel: 'InwardReceipt',
-        itemType: 'reel',
-        specificationSummary: `${line.reelWidthInches}" | BF ${line.bf} | ${line.gsm} GSM | ${line.quality}`,
-        quantityChange: qty,
-        weightChangeKg: weightNum,
-        notes: `Inward Receipt ${receipt.receiptNumber} - Inv: ${receipt.invoiceReference}`,
-        performedBy: req.user._id
-      }], { session });
-    }
+      postedReceipt = receipt;
+    });
 
-    await session.commitTransaction();
-    session.endSession();
-
-    res.json({ message: 'Receipt posted successfully. Reel stock and ledger updated.', receipt });
+    return res.json({ message: 'Receipt posted successfully. Reel stock and ledger updated.', receipt: postedReceipt });
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
-    res.status(500).json({ message: 'Error posting receipt', error: error.message });
+    console.error('[INWARD] Posting failed:', error.message);
+    return res.status(error.statusCode || 500).json({
+      message: error.statusCode ? error.message : 'Error posting receipt'
+    });
+  } finally {
+    await session.endSession();
   }
 };

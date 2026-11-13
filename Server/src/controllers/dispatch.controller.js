@@ -3,6 +3,7 @@ const Dispatch = require('../models/Dispatch.model');
 const FinishedBox = require('../models/FinishedBox.model');
 const StockMovement = require('../models/StockMovement.model');
 const Party = require('../models/Party.model');
+const Sequence = require('../models/Sequence.model');
 
 exports.recordDispatch = async (req, res) => {
   const { customerId, vehicleNumber, driverName, boxes } = req.body || {};
@@ -31,9 +32,13 @@ exports.recordDispatch = async (req, res) => {
         throw error;
       }
 
-      // Unique index on challanNumber remains the final concurrency guard.
-      const count = await Dispatch.countDocuments().session(session);
-      challanNumber = `DC-${String(count + 1).padStart(6, '0')}`;
+      const existingCount = await Dispatch.countDocuments().session(session);
+      const sequence = await Sequence.findOneAndUpdate(
+        { _id: 'dispatch-challan' },
+        [{ $set: { value: { $add: [{ $max: [{ $ifNull: ['$value', existingCount] }, existingCount] }, 1] } } }],
+        { new: true, upsert: true, session }
+      );
+      challanNumber = `DC-${String(sequence.value).padStart(6, '0')}`;
 
       const dispatchLines = [];
       for (const [boxId, dispatchQuantity] of quantities) {
