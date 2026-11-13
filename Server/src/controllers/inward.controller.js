@@ -105,6 +105,7 @@ exports.postReceipt = async (req, res) => {
       await StockMovement.create([{
         movementType: 'inward_receipt',
         referenceId: receipt._id,
+        referenceModel: 'InwardReceipt',
         itemType: 'reel',
         specificationSummary: `${line.reelWidthInches}" | BF ${line.bf} | ${line.gsm} GSM | ${line.quality}`,
         quantityChange: qty,
