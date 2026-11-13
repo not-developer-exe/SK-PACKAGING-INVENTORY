@@ -3,6 +3,7 @@ const InwardReceipt = require('../models/InwardReceipt.model');
 const ReelUnit = require('../models/ReelUnit.model');
 const StockMovement = require('../models/StockMovement.model');
 const Party = require('../models/Party.model');
+const Sequence = require('../models/Sequence.model');
 
 // 1. Create Draft Receipt
 exports.createDraftReceipt = async (req, res) => {
@@ -105,7 +106,14 @@ exports.postReceipt = async (req, res) => {
         }
       }
 
-      let reelCounter = await ReelUnit.countDocuments().session(session);
+      const existingReelCount = await ReelUnit.countDocuments().session(session);
+      const totalReelsToCreate = receipt.lines.reduce((sum, line) => sum + Number(line.reelCount), 0);
+      const reelSequence = await Sequence.findOneAndUpdate(
+        { _id: 'reel-unit' },
+        { $max: { value: existingReelCount }, $inc: { value: totalReelsToCreate } },
+        { new: true, upsert: true, setDefaultsOnInsert: true, session }
+      );
+      let reelCounter = reelSequence.value - totalReelsToCreate;
 
       for (const line of receipt.lines) {
         const weightNum = Number(line.totalWeightKg.toString());
