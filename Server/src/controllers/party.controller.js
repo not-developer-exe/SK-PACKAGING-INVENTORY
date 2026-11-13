@@ -71,7 +71,11 @@ exports.deleteParty = async (req, res) => {
 
 exports.addTransaction = async (req, res) => {
   try {
-    const { amount, mode, ref, direction } = req.body; // direction: 'in' or 'out'
+    const { amount: rawAmount, mode, ref, direction } = req.body || {};
+    const amount = Number(rawAmount);
+    if (!Number.isFinite(amount) || amount <= 0 || !['in', 'out'].includes(direction) || typeof mode !== 'string' || !mode.trim()) {
+      return res.status(400).json({ message: 'A positive amount, payment mode and valid direction are required.' });
+    }
     const party = await Party.findById(req.params.id);
     
     if (!party) return res.status(404).json({ message: 'Party not found' });
