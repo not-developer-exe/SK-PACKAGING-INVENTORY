@@ -7,7 +7,7 @@ const invoiceSchema = new mongoose.Schema({
   dispatchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Dispatch', required: true }, // Links directly to Delivery Challan
   
   items: [{
-    boxId: { type: mongoose.Schema.Types.ObjectId, ref: 'Box' },
+    boxId: { type: mongoose.Schema.Types.ObjectId, ref: 'FinishedBox' },
     quantity: { type: Number, required: true },
     rate: { type: Number, required: true },
     taxableAmount: { type: Number, required: true }
