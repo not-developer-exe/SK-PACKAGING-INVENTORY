@@ -2,92 +2,121 @@ const mongoose = require('mongoose');
 const Dispatch = require('../models/Dispatch.model');
 const FinishedBox = require('../models/FinishedBox.model');
 const StockMovement = require('../models/StockMovement.model');
+const Party = require('../models/Party.model');
 
 exports.recordDispatch = async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
+  const { customerId, vehicleNumber, driverName, boxes } = req.body || {};
+  if (!mongoose.isValidObjectId(customerId) || !Array.isArray(boxes) || boxes.length === 0) {
+    return res.status(400).json({ message: 'A valid customer and at least one box batch are required' });
+  }
 
-  try {
-    const { customerId, vehicleNumber, driverName, boxes } = req.body;
-
-    if (!customerId || !boxes?.length) {
-      return res.status(400).json({ message: 'Customer and at least one box batch are required.' });
+  const quantities = new Map();
+  for (const item of boxes) {
+    const id = String(item.boxId || '');
+    const quantity = Number(item.dispatchQuantity);
+    if (!mongoose.isValidObjectId(id) || !Number.isInteger(quantity) || quantity <= 0) {
+      return res.status(400).json({ message: 'Each dispatch line must contain a valid batch and a positive whole-number quantity' });
     }
+    quantities.set(id, (quantities.get(id) || 0) + quantity);
+  }
 
-    // 1. Generate Challan Number
-    const count = await Dispatch.countDocuments();
-    const challanNumber = `DC-${String(count + 1).padStart(6, '0')}`;
-
-    // 2. Process each box batch being dispatched
-    for (const item of boxes) {
-      const dispatchQty = parseInt(item.dispatchQuantity, 10);
-      
-      const box = await FinishedBox.findById(item.boxId).session(session);
-      if (!box) throw new Error(`Box batch ${item.boxId} not found.`);
-
-      if (box.quantityAvailable < dispatchQty) {
-        throw new Error(`Insufficient stock for ${box.itemName}. Available: ${box.quantityAvailable}, Requested: ${dispatchQty}`);
+  const session = await mongoose.startSession();
+  let challanNumber;
+  try {
+    await session.withTransaction(async () => {
+      const customer = await Party.findById(customerId).session(session);
+      if (!customer || !['Customer', 'Both'].includes(customer.type)) {
+        const error = new Error('Selected party is not a valid customer');
+        error.statusCode = 400;
+        throw error;
       }
 
-      // Deduct inventory
-      box.quantityAvailable -= dispatchQty;
-      if (box.quantityAvailable === 0) box.status = 'dispatched';
-      await box.save({ session });
+      // Unique index on challanNumber remains the final concurrency guard.
+      const count = await Dispatch.countDocuments().session(session);
+      challanNumber = `DC-${String(count + 1).padStart(6, '0')}`;
 
-      // Ledger Entry
-      await StockMovement.create([{
-        movementType: 'dispatch',
-        referenceId: box._id,
-        itemType: 'finished_good',
-        specificationSummary: `${box.itemName} | ${box.dimensions.length}x${box.dimensions.width}x${box.dimensions.height}`,
-        quantityChange: -dispatchQty,
-        weightChangeKg: 0, // Finished goods dispatch usually tracks counts, not raw paper weight
-        notes: `Dispatched via Challan ${challanNumber}`,
-        performedBy: req.user._id
-      }], { session, ordered: true });
-    }
+      const dispatchLines = [];
+      for (const [boxId, dispatchQuantity] of quantities) {
+        const box = await FinishedBox.findById(boxId).session(session);
+        if (!box) {
+          const error = new Error(`Finished goods batch ${boxId} was not found`);
+          error.statusCode = 404;
+          throw error;
+        }
+        if (String(box.customerId) !== String(customerId)) {
+          const error = new Error(`Batch ${box.batchNumber} is assigned to a different customer`);
+          error.statusCode = 400;
+          throw error;
+        }
+        if (box.quantityAvailable < dispatchQuantity) {
+          const error = new Error(`Insufficient stock for ${box.itemName}. Available: ${box.quantityAvailable}, requested: ${dispatchQuantity}`);
+          error.statusCode = 409;
+          throw error;
+        }
 
-    // 3. Create the Delivery Challan Header
-    const dispatch = await Dispatch.create([{
-      challanNumber,
-      customerId,
-      vehicleNumber,
-      driverName,
-      boxes
-    }], { session, ordered: true });
+        box.quantityAvailable -= dispatchQuantity;
+        if (box.quantityAvailable === 0) box.status = 'dispatched';
+        await box.save({ session });
 
-    await session.commitTransaction();
-    session.endSession();
+        await StockMovement.create([{
+          movementType: 'dispatch',
+          referenceId: box._id,
+          itemType: 'finished_good',
+          specificationSummary: `${box.itemName} | ${box.dimensions.length}x${box.dimensions.width}x${box.dimensions.height}`,
+          quantityChange: -dispatchQuantity,
+          weightChangeKg: 0,
+          notes: `Dispatched via Challan ${challanNumber}`,
+          performedBy: req.user._id
+        }], { session });
 
-    res.status(201).json({ message: 'Dispatch recorded successfully', challanNumber });
+        dispatchLines.push({ boxId: box._id, dispatchQuantity });
+      }
+
+      await Dispatch.create([{
+        challanNumber,
+        customerId,
+        vehicleNumber: typeof vehicleNumber === 'string' ? vehicleNumber.trim() : '',
+        driverName: typeof driverName === 'string' ? driverName.trim() : '',
+        boxes: dispatchLines,
+        recordedBy: req.user._id
+      }], { session });
+    });
+
+    return res.status(201).json({ message: 'Dispatch recorded successfully', challanNumber });
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
-    console.error('[DISPATCH ERROR]', error);
-    res.status(500).json({ message: error.message || 'Error recording dispatch' });
+    console.error('[DISPATCH ERROR]', error.message);
+    const status = error.statusCode || (error.code === 11000 ? 409 : 500);
+    return res.status(status).json({
+      message: status >= 500 ? 'Unable to record dispatch. No stock changes were committed.' : error.message
+    });
+  } finally {
+    await session.endSession();
   }
 };
 
-// Helper: Fetch boxes that are currently sitting in the warehouse
 exports.getAvailableBoxes = async (req, res) => {
   try {
     const boxes = await FinishedBox.find({ quantityAvailable: { $gt: 0 } })
       .populate('customerId', 'name')
-      .sort({ createdAt: 1 });
-    res.json({ boxes });
+      .sort({ createdAt: 1 })
+      .lean();
+    return res.json({ boxes });
   } catch (error) {
-    res.status(500).json({ message: 'Error fetching available boxes', error: error.message });
+    console.error('[DISPATCH] Available stock query failed:', error.message);
+    return res.status(500).json({ message: 'Unable to fetch available finished goods' });
   }
 };
 
 exports.getDispatches = async (req, res) => {
-    try {
-      const dispatches = await Dispatch.find()
-        .populate('customerId', 'name')
-        .populate('boxes.boxId', 'batchNumber itemName dimensions')
-        .sort({ createdAt: -1 }); // Newest first
-      res.json({ dispatches });
-    } catch (error) {
-      res.status(500).json({ message: 'Error fetching dispatches', error: error.message });
-    }
-  };
+  try {
+    const dispatches = await Dispatch.find()
+      .populate('customerId', 'name')
+      .populate('boxes.boxId', 'batchNumber itemName dimensions')
+      .sort({ createdAt: -1 })
+      .lean();
+    return res.json({ dispatches });
+  } catch (error) {
+    console.error('[DISPATCH] Dispatch history query failed:', error.message);
+    return res.status(500).json({ message: 'Unable to fetch dispatch history' });
+  }
+};
