@@ -116,7 +116,7 @@ export default function WasteRegisterPage() {
 
       {/* Tabs */}
       <div className="flex gap-2 border-b border-slate-200 pb-2">
-        <button onClick={() => setActiveTab('inventory')} className={`px-4 py-2 text-sm font-medium transition ${activeTab === 'inventory' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}>Production Waste Log</button>
+        <button onClick={() => setActiveTab('inventory')} className={`px-4 py-2 text-sm font-medium transition ${activeTab === 'inventory' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}>Verified Scrap Log</button>
         <button onClick={() => setActiveTab('sales')} className={`px-4 py-2 text-sm font-medium transition ${activeTab === 'sales' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}>Scrap Sales History</button>
       </div>
 
@@ -141,7 +141,7 @@ export default function WasteRegisterPage() {
                   <td className="px-5 py-4 text-slate-700">{run.operatorName}</td>
                 </tr>
               ))}
-              {data.productionWaste.length === 0 && (<tr><td colSpan={4} className="p-6 text-center text-slate-500">No machine waste generated yet.</td></tr>)}
+              {data.productionWaste.length === 0 && (<tr><td colSpan={4} className="p-6 text-center text-slate-500">No measured recoverable scrap recorded yet.</td></tr>)}
             </tbody>
           </table>
         ) : (
