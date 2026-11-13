@@ -1,4 +1,6 @@
+const mongoose = require('mongoose');
 const Party = require('../models/Party.model');
+const writeAuditLog = require('../utils/writeAuditLog');
 const AuditLog = require('../models/AuditLog.model');
 
 async function auditPartyChange(req, action, party, summary, metadata = {}) {
@@ -125,26 +127,40 @@ exports.addTransaction = async (req, res) => {
     return res.status(400).json({ message: 'Enter a positive amount, payment mode and valid direction.' });
   }
 
+  const session = await mongoose.startSession();
   try {
-    const party = await Party.findById(req.params.id);
-    if (!party) return res.status(404).json({ message: 'Party not found' });
-    const isPaymentIn = direction === 'in';
-    const newBalance = isPaymentIn ? party.balance - amount : party.balance + amount;
-    const newTxn = {
-      type: isPaymentIn ? 'Payment Received' : 'Payment Sent',
-      ref: mode.trim() + (ref.trim() ? ' / ' + ref.trim() : ''),
-      debit: isPaymentIn ? 0 : amount,
-      credit: isPaymentIn ? amount : 0,
-      balance: newBalance
-    };
-    party.ledger.push(newTxn);
-    party.balance = newBalance;
-    await party.save();
-    await auditPartyChange(req, 'party.payment_recorded', party, newTxn.type + ' recorded for ' + party.name, { amount, mode: mode.trim(), ref: ref.trim(), direction, resultingBalance: newBalance });
-    return res.json(party);
+    let updatedParty;
+    await session.withTransaction(async () => {
+      const party = await Party.findById(req.params.id).session(session);
+      if (!party) throw Object.assign(new Error('Party not found.'), { statusCode: 404 });
+      const isPaymentIn = direction === 'in';
+      const newBalance = isPaymentIn ? party.balance - amount : party.balance + amount;
+      const newTxn = {
+        type: isPaymentIn ? 'Payment Received' : 'Payment Sent',
+        ref: mode.trim() + (ref.trim() ? ' / ' + ref.trim() : ''),
+        debit: isPaymentIn ? 0 : amount,
+        credit: isPaymentIn ? amount : 0,
+        balance: newBalance
+      };
+      party.ledger.push(newTxn);
+      party.balance = newBalance;
+      await party.save({ session });
+      await writeAuditLog(req, {
+        action: 'party.payment_recorded',
+        entityType: 'Party',
+        entityId: party._id,
+        entityLabel: party.name,
+        summary: newTxn.type + ' recorded for ' + party.name,
+        metadata: { amount, mode: mode.trim(), ref: ref.trim(), direction, resultingBalance: newBalance }
+      }, session);
+      updatedParty = party;
+    });
+    return res.json(updatedParty);
   } catch (error) {
     console.error('[PARTIES] Payment failed:', error.message);
-    return res.status(400).json({ message: 'Unable to record payment.' });
+    return res.status(error.statusCode || 400).json({ message: error.statusCode ? error.message : 'Unable to record payment.' });
+  } finally {
+    await session.endSession();
   }
 };
 
