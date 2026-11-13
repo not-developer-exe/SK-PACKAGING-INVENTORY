@@ -1,20 +1,20 @@
-import axios from 'axios';
+import axiosClient from '../api/axiosClient';
 
-const API_URL = 'http://localhost:5000/api/invoices/'; // Adjust if your port differs
+const API_PATH = '/invoices/';
 
 export const invoiceService = {
   createInvoice: async (invoiceData) => {
-    const response = await axios.post(API_URL, invoiceData);
+    const response = await axiosClient.post(API_PATH, invoiceData);
     return response.data;
   },
-  
+
   getInvoices: async () => {
-    const response = await axios.get(API_URL);
+    const response = await axiosClient.get(API_PATH);
     return response.data;
   },
 
   getUninvoicedDispatches: async (customerId) => {
-    const response = await axios.get(`${API_URL}uninvoiced/${customerId}`);
+    const response = await axiosClient.get(`${API_PATH}uninvoiced/${encodeURIComponent(customerId)}`);
     return response.data;
   }
 };
