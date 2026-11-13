@@ -110,7 +110,7 @@ exports.postReceipt = async (req, res) => {
       const totalReelsToCreate = receipt.lines.reduce((sum, line) => sum + Number(line.reelCount), 0);
       const reelSequence = await Sequence.findOneAndUpdate(
         { _id: 'reel-unit' },
-        [{ $set: { value: { $add: [{ $max: [{ $ifNull: ['$value', existingReelCount] }, existingReelCount] }, totalReelsToCreate] } }],
+        [{ $set: { value: { $add: [{ $max: [{ $ifNull: ['$value', existingReelCount] }, existingReelCount] }, totalReelsToCreate] } } }],
         { new: true, upsert: true, session }
       );
       let reelCounter = reelSequence.value - totalReelsToCreate;
