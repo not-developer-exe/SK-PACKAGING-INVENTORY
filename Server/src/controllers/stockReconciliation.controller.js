@@ -117,20 +117,20 @@ exports.postStockReconciliation = async (req, res) => {
         const reel = reelMap.get(String(line.reelId));
         const oldWeight = Number(line.systemWeightKg.toString());
         const newWeight = Number(line.countedWeightKg.toString());
-        const updated = await ReelUnit.updateOne(
-          { _id: reel._id, remainingWeightKg: reel.remainingWeightKg, status: reel.status },
-          {
-            $set: {
-              remainingWeightKg: newWeight,
-              status: newWeight === 0 ? 'consumed' : newWeight < Number(reel.originalWeightKg.toString()) ? 'partial' : 'available'
-            }
-          },
-          { session }
-        );
-        if (updated.modifiedCount !== 1) throw new Error('Stock changed while this count was being posted. Refresh and retry.');
-
         const delta = newWeight - oldWeight;
         if (delta !== 0) {
+          const updated = await ReelUnit.updateOne(
+            { _id: reel._id, remainingWeightKg: reel.remainingWeightKg, status: reel.status },
+            {
+              $set: {
+                remainingWeightKg: newWeight,
+                status: newWeight === 0 ? 'consumed' : newWeight < Number(reel.originalWeightKg.toString()) ? 'partial' : 'available'
+              }
+            },
+            { session }
+          );
+          if (updated.modifiedCount !== 1) throw new Error('Stock changed while this count was being posted. Refresh and retry.');
+
           await StockMovement.create([{
             movementType: 'adjustment',
             referenceId: reconciliation._id,
