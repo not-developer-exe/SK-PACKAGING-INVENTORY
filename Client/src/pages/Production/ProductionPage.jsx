@@ -55,6 +55,10 @@ export default function ProductionPage() {
       setError('Output weight cannot be greater than input weight. Check your measurements.');
       return;
     }
+    if (recoverableWasteKg === '') {
+      setError('Enter the measured recoverable scrap weight, or enter 0 if no recoverable scrap was produced.');
+      return;
+    }
     if (!Number.isFinite(measuredScrap) || measuredScrap < 0 || measuredScrap > massDifference) {
       setError('Measured recoverable scrap must be non-negative and cannot exceed the input-output weight difference.');
       return;
@@ -225,6 +229,7 @@ export default function ProductionPage() {
           <label className="mb-2 block text-sm font-semibold text-amber-900">Measured Recoverable Scrap (kg)</label>
           <input
             type="number"
+            required
             min="0"
             max={Math.max(0, massDifference)}
             step="0.001"
