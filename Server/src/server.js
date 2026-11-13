@@ -3,6 +3,10 @@ const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const connectDB = require('./config/db');
+
+// Import Routes
+const authRoutes = require('./routes/auth.routes');
+const partyRoutes = require('./routes/party.routes');
 const inwardRoutes = require('./routes/inward.routes');
 const inventoryRoutes = require('./routes/inventory.routes'); 
 const productionRoutes = require('./routes/production.routes');
@@ -12,12 +16,6 @@ const dispatchRoutes = require('./routes/dispatch.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
 const wasteRoutes = require('./routes/waste.routes');
 const invoiceRoutes = require('./routes/invoice.routes');
-
-
-// Import Routes
-const authRoutes = require('./routes/auth.routes');
-const partyRoutes = require('./routes/party.routes');
-
 
 const app = express();
 
@@ -36,7 +34,7 @@ app.use(cors(corsOptions));
 // 3. BODY & COOKIE PARSERS (MUST BE BEFORE ROUTES)
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cookieParser()); // <-- This creates req.cookies
+app.use(cookieParser()); // Creates req.cookies
 
 // 4. NETWORK LOGGER
 app.use((req, res, next) => {
@@ -44,10 +42,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// 5. ROUTES (MUST BE AFTER COOKIE PARSER)
-app.use('/api/auth', authRoutes);
-app.use('/api/parties', partyRoutes);
-app.use('/api/inward', inwardRoutes);
+// 5. ROUTES
 app.use('/api/auth', authRoutes);
 app.use('/api/parties', partyRoutes);
 app.use('/api/inward', inwardRoutes);

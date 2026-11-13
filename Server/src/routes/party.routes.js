@@ -1,12 +1,20 @@
 const express = require('express');
 const router = express.Router();
-const { getParties, createParty, togglePartyStatus } = require('../controllers/party.controller');
-const { protect } = require('../middlewares/auth.middleware');
+const { 
+  getParties, 
+  createParty, 
+  deleteParty, 
+  addTransaction, 
+  deleteTransaction 
+} = require('../controllers/party.controller');
 
-router.use(protect); // All party routes require authentication
-
+// Master Routes
 router.get('/', getParties);
 router.post('/', createParty);
-router.patch('/:id/status', togglePartyStatus);
+router.delete('/:id', deleteParty);
+
+// Khata (Ledger) Routes
+router.post('/:id/transaction', addTransaction);
+router.delete('/:partyId/transaction/:txnId', deleteTransaction);
 
 module.exports = router;

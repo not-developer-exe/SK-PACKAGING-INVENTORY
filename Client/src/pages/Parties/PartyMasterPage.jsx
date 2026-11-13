@@ -1,16 +1,15 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Plus, Trash2, ArrowLeft, Phone, MapPin, Receipt, IndianRupee, User, Calendar, UserPlus, X, CheckCircle2, ArrowDownRight, ArrowUpRight } from 'lucide-react';
+import { Search, Plus, Trash2, ArrowLeft, Phone, MapPin, Receipt, IndianRupee, User, Calendar, UserPlus, X, CheckCircle2, ArrowDownRight, ArrowUpRight, Save } from 'lucide-react';
 
 export default function PartyMasterPage() {
   const [activeView, setActiveView] = useState('directory'); 
   const [selectedParty, setSelectedParty] = useState(null);
   
-  // Live State
   const [parties, setParties] = useState([
-    { _id: 'P01', name: 'Nano Fertilizers Private Ltd', type: 'Customer', phone: '+91 98765 43210', city: 'Gwalior', balance: 145000 },
-    { _id: 'P02', name: 'Cheema Delta Mills', type: 'Supplier', phone: '+91 99887 76655', city: 'Indore', balance: -450000 },
-    { _id: 'P03', name: 'Anvi Traders', type: 'Customer', phone: '+91 88776 65544', city: 'Bhopal', balance: 44333 },
-    { _id: 'P04', name: 'Test Empty Party', type: 'Customer', phone: '-', city: 'Gwalior', balance: 0 },
+    { _id: 'P01', name: 'Nano Fertilizers Private Ltd', type: 'Customer', phone: '+91 98765 43210', city: 'Gwalior', balance: 145000, openingBalance: 145000 },
+    { _id: 'P02', name: 'Cheema Delta Mills', type: 'Supplier', phone: '+91 99887 76655', city: 'Indore', balance: -450000, openingBalance: -450000 },
+    { _id: 'P03', name: 'Anvi Traders', type: 'Customer', phone: '+91 88776 65544', city: 'Bhopal', balance: 44333, openingBalance: 44333 },
+    { _id: 'P05', name: 'Bahl Paper Mills', type: 'Both', phone: '+91 77665 54433', city: 'Delhi', balance: -25000, openingBalance: -25000 },
   ]);
 
   const [ledger, setLedger] = useState([
@@ -19,24 +18,73 @@ export default function PartyMasterPage() {
     { _id: 'L3', date: '2026-11-12', type: 'Payment Received', ref: 'NEFT', debit: 0, credit: 22194, balance: 145000 },
   ]);
   
-  // Directory & Filter State
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('All');
   const [monthFilter, setMonthFilter] = useState(new Date().toISOString().slice(0, 7));
 
-  // Payment Modal State
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [paymentDirection, setPaymentDirection] = useState('in'); // 'in' or 'out'
+  const [paymentDirection, setPaymentDirection] = useState('in'); 
   const [payAmount, setPayAmount] = useState('');
   const [payMode, setPayMode] = useState('NEFT');
   const [payRef, setPayRef] = useState('');
 
-  // --- DYNAMIC MATH & DELETES ---
+  const [showPartyModal, setShowPartyModal] = useState(false);
+  const [editingParty, setEditingParty] = useState(null);
+  const [partyForm, setPartyForm] = useState({ name: '', type: 'Customer', phone: '', city: '', openingBalance: 0 });
+
+  // UI Helpers for Type Colors
+  const getTypeColors = (type) => {
+    if (type === 'Supplier') return 'bg-purple-50 text-purple-700 border-purple-200';
+    if (type === 'Both') return 'bg-amber-50 text-amber-700 border-amber-200';
+    return 'bg-blue-50 text-blue-700 border-blue-200';
+  };
+  const getAvatarColors = (type) => {
+    if (type === 'Supplier') return 'bg-purple-100 text-purple-700';
+    if (type === 'Both') return 'bg-amber-100 text-amber-700';
+    return 'bg-blue-100 text-blue-700';
+  };
+
+  const handleOpenAddModal = () => {
+    setEditingParty(null);
+    setPartyForm({ name: '', type: 'Customer', phone: '', city: '', openingBalance: 0 });
+    setShowPartyModal(true);
+  };
+
+  const handleOpenEditModal = (party, e) => {
+    e.stopPropagation();
+    setEditingParty(party);
+    setPartyForm({ 
+      name: party.name, 
+      type: party.type, 
+      phone: party.phone, 
+      city: party.city, 
+      openingBalance: party.openingBalance || 0 
+    });
+    setShowPartyModal(true);
+  };
+
+  const handleSaveParty = (e) => {
+    e.preventDefault();
+    if (editingParty) {
+      setParties(parties.map(p => p._id === editingParty._id ? { ...p, ...partyForm, openingBalance: Number(partyForm.openingBalance) } : p));
+      if (selectedParty && selectedParty._id === editingParty._id) {
+        setSelectedParty({ ...selectedParty, ...partyForm });
+      }
+    } else {
+      const newParty = {
+        _id: `P0${parties.length + 5}`, 
+        ...partyForm,
+        openingBalance: Number(partyForm.openingBalance),
+        balance: Number(partyForm.openingBalance)
+      };
+      setParties([...parties, newParty]);
+    }
+    setShowPartyModal(false);
+  };
+
   const handleDeleteParty = (party, e) => {
     e.stopPropagation(); 
-    if (party.balance !== 0) {
-      return alert(`Cannot delete ${party.name}. Their balance must be settled to ₹0 first.`);
-    }
+    if (party.balance !== 0) return alert(`Cannot delete ${party.name}. Their balance must be settled to ₹0 first.`);
     if (window.confirm(`Are you sure you want to permanently delete ${party.name}?`)) {
       setParties(parties.filter(p => p._id !== party._id));
     }
@@ -45,8 +93,6 @@ export default function PartyMasterPage() {
   const handleDeleteTransaction = (transaction) => {
     if (window.confirm(`Are you sure you want to delete transaction ${transaction.ref}? This will instantly recalculate the party's balance.`)) {
       setLedger(ledger.filter(t => t._id !== transaction._id));
-
-      // Reverse the math
       const balanceImpact = (transaction.credit || 0) - (transaction.debit || 0);
       const updatedParties = parties.map(p => {
         if (p._id === selectedParty._id) {
@@ -66,11 +112,7 @@ export default function PartyMasterPage() {
     if (!amount || amount <= 0) return;
 
     const isPaymentIn = paymentDirection === 'in';
-    
-    // Math: Payment-In reduces a positive balance (Credit). Payment-Out increases a negative balance toward 0 (Debit).
-    const newBalance = isPaymentIn 
-      ? selectedParty.balance - amount 
-      : selectedParty.balance + amount;
+    const newBalance = isPaymentIn ? selectedParty.balance - amount : selectedParty.balance + amount;
 
     const newTxn = {
       _id: `L-${Date.now()}`,
@@ -98,10 +140,14 @@ export default function PartyMasterPage() {
     setShowPaymentModal(false);
   };
 
+  // Smart Filtering (Includes "Both" intelligently)
   const filteredParties = useMemo(() => {
     return parties.filter(p => {
       const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase());
-      const matchesType = typeFilter === 'All' || p.type === typeFilter;
+      const matchesType = typeFilter === 'All' 
+        || p.type === typeFilter 
+        || (typeFilter === 'Customer' && p.type === 'Both')
+        || (typeFilter === 'Supplier' && p.type === 'Both');
       return matchesSearch && matchesType;
     });
   }, [search, typeFilter, parties]); 
@@ -118,7 +164,7 @@ export default function PartyMasterPage() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl font-bold text-slate-900">{selectedParty.name}</h1>
-                <span className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded border ${selectedParty.type === 'Customer' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-purple-50 text-purple-700 border-purple-200'}`}>
+                <span className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded border ${getTypeColors(selectedParty.type)}`}>
                   {selectedParty.type}
                 </span>
               </div>
@@ -273,7 +319,10 @@ export default function PartyMasterPage() {
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Party Master</h1>
           <p className="mt-1 text-sm text-slate-500">Manage customers, suppliers, and view their financial ledgers.</p>
         </div>
-        <button className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 shadow-sm">
+        <button 
+          onClick={handleOpenAddModal}
+          className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 shadow-sm"
+        >
           <UserPlus size={16} /> Add New Party
         </button>
       </div>
@@ -324,7 +373,7 @@ export default function PartyMasterPage() {
                 >
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-3">
-                      <div className={`flex h-10 w-10 items-center justify-center rounded-full font-bold text-sm ${party.type === 'Customer' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                      <div className={`flex h-10 w-10 items-center justify-center rounded-full font-bold text-sm ${getAvatarColors(party.type)}`}>
                         {party.name.substring(0, 1)}
                       </div>
                       <div>
@@ -337,7 +386,7 @@ export default function PartyMasterPage() {
                     <span className="flex items-center gap-1.5"><Phone size={14} className="text-slate-400"/> {party.phone}</span>
                   </td>
                   <td className="px-5 py-4">
-                    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold border ${party.type === 'Customer' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-purple-50 text-purple-700 border-purple-200'}`}>
+                    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold border ${getTypeColors(party.type)}`}>
                       {party.type}
                     </span>
                   </td>
@@ -350,7 +399,7 @@ export default function PartyMasterPage() {
                   <td className="px-5 py-4 text-right">
                     <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button 
-                        onClick={(e) => { e.stopPropagation(); }} 
+                        onClick={(e) => handleOpenEditModal(party, e)} 
                         className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition" 
                         title="Edit Party"
                       >
@@ -378,6 +427,92 @@ export default function PartyMasterPage() {
           </table>
         </div>
       </div>
+
+      {/* Add / Edit Party Modal */}
+      {showPartyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm" onClick={() => setShowPartyModal(false)}>
+          <div className="relative w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 bg-slate-50">
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <UserPlus size={18} className="text-blue-600"/> {editingParty ? 'Edit Party Details' : 'Add New Party'}
+              </h3>
+              <button onClick={() => setShowPartyModal(false)} className="text-slate-400 hover:text-slate-700"><X size={20}/></button>
+            </div>
+            
+            <form onSubmit={handleSaveParty} className="p-6 space-y-4">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">Firm Name *</label>
+                <input 
+                  type="text" 
+                  required 
+                  value={partyForm.name} 
+                  onChange={e => setPartyForm({...partyForm, name: e.target.value})} 
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 outline-none focus:border-blue-500" 
+                  placeholder="e.g. SK Packaging" 
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-slate-700">Type *</label>
+                  <select 
+                    value={partyForm.type} 
+                    onChange={e => setPartyForm({...partyForm, type: e.target.value})} 
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500"
+                  >
+                    <option value="Customer">Customer</option>
+                    <option value="Supplier">Supplier</option>
+                    <option value="Both">Both (Supplier & Customer)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-slate-700">Phone</label>
+                  <input 
+                    type="text" 
+                    value={partyForm.phone} 
+                    onChange={e => setPartyForm({...partyForm, phone: e.target.value})} 
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-500" 
+                    placeholder="+91..." 
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-slate-700">City</label>
+                  <input 
+                    type="text" 
+                    value={partyForm.city} 
+                    onChange={e => setPartyForm({...partyForm, city: e.target.value})} 
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-500" 
+                    placeholder="e.g. Gwalior" 
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                    Opening Balance (₹) <span className="text-xs font-normal text-slate-400">(Use - for payable)</span>
+                  </label>
+                  <input 
+                    type="number" 
+                    required 
+                    value={partyForm.openingBalance} 
+                    onChange={e => setPartyForm({...partyForm, openingBalance: e.target.value})} 
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-500 font-medium" 
+                    placeholder="0" 
+                  />
+                </div>
+              </div>
+
+              <div className="pt-4 mt-2 border-t border-slate-100 flex justify-end gap-3">
+                <button type="button" onClick={() => setShowPartyModal(false)} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 rounded-xl transition">Cancel</button>
+                <button type="submit" className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2 rounded-xl text-sm font-semibold hover:bg-blue-700 transition shadow-sm">
+                  <Save size={16}/> {editingParty ? 'Save Changes' : 'Create Party'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

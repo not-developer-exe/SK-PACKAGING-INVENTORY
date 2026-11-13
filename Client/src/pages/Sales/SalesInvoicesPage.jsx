@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Search,
   Plus,
@@ -71,7 +72,8 @@ const sampleInvoices = [
   },
 ];
 
-export default function SalesInvoicesPage({ setPage }) {
+export default function SalesInvoicesPage() {
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
 
@@ -133,7 +135,7 @@ export default function SalesInvoicesPage({ setPage }) {
           </p>
         </div>
         <button
-          onClick={() => setPage("Create GST Invoice")}
+          onClick={() => navigate('/sales/new')}
           className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 shadow-sm"
         >
           <Plus size={16} /> New GST Invoice
