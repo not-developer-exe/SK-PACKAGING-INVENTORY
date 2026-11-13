@@ -5,6 +5,7 @@ const ReelUnit = require('../models/ReelUnit.model');
 const StockMovement = require('../models/StockMovement.model');
 const Sequence = require('../models/Sequence.model');
 const { calculateProductionBalance } = require('../utils/productionAccounting');
+const writeAuditLog = require('../utils/writeAuditLog');
 
 exports.recordProduction = async (req, res) => {
   const {
@@ -143,6 +144,7 @@ exports.recordProduction = async (req, res) => {
       }], { session, ordered: true });
     }
 
+    await writeAuditLog(req, { action: 'production.recorded', entityType: 'ProductionRun', entityId: run._id, entityLabel: runNumber, summary: 'Production run recorded: ' + runNumber, metadata: { totalInputWeightKg: totalInputWeight, totalOutputWeightKg: totalOutputWeight, recoverableWasteKg, processLossKg, inputReelCount: inputs.length, outputLineCount: outputs.length } }, session);
     await session.commitTransaction();
     return res.status(201).json({
       message: 'Production run recorded successfully',
