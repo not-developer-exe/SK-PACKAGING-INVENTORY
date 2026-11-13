@@ -41,8 +41,8 @@ exports.recordProduction = async (req, res) => {
     const existingCount = await ProductionRun.countDocuments().session(session);
     const sequence = await Sequence.findOneAndUpdate(
       { _id: 'production-run' },
-      { $max: { value: existingCount }, $inc: { value: 1 } },
-      { new: true, upsert: true, setDefaultsOnInsert: true, session }
+      [{ $set: { value: { $add: [{ $max: [{ $ifNull: ['$value', existingCount] }, existingCount] }, 1] } }],
+      { new: true, upsert: true, session }
     );
     const runNumber = `PR-${String(sequence.value).padStart(5, '0')}`;
 
