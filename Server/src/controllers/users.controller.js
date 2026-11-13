@@ -1,5 +1,7 @@
+const mongoose = require('mongoose');
 const User = require('../models/User.model');
-const AuditLog = require('../models/AuditLog.model');
+const Sequence = require('../models/Sequence.model');
+const writeAuditLog = require('../utils/writeAuditLog');
 
 const publicUser = (user) => ({
   id: user._id,
@@ -10,20 +12,6 @@ const publicUser = (user) => ({
   createdAt: user.createdAt,
   updatedAt: user.updatedAt
 });
-
-async function auditUser(req, action, user, summary, metadata = {}) {
-  await AuditLog.create({
-    action,
-    entityType: 'User',
-    entityId: user._id,
-    entityLabel: user.email,
-    actorId: req.user._id,
-    actorName: req.user.name,
-    actorRole: req.user.role,
-    summary,
-    metadata
-  });
-}
 
 exports.listUsers = async (req, res) => {
   try {
@@ -55,7 +43,7 @@ exports.createUser = async (req, res) => {
       role,
       isActive: true
     });
-    await auditUser(req, 'user.created', user, 'User account created: ' + user.email, { role });
+    await writeAuditLog(req, { action: 'user.created', entityType: 'User', entityId: user._id, entityLabel: user.email, summary: 'User account created: ' + user.email, metadata: { role } });
     return res.status(201).json({ user: publicUser(user) });
   } catch (error) {
     console.error('[USERS] Create failed:', error.message);
@@ -78,40 +66,59 @@ exports.updateUser = async (req, res) => {
     return res.status(400).json({ message: 'New password must contain 12 to 128 characters.' });
   }
 
+  const session = await mongoose.startSession();
   try {
-    const user = await User.findById(req.params.id);
-    if (!user) return res.status(404).json({ message: 'User not found.' });
+    let updatedUser;
+    await session.withTransaction(async () => {
+      // A shared sequence write serializes admin-role changes so two requests cannot
+      // concurrently remove the final active administrator.
+      await Sequence.findOneAndUpdate(
+        { _id: 'admin-management-lock' },
+        [{ $set: { value: { $add: [{ $ifNull: ['$value', 0] }, 1] } } }],
+        { new: true, upsert: true, session }
+      );
 
-    const nextRole = role ?? user.role;
-    const nextActive = isActive ?? user.isActive;
-    const removesAdmin = user.role === 'admin' && user.isActive && (nextRole !== 'admin' || !nextActive);
-    if (removesAdmin) {
-      const activeAdmins = await User.countDocuments({ role: 'admin', isActive: true });
-      if (activeAdmins <= 1) {
-        return res.status(409).json({ message: 'The last active administrator cannot be demoted or deactivated.' });
+      const user = await User.findById(req.params.id).session(session);
+      if (!user) throw Object.assign(new Error('User not found.'), { statusCode: 404 });
+
+      const nextRole = role ?? user.role;
+      const nextActive = isActive ?? user.isActive;
+      const removesAdmin = user.role === 'admin' && user.isActive && (nextRole !== 'admin' || !nextActive);
+      if (removesAdmin) {
+        const activeAdmins = await User.countDocuments({ role: 'admin', isActive: true }).session(session);
+        if (activeAdmins <= 1) throw Object.assign(new Error('The last active administrator cannot be demoted or deactivated.'), { statusCode: 409 });
       }
-    }
-    if (String(user._id) === String(req.user._id) && !nextActive) {
-      return res.status(400).json({ message: 'You cannot deactivate your own account.' });
-    }
+      if (String(user._id) === String(req.user._id) && !nextActive) {
+        throw Object.assign(new Error('You cannot deactivate your own account.'), { statusCode: 400 });
+      }
 
-    const before = { name: user.name, role: user.role, isActive: user.isActive };
-    if (name !== undefined) user.name = name.trim();
-    if (role !== undefined) user.role = role;
-    if (isActive !== undefined) user.isActive = isActive;
-    if (password !== undefined) user.password = password;
-    await user.save();
+      const before = { name: user.name, role: user.role, isActive: user.isActive };
+      if (name !== undefined) user.name = name.trim();
+      if (role !== undefined) user.role = role;
+      if (isActive !== undefined) user.isActive = isActive;
+      if (password !== undefined) user.password = password;
+      await user.save({ session });
 
-    const changed = {
-      before,
-      after: { name: user.name, role: user.role, isActive: user.isActive },
-      passwordReset: password !== undefined
-    };
-    await auditUser(req, 'user.updated', user, 'User account updated: ' + user.email, changed);
-    return res.json({ user: publicUser(user) });
+      await writeAuditLog(req, {
+        action: 'user.updated',
+        entityType: 'User',
+        entityId: user._id,
+        entityLabel: user.email,
+        summary: 'User account updated: ' + user.email,
+        metadata: {
+          before,
+          after: { name: user.name, role: user.role, isActive: user.isActive },
+          passwordReset: password !== undefined
+        }
+      }, session);
+      updatedUser = user;
+    });
+    return res.json({ user: publicUser(updatedUser) });
   } catch (error) {
     console.error('[USERS] Update failed:', error.message);
-    return res.status(400).json({ message: 'Unable to update user account.' });
+    return res.status(error.statusCode || 400).json({ message: error.statusCode ? error.message : 'Unable to update user account.' });
+  } finally {
+    await session.endSession();
   }
 };
 
