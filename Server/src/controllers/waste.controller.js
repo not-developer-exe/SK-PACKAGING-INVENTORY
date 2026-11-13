@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const ProductionRun = require('../models/ProductionRun.model');
 const ScrapSale = require('../models/ScrapSale.model');
 const WasteInventory = require('../models/WasteInventory.model');
+const { calculateScrapAvailability } = require('../utils/productionAccounting');
 
 const asNumber = (value) => {
   if (value === null || value === undefined) return 0;
@@ -26,7 +27,7 @@ exports.getWasteStats = async (req, res) => {
     const totalWasteSold = scrapSales.reduce((sum, sale) => sum + asNumber(sale.weightSoldKg), 0);
     const legacyUnverifiedWasteKg = asNumber(legacyRows[0] && legacyRows[0].total);
     // Keep negative balances visible: historical sales may exceed newly verified scrap.
-    const currentWasteInventory = totalWasteGenerated - totalWasteSold;
+    const currentWasteInventory = calculateScrapAvailability(totalWasteGenerated, totalWasteSold);
 
     const verifiedRuns = productionWaste.map((run) => ({
       ...run,
@@ -78,7 +79,7 @@ exports.recordScrapSale = async (req, res) => {
 
       const generated = asNumber(generatedRows[0] && generatedRows[0].total);
       const sold = asNumber(soldRows[0] && soldRows[0].total);
-      const available = generated - sold;
+      const available = calculateScrapAvailability(generated, sold);
 
       if (weightSoldKg > available) {
         const error = new Error('Insufficient verified scrap stock. Available: ' + available.toFixed(2) + ' kg; requested: ' + weightSoldKg.toFixed(2) + ' kg. Legacy unverified production variance is excluded until reconciled.');
