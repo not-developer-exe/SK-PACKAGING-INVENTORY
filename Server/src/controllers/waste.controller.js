@@ -3,6 +3,7 @@ const ProductionRun = require('../models/ProductionRun.model');
 const ScrapSale = require('../models/ScrapSale.model');
 const WasteInventory = require('../models/WasteInventory.model');
 const { calculateScrapAvailability } = require('../utils/productionAccounting');
+const writeAuditLog = require('../utils/writeAuditLog');
 
 const asNumber = (value) => {
   if (value === null || value === undefined) return 0;
@@ -95,6 +96,7 @@ exports.recordScrapSale = async (req, res) => {
         totalAmount,
         recordedBy: req.user._id
       }], { session });
+      await writeAuditLog(req, { action: 'scrap.sale_recorded', entityType: 'ScrapSale', entityId: sale._id, entityLabel: sale.buyerName, summary: 'Scrap sold to ' + sale.buyerName + ': ' + weightSoldKg.toFixed(2) + ' kg', metadata: { weightSoldKg, ratePerKg, totalAmount } }, session);
       createdSale = sale;
     });
 
