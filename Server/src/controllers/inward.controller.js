@@ -14,7 +14,7 @@ exports.createDraftReceipt = async (req, res) => {
     }
 
     const supplier = await Party.findById(supplierId);
-    if (!supplier || !['supplier', 'both'].includes(supplier.partyType)) {
+    if (!supplier || !['Supplier', 'Both'].includes(supplier.type)) {
       return res.status(400).json({ message: 'Invalid or non-supplier party selected.' });
     }
 
