@@ -64,7 +64,7 @@ export default function WasteRegisterPage() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-amber-800">Current Scrap Inventory</h2>
-          <p className="mt-2 text-3xl font-bold text-amber-900">{data.currentWasteInventory.toLocaleString('en-IN', { maximumFractionDigits: 1 })} <span className="text-base font-medium">kg</span></p>
+          <p className="mt-2 text-3xl font-bold text-amber-900">{Number(data.currentWasteInventory || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })} <span className="text-base font-medium">kg</span></p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-slate-600">Verified Scrap Generated</h2>
@@ -73,6 +73,10 @@ export default function WasteRegisterPage() {
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-emerald-800">Total Scrap Sold</h2>
           <p className="mt-2 text-3xl font-bold text-emerald-900">{Number(data.totalWasteSold || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })} <span className="text-base font-medium">kg</span></p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="text-sm font-semibold text-slate-600">Legacy Unverified Variance</h2>
+          <p className="mt-2 text-3xl font-bold text-slate-900">{Number(data.legacyUnverifiedWasteKg || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })} <span className="text-base font-medium">kg</span></p>
         </div>
       </div>
 
