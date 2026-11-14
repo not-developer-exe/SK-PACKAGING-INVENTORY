@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { inventoryService } from '../../services/inventoryService';
 import { productionService } from '../../services/productionService';
+import DateRangeFilter from '../../components/DateRangeFilter';
 import { Factory, Plus, Trash2, Loader2, Save } from 'lucide-react';
 
 export default function ProductionPage() {
@@ -10,6 +11,8 @@ export default function ProductionPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
 
   // Form State
   const [shift, setShift] = useState('Day');
@@ -28,10 +31,10 @@ export default function ProductionPage() {
     fetchReels();
   }, []);
 
-  const fetchReels = async () => {
+  const fetchReels = async (dateParams = {}) => {
     try {
       setLoading(true);
-      const [reels, runs] = await Promise.all([inventoryService.getPhysicalReels(), productionService.getRuns()]);
+      const [reels, runs] = await Promise.all([inventoryService.getPhysicalReels(), productionService.getRuns(dateParams)]);
       setAvailableReels(reels);
       setProductionRuns(runs);
     } catch (err) {
@@ -291,13 +294,14 @@ export default function ProductionPage() {
         {error && <div className="rounded-xl bg-red-50 p-4 text-sm font-medium text-red-700 border border-red-100">{error}</div>}
         {success && <div className="rounded-xl bg-emerald-50 p-4 text-sm font-medium text-emerald-700 border border-emerald-100">{success}</div>}
       </form>
+      <DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => fetchReels({ from, to })} onReset={() => { setFrom(''); setTo(''); fetchReels({}); }} loading={loading} label="Production date range" />
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold text-slate-900">Recent Production Runs</h2>
             <p className="text-sm text-slate-500">Latest 100 runs with reel-to-sheet traceability and width substitutions</p>
           </div>
-          <button type="button" onClick={fetchReels} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Refresh</button>
+          <button type="button" onClick={() => fetchReels({ from, to })} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Refresh</button>
         </div>
         {productionRuns.length === 0 ? (
           <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500">No production runs recorded yet.</p>
