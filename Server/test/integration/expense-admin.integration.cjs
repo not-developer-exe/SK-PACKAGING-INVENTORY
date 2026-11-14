@@ -359,7 +359,7 @@ test('inward posting preserves individual reel weights, landed cost and stock le
       invoiceReference: 'SUP-INV-REELS-002',
       receiptDate: '2026-11-14',
       lines: [{
-        reelWidthInches: 30, bf: 18, gsm: 120, quality: 'GY',
+        reelWidthInches: 36, bf: 18, gsm: 140, quality: 'GY',
         reelCount: 2, totalWeightKg: 100, ratePerKg: 35
       }]
     }
@@ -371,4 +371,11 @@ test('inward posting preserves individual reel weights, landed cost and stock le
   assert.equal(aggregatePosted.status, 200);
   const aggregateReels = await ReelUnit.find({ inwardReceiptId: aggregateId });
   assert.deepEqual(aggregateReels.map(reel => Number(reel.originalWeightKg.toString())), [50, 50]);
+
+  const qualityStocks = await api('/api/inventory/reels');
+  const sameDimensions = qualityStocks.data.stock.filter(item =>
+    item.width === 36 && item.bf === 18 && item.gsm === 140
+  );
+  assert.equal(sameDimensions.length, 2);
+  assert.notEqual(sameDimensions[0].id, sameDimensions[1].id);
 });
