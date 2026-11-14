@@ -431,6 +431,21 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
   assert.equal(availableBeforeConversion.status, 200);
   assert.equal(availableBeforeConversion.data.sheets[0].productionRunId.runNumber, run.runNumber);
 
+  const overdrawnConversion = await api('/api/conversion', {
+    method: 'POST',
+    body: {
+      sheetId: String(outputSheets[0]._id),
+      sheetsConsumed: 101,
+      customerId: String(party._id),
+      itemName: 'Overdraw Test Box',
+      dimensions: { length: 12, width: 10, height: 8 },
+      boxesProduced: 1,
+      conversionDate: '2026-10-16'
+    }
+  });
+  assert.equal(overdrawnConversion.status, 409);
+  assert.equal((await CorrugatedSheet.findById(outputSheets[0]._id)).sheetCount, 100);
+
   const conversion = await api('/api/conversion', {
     method: 'POST',
     body: {
