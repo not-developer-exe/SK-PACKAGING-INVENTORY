@@ -20,4 +20,6 @@ const openingStockAdjustmentSchema = new mongoose.Schema({
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
 }, { timestamps: true });
 
+openingStockAdjustmentSchema.index({ adjustmentDate: -1 });
+
 module.exports = mongoose.model('OpeningStockAdjustment', openingStockAdjustmentSchema);
