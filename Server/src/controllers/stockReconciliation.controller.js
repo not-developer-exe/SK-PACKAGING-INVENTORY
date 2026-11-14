@@ -173,8 +173,9 @@ exports.postStockReconciliation = async (req, res) => {
     return res.status(201).json({ message: 'Physical stock count reconciled and ledger-adjusted.', reconciliation: result });
   } catch (error) {
     console.error('[STOCK RECONCILIATION] Posting failed:', error.message);
-    const clientError = error.name === 'ValidationError' || error.name === 'CastError' || /no longer active|cannot exceed|Stock changed/.test(error.message);
-    return res.status(clientError ? 409 : 500).json({ message: clientError ? error.message : 'Reconciliation failed. No stock changes were committed.' });
+    const clientError = Boolean(error.statusCode) || error.name === 'ValidationError' || error.name === 'CastError' || /no longer active|cannot exceed|Stock changed/.test(error.message);
+    const statusCode = error.statusCode || (clientError ? 409 : 500);
+    return res.status(statusCode).json({ message: clientError ? error.message : 'Reconciliation failed. No stock changes were committed.' });
   } finally {
     await session.endSession();
   }
