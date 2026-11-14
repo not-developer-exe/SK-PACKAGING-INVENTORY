@@ -15,6 +15,7 @@ const Invoice = require('../../src/models/Invoice.model');
 const ReelUnit = require('../../src/models/ReelUnit.model');
 const ProductionRun = require('../../src/models/ProductionRun.model');
 const StockMovement = require('../../src/models/StockMovement.model');
+const connectDB = require('../../src/config/db');
 
 let server;
 let baseUrl;
@@ -216,4 +217,22 @@ test('payment allocations reverse atomically and production posting rolls back p
   assert.equal(refreshedReel.remainingWeightKg.toString(), '100');
   assert.equal(await ProductionRun.countDocuments(), 0);
   assert.equal(await StockMovement.countDocuments({ referenceId: availableReel._id }), 0);
+});
+
+
+test('configured ADMIN_EMAIL promotes an existing owner login to active admin', async () => {
+  const owner = await User.create({
+    name: 'Configured Owner',
+    email: 'owner@test.local',
+    password: 'OwnerPassword-12345',
+    role: 'accountant',
+    isActive: false
+  });
+  process.env.ADMIN_EMAIL = 'owner@test.local';
+  delete process.env.ADMIN_PASSWORD;
+  await mongoose.disconnect();
+  await connectDB();
+  const promoted = await User.findById(owner._id);
+  assert.equal(promoted.role, 'admin');
+  assert.equal(promoted.isActive, true);
 });
