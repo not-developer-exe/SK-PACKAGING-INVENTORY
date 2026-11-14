@@ -77,7 +77,7 @@ exports.listAdminRecords = async (req, res) => {
       }
       const from = typeof req.query.dateFrom === 'string' ? req.query.dateFrom : '';
       const to = typeof req.query.dateTo === 'string' ? req.query.dateTo : '';
-      if ((from && !/^\\d{4}-\\d{2}-\\d{2}$/.test(from)) || (to && !/^\\d{4}-\\d{2}-\\d{2}$/.test(to))) {
+      if ((from && !/^\d{4}-\d{2}-\d{2}$/.test(from)) || (to && !/^\d{4}-\d{2}-\d{2}$/.test(to))) {
         return res.status(400).json({ message: 'Audit date filters must use YYYY-MM-DD.' });
       }
       if (from || to) {
