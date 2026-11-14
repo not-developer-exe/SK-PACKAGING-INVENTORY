@@ -1,4 +1,4 @@
-const DATE_ONLY_PATTERN = /^\\d{4}-\\d{2}-\\d{2}$/;
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 function isValidDateOnly(value) {
   if (typeof value !== 'string' || !DATE_ONLY_PATTERN.test(value)) return false;
