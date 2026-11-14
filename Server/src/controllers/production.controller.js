@@ -7,6 +7,7 @@ const Sequence = require('../models/Sequence.model');
 const { calculateProductionBalance } = require('../utils/productionAccounting');
 const writeAuditLog = require('../utils/writeAuditLog');
 const { calculateWidthSubstitution } = require('../utils/widthSubstitution');
+const { calculateMaterialCost, calculateUnitMaterialCost } = require('../utils/materialCosting');
 
 exports.getProductionRuns = async (req, res) => {
   try {
@@ -149,6 +150,8 @@ exports.recordProduction = async (req, res) => {
       }
 
       const actualWidthInches = Number(reel.reelWidthInches);
+      const landedRatePerKg = Number(reel.landedRatePerKg?.toString() || reel.ratePerKg.toString());
+      const materialCost = calculateMaterialCost(consumedWeight, landedRatePerKg);
       const requestedWidthInches = input.requestedWidthInches || actualWidthInches;
       const widthTrace = calculateWidthSubstitution(requestedWidthInches, actualWidthInches);
       tracedInputs.push({
@@ -160,6 +163,8 @@ exports.recordProduction = async (req, res) => {
         bf: reel.bf,
         gsm: reel.gsm,
         quality: reel.quality,
+        landedRatePerKg,
+        materialCost,
         weightConsumedKg: consumedWeight
       });
 
@@ -177,6 +182,9 @@ exports.recordProduction = async (req, res) => {
       }], { session, ordered: true });
     }
 
+    const totalMaterialCost = Number(tracedInputs.reduce((sum, item) => sum + item.materialCost, 0).toFixed(2));
+    const materialCostPerOutputKg = calculateUnitMaterialCost(totalMaterialCost, totalOutputWeight);
+
     const [run] = await ProductionRun.create([{
       runNumber,
       shift,
@@ -184,6 +192,8 @@ exports.recordProduction = async (req, res) => {
       inputReels: tracedInputs,
       totalInputWeightKg: totalInputWeight,
       totalOutputWeightKg: totalOutputWeight,
+      totalMaterialCost,
+      materialCostPerOutputKg,
       recoverableWasteKg,
       processLossKg,
       wasteGeneratedKg: recoverableWasteKg,
@@ -199,6 +209,8 @@ exports.recordProduction = async (req, res) => {
         widthInches: output.widthInches,
         sheetCount: output.sheetCount,
         totalWeightKg: output.totalWeightKg,
+        unitCostPerKg: materialCostPerOutputKg,
+        costingStatus: 'available',
         status: 'available'
       }], { session, ordered: true });
 
@@ -215,7 +227,7 @@ exports.recordProduction = async (req, res) => {
       }], { session, ordered: true });
     }
 
-    await writeAuditLog(req, { action: 'production.recorded', entityType: 'ProductionRun', entityId: run._id, entityLabel: runNumber, summary: 'Production run recorded: ' + runNumber, metadata: { totalInputWeightKg: totalInputWeight, totalOutputWeightKg: totalOutputWeight, recoverableWasteKg, processLossKg, inputReelCount: tracedInputs.length, outputLineCount: outputs.length, widthSubstitutions: tracedInputs.filter((item) => item.widthVarianceInches !== 0).map((item) => ({ reelCode: item.reelCode, requestedWidthInches: item.requestedWidthInches, actualWidthInches: item.actualWidthInches, varianceInches: item.widthVarianceInches })) } }, session);
+    await writeAuditLog(req, { action: 'production.recorded', entityType: 'ProductionRun', entityId: run._id, entityLabel: runNumber, summary: 'Production run recorded: ' + runNumber, metadata: { totalInputWeightKg: totalInputWeight, totalOutputWeightKg: totalOutputWeight, totalMaterialCost, materialCostPerOutputKg, recoverableWasteKg, processLossKg, inputReelCount: tracedInputs.length, outputLineCount: outputs.length, widthSubstitutions: tracedInputs.filter((item) => item.widthVarianceInches !== 0).map((item) => ({ reelCode: item.reelCode, requestedWidthInches: item.requestedWidthInches, actualWidthInches: item.actualWidthInches, varianceInches: item.widthVarianceInches })) } }, session);
     await session.commitTransaction();
     return res.status(201).json({
       message: 'Production run recorded successfully',
