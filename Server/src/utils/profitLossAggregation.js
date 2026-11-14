@@ -1,3 +1,5 @@
+const numeric = (value) => Number(value === null || value === undefined ? 0 : value.toString());
+
 const dateKey = (value, mode) => {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Kolkata',
@@ -41,12 +43,12 @@ const addToGroup = (map, key, invoice) => {
 
 const addRunToGroup = (map, key, run) => {
   const group = ensureGroup(map, key);
-  const inputWeight = Number(run.totalInputWeightKg || 0);
-  const materialCost = Number(run.totalMaterialCost || 0);
-  const processLossKg = Number(run.processLossKg || 0);
+  const inputWeight = numeric(run.totalInputWeightKg);
+  const materialCost = numeric(run.totalMaterialCost);
+  const processLossKg = numeric(run.processLossKg);
   group.productionRunCount += 1;
   group.processLossKg += processLossKg;
-  group.recoverableScrapGeneratedKg += Number(run.recoverableWasteKg || 0);
+  group.recoverableScrapGeneratedKg += numeric(run.recoverableWasteKg);
   if (inputWeight > 0 && materialCost >= 0) {
     group.processLossCostEstimate += processLossKg * materialCost / inputWeight;
   }
