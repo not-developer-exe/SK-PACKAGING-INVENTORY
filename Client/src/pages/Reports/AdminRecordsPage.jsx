@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Database, RefreshCw, Save, ShieldAlert, Search } from 'lucide-react';
+import { Database, RefreshCw, Save, ShieldAlert, Search, Download } from 'lucide-react';
 import axiosClient from '../../api/axiosClient';
 
 const entities = [
@@ -24,6 +24,7 @@ export default function AdminRecordsPage() {
   const [draft, setDraft] = useState(null);
   const [reason, setReason] = useState('');
   const [search, setSearch] = useState('');
+  const [auditFilters, setAuditFilters] = useState({ action: '', entityType: '', actorRole: '', dateFrom: '', dateTo: '' });
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
@@ -37,7 +38,7 @@ export default function AdminRecordsPage() {
   const load = async (requestedPage = page, keepId = null) => {
     setLoading(true); setError('');
     try {
-      const { data } = await axiosClient.get('/admin-records/' + entity, { params: { page: requestedPage, limit: 50, search } });
+      const { data } = await axiosClient.get('/admin-records/' + entity, { params: { page: requestedPage, limit: 50, search, ...(entity === 'auditLogs' ? auditFilters : {}) } });
       setRecords(data.records || []);
       setPage(data.page || requestedPage);
       setTotalPages(data.totalPages || 1);
@@ -51,6 +52,21 @@ export default function AdminRecordsPage() {
     finally { setLoading(false); }
   };
   useEffect(() => { setPage(1); load(1); }, [entity]);
+
+  const exportAuditPage = () => {
+    if (entity !== 'auditLogs' || !records.length) return;
+    const columns = ['createdAt', 'action', 'entityType', 'entityId', 'entityLabel', 'actorName', 'actorRole', 'summary', 'metadata'];
+    const quote = value => '"' + String(value ?? '').replaceAll('"', '""') + '"';
+    const csv = [columns.join(','), ...records.map(record => columns.map(key =>
+      quote(key === 'metadata' ? JSON.stringify(record[key] || {}) : key === 'createdAt' ? (record[key] ? new Date(record[key]).toISOString() : '') : record[key])
+    ).join(','))].join('\\r\\n');
+    const url = URL.createObjectURL(new Blob(['\\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'sk-packaging-audit-page-' + page + '.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   const selectRecord = record => {
     setSelected(record);
@@ -94,6 +110,14 @@ export default function AdminRecordsPage() {
       <label className="text-sm font-medium">Record type<select value={entity} onChange={e => setEntity(e.target.value)} className="mt-1 block min-w-56 rounded-lg border bg-white px-3 py-2">{entities.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
       <label className="min-w-56 flex-1 text-sm font-medium">Search all records<div className="mt-1 flex items-center gap-2 rounded-lg border px-3"><Search size={15} className="text-slate-400"/><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search fields or values" className="w-full py-2 outline-none"/></div></label>
       <button onClick={() => load(1)} disabled={loading} className="mt-5 rounded-lg border px-3 py-2 text-sm">Search</button><button onClick={() => load(page, selected?._id)} disabled={loading} className="mt-5 rounded-lg border px-3 py-2 text-sm"><RefreshCw size={15} className="mr-1 inline"/>Refresh</button>
+      {entity === 'auditLogs' && <button onClick={exportAuditPage} disabled={!records.length} className="mt-5 rounded-lg border px-3 py-2 text-sm disabled:opacity-40"><Download size={15} className="mr-1 inline"/>Export page CSV</button>}
+      {entity === 'auditLogs' && <div className="grid w-full gap-3 border-t pt-3 sm:grid-cols-2 lg:grid-cols-5">
+        <label className="text-xs font-medium">Action<input value={auditFilters.action} onChange={e => setAuditFilters(v => ({ ...v, action: e.target.value }))} placeholder="e.g. expense.updated" className="mt-1 w-full rounded-lg border px-2 py-2 text-sm"/></label>
+        <label className="text-xs font-medium">Entity type<input value={auditFilters.entityType} onChange={e => setAuditFilters(v => ({ ...v, entityType: e.target.value }))} placeholder="e.g. Expense" className="mt-1 w-full rounded-lg border px-2 py-2 text-sm"/></label>
+        <label className="text-xs font-medium">Actor role<select value={auditFilters.actorRole} onChange={e => setAuditFilters(v => ({ ...v, actorRole: e.target.value }))} className="mt-1 w-full rounded-lg border bg-white px-2 py-2 text-sm"><option value="">All roles</option><option value="admin">Admin</option><option value="accountant">Accountant</option></select></label>
+        <label className="text-xs font-medium">From date<input type="date" value={auditFilters.dateFrom} onChange={e => setAuditFilters(v => ({ ...v, dateFrom: e.target.value }))} className="mt-1 w-full rounded-lg border px-2 py-2 text-sm"/></label>
+        <label className="text-xs font-medium">To date<input type="date" value={auditFilters.dateTo} onChange={e => setAuditFilters(v => ({ ...v, dateTo: e.target.value }))} className="mt-1 w-full rounded-lg border px-2 py-2 text-sm"/></label>
+      </div>}
     </div>
     {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     {success && <p role="status" className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700">{success}</p>}
