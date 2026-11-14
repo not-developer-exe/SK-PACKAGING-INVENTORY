@@ -14,6 +14,7 @@ const partySchema = new mongoose.Schema({
   type: { type: String, enum: ['Customer', 'Supplier', 'Both'], required: true },
   phone: { type: String },
   city: { type: String },
+  isActive: { type: Boolean, default: true },
   balance: { type: Number, default: 0 }, // Positive = They owe you. Negative = You owe them.
   ledger: [ledgerSchema]
 }, { timestamps: true });

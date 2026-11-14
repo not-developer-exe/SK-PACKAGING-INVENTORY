@@ -1,7 +1,7 @@
 import React from 'react';
 import { Routes, Route, Link, useLocation, Navigate, Outlet, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, Users, FileText, Package, ArrowDownToLine, Factory,
+  LayoutDashboard, Users, FileText, Package, ArrowDownToLine, Factory, ClipboardCheck,
   Scissors, Truck, LogOut, FilePlus2, BookOpen, Trash2, ShieldCheck
 } from 'lucide-react';
 
@@ -19,6 +19,8 @@ import DispatchPage from './pages/Operations/DispatchPage';
 import StockLedgerPage from './pages/Reports/StockLedgerPage';
 import WasteRegisterPage from './pages/Reports/WasteRegisterPage';
 import OpeningStockPage from './pages/Reports/OpeningStockPage';
+import UserManagementPage from './pages/Reports/UserManagementPage';
+import StockReconciliationPage from './pages/Reports/StockReconciliationPage';
 
 function RequireAuth() {
   const { user, loading } = useAuth();
@@ -45,7 +47,9 @@ function Sidebar() {
       { name: 'Stock Ledger', path: '/inventory/ledger', icon: BookOpen }
     ] },
     ...(user?.role === 'admin' ? [{ group: 'Administration', items: [
-      { name: 'Opening Stock & Audit', path: '/admin/opening-stock', icon: ShieldCheck }
+      { name: 'Opening Stock & Audit', path: '/admin/opening-stock', icon: ShieldCheck },
+      { name: 'User Management', path: '/admin/users', icon: Users },
+      { name: 'Stock Reconciliation', path: '/admin/stock-reconciliation', icon: ClipboardCheck }
     ] }] : []),
     { group: 'Factory Operations', items: [
       { name: 'Production', path: '/operations/production', icon: Factory },
@@ -105,6 +109,8 @@ export default function App() {
           <Route path="operations/dispatch" element={<DispatchPage />} />
           <Route path="operations/waste" element={<WasteRegisterPage />} />
           <Route path="admin/opening-stock" element={user?.role === 'admin' ? <OpeningStockPage /> : <Navigate to="/" replace />} />
+          <Route path="admin/users" element={user?.role === 'admin' ? <UserManagementPage /> : <Navigate to="/" replace />} />
+          <Route path="admin/stock-reconciliation" element={user?.role === 'admin' ? <StockReconciliationPage /> : <Navigate to="/" replace />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to={user ? '/' : '/login'} replace />} />
