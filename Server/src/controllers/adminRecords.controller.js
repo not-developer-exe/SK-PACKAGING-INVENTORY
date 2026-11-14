@@ -70,8 +70,27 @@ exports.listAdminRecords = async (req, res) => {
     const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 50));
     const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 100) : '';
     const filter = {};
+    if (req.params.entity === 'auditLogs') {
+      for (const field of ['action', 'entityType', 'actorRole']) {
+        const value = typeof req.query[field] === 'string' ? req.query[field].trim().slice(0, 100) : '';
+        if (value) filter[field] = value;
+      }
+      const from = typeof req.query.dateFrom === 'string' ? req.query.dateFrom : '';
+      const to = typeof req.query.dateTo === 'string' ? req.query.dateTo : '';
+      if ((from && !/^\\d{4}-\\d{2}-\\d{2}$/.test(from)) || (to && !/^\\d{4}-\\d{2}-\\d{2}$/.test(to))) {
+        return res.status(400).json({ message: 'Audit date filters must use YYYY-MM-DD.' });
+      }
+      if (from || to) {
+        filter.createdAt = {};
+        if (from) filter.createdAt.$gte = new Date(from + 'T00:00:00+05:30');
+        if (to) filter.createdAt.$lt = new Date(new Date(to + 'T00:00:00+05:30').getTime() + 86400000);
+      }
+    }
+    if (search) {
+      const escaped = search.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\    const filter = {};
     if (search) {
       const escaped = search.replace(/[.*+?^$()|[\\]\\\\]/g, '\\$&').replaceAll('{', '\\{').replaceAll('}', '\\}');
+      const expression = new RegExp(escaped, 'i');');
       const expression = new RegExp(escaped, 'i');
       const searchableStrings = Object.entries(Model.schema.paths)
         .filter(([path, schema]) => schema.instance === 'String' && !path.toLowerCase().includes('password'))
@@ -86,7 +105,7 @@ exports.listAdminRecords = async (req, res) => {
       if (conditions.length) filter.$or = conditions;
     }
     const [records, total] = await Promise.all([
-      Model.find(filter).sort({ updatedAt: -1, createdAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).lean(),
+      Model.find(filter).sort(req.params.entity === 'auditLogs' ? { createdAt: -1, _id: -1 } : { updatedAt: -1, createdAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).lean(),
       Model.countDocuments(filter)
     ]);
     const editableFields = editableFieldsByEntity[req.params.entity] || [];
