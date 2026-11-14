@@ -8,7 +8,7 @@ const entities = [
   ['dispatches', 'Dispatches'], ['invoices', 'Invoices'], ['inwardReceipts', 'Inward receipts'],
   ['scrapSales', 'Scrap sales'], ['wasteInventory', 'Waste inventory'],
   ['stockMovements', 'Stock movements'], ['openingStockAdjustments', 'Opening stock adjustments'],
-  ['stockReconciliations', 'Stock reconciliations'], ['expenses', 'Expenses']
+  ['stockReconciliations', 'Stock reconciliations'], ['expenses', 'Expenses'], ['auditLogs', 'Audit history (read-only)']
 ];
 
 const pretty = value => {
