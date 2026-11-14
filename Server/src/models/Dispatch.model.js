@@ -13,7 +13,10 @@ const dispatchSchema = new mongoose.Schema({
   vehicleNumber: { type: String, trim: true },
   driverName: { type: String, trim: true },
   
-  status: { type: String, enum: ['dispatched', 'delivered'], default: 'dispatched' },
+  status: { type: String, enum: ['dispatched', 'delivered', 'cancelled'], default: 'dispatched' },
+  cancelledAt: { type: Date },
+  cancelledBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  cancellationReason: { type: String, trim: true, maxlength: 500 },
   recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
 
