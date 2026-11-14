@@ -315,7 +315,7 @@ test('payment allocations reverse atomically and production posting rolls back p
   const failedRun = await api('/api/production', {
     method: 'POST',
     body: {
-      shift: 'Morning',
+      shift: 'Day',
       operatorName: 'Integration Test',
       recoverableWasteKg: 1,
       wasteBreakdown: [{ category: 'edge_trim', weightKg: 1 }],
