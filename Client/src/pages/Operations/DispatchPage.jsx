@@ -74,7 +74,7 @@ export default function DispatchPage() {
       setDispatchBoxes([{ boxId: '', dispatchQuantity: '' }]);
       
       const [historyData, boxesData] = await Promise.all([
-        dispatchService.getDispatches(),
+        dispatchService.getDispatches({ from, to }),
         dispatchService.getAvailableBoxes()
       ]);
       setDispatches(historyData);
@@ -205,7 +205,9 @@ export default function DispatchPage() {
           </div>
         </form>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="space-y-4">
+          <DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => fetchData({ from, to })} onReset={() => { setFrom(''); setTo(''); fetchData({}); }} loading={loading} label="Dispatch date range" />
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <tr>
@@ -238,6 +240,7 @@ export default function DispatchPage() {
               {dispatches.length === 0 && (<tr><td colSpan={5} className="p-8 text-center text-slate-500">No dispatches recorded yet.</td></tr>)}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
