@@ -5,6 +5,20 @@ const Dispatch = require('../models/Dispatch.model');
 const Party = require('../models/Party.model');
 const writeAuditLog = require('../utils/writeAuditLog');
 
+exports.getInvoices = async (req, res) => {
+  try {
+    const invoices = await Invoice.find()
+      .populate('customerId', 'name')
+      .populate('dispatchId', 'challanNumber dispatchDate')
+      .sort({ invoiceDate: -1, createdAt: -1 })
+      .lean();
+    return res.json({ invoices });
+  } catch (error) {
+    console.error('[INVOICE] List failed:', error.message);
+    return res.status(500).json({ message: 'Unable to fetch invoices.' });
+  }
+};
+
 exports.getUninvoicedDispatches = async (req, res) => {
   try {
     const { customerId } = req.params;
