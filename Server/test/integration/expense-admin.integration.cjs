@@ -211,6 +211,15 @@ test('admin console and expense register enforce roles and keep an audit trail',
   const auditRecords = await api('/api/admin-records/auditLogs');
   assert.equal(auditRecords.status, 200);
   assert.ok(auditRecords.data.records.some(item => item.action === 'admin.record_overridden'));
+  const filteredAudit = await api('/api/admin-records/auditLogs?action=admin.record_overridden&actorRole=admin&dateFrom=2026-01-01&dateTo=2027-12-31');
+  assert.equal(filteredAudit.status, 200);
+  assert.ok(filteredAudit.data.records.length > 0);
+  assert.ok(filteredAudit.data.records.every(item => item.action === 'admin.record_overridden' && item.actorRole === 'admin'));
+  const searchedAudit = await api('/api/admin-records/auditLogs?search=Correcting%20the%20party%20master');
+  assert.equal(searchedAudit.status, 200);
+  assert.ok(searchedAudit.data.records.some(item => item.action === 'admin.record_overridden'));
+  const invalidAuditDate = await api('/api/admin-records/auditLogs?dateFrom=14-11-2026');
+  assert.equal(invalidAuditDate.status, 400);
   const auditEdit = await api('/api/admin-records/auditLogs/' + auditRecords.data.records[0]._id, { method: 'PATCH', body: { document: auditRecords.data.records[0], reason: 'Should not be editable in audit history.' } });
   assert.equal(auditEdit.status, 403);
 
