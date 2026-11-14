@@ -43,8 +43,33 @@ exports.listAdminRecords = async (req, res) => {
   const Model = models[req.params.entity];
   if (!Model) return res.status(404).json({ message: 'Unsupported record type.' });
   try {
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 50));
+    const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 100) : '';
+    const filter = {};
+    if (search) {
+      const escaped = search.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\  try {
     const records = await Model.find().sort({ updatedAt: -1, createdAt: -1 }).limit(100).lean();
     return res.json({ entity: req.params.entity, records: records.map(serialize) });
+  } catch (error) {');
+      const expression = new RegExp(escaped, 'i');
+      const searchableStrings = Object.entries(Model.schema.paths)
+        .filter(([path, schema]) => schema.instance === 'String' && !path.toLowerCase().includes('password'))
+        .map(([path]) => ({ [path]: expression }));
+      const conditions = [...searchableStrings];
+      const numericSearch = Number(search);
+      if (Number.isFinite(numericSearch)) {
+        conditions.push(...Object.entries(Model.schema.paths)
+          .filter(([, schema]) => schema.instance === 'Number')
+          .map(([path]) => ({ [path]: numericSearch })));
+      }
+      if (conditions.length) filter.$or = conditions;
+    }
+    const [records, total] = await Promise.all([
+      Model.find(filter).sort({ updatedAt: -1, createdAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).lean(),
+      Model.countDocuments(filter)
+    ]);
+    return res.json({ entity: req.params.entity, records: records.map(serialize), page, limit, total, totalPages: Math.ceil(total / limit) });
   } catch (error) {
     console.error('[ADMIN RECORDS] List failed:', error.message);
     return res.status(500).json({ message: 'Unable to load records.' });
