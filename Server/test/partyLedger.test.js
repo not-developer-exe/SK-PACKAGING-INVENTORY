@@ -10,7 +10,7 @@ test('recalculates running balances in transaction-date order with opening balan
     { _id: 'd', type: 'Payment Received', date: '2026-01-01', debit: 0, credit: 100, balance: 0 }
   ];
   const balance = recalculatePartyLedger(ledger);
-  assert.equal(balance, 200);
+  assert.equal(balance, 1200);
   assert.equal(ledger.find(item => item._id === 'd').balance, 900);
   assert.equal(ledger.find(item => item._id === 'b').balance, 1400);
   assert.equal(ledger.find(item => item._id === 'c').balance, 1200);
