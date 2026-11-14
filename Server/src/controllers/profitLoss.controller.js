@@ -18,8 +18,8 @@ exports.getProfitLoss = async (req, res) => {
     if (!isValidDateOnly(from) || !isValidDateOnly(to)) {
       return res.status(400).json({ message: 'Use YYYY-MM-DD for report dates.' });
     }
-    if (req.query.partyId && !mongoose.isValidObjectId(req.query.partyId)) {
-      return res.status(400).json({ message: 'Invalid party ID.' });
+    if (req.query.partyId) {
+      return res.status(400).json({ message: 'This is a company-wide P&L. Use the Party-wise breakdown to review individual customers.' });
     }
     const fromDate = new Date(from + 'T00:00:00+05:30');
     const toDate = new Date(to + 'T00:00:00+05:30');
@@ -32,7 +32,6 @@ exports.getProfitLoss = async (req, res) => {
       invoiceDate: { $gte: fromDate, $lt: toDate },
       status: { $ne: 'Cancelled' }
     };
-    if (req.query.partyId) invoiceFilter.customerId = req.query.partyId;
 
     const [invoices, scrapSales, productionRuns, expenses, allTimeWasteTotals] = await Promise.all([
       Invoice.find(invoiceFilter)
@@ -66,8 +65,9 @@ exports.getProfitLoss = async (req, res) => {
     const operatingProfit = Number((grossProfit + scrapRevenue - operatingExpenses).toFixed(2));
     const netProfitBeforeTax = Number((operatingProfit - financeCosts).toFixed(2));
     const expenseByCategory = Object.values(expenses.reduce((groups, item) => {
-      const key = item.category;
-      if (!groups[key]) groups[key] = { category: key, amount: 0, count: 0, costTreatment: item.costTreatment };
+      const costTreatment = item.costTreatment || 'operating_expense';
+      const key = item.category + ':' + costTreatment;
+      if (!groups[key]) groups[key] = { category: item.category, amount: 0, count: 0, costTreatment };
       groups[key].amount += Number(item.amount || 0);
       groups[key].count += 1;
       return groups;
@@ -100,6 +100,9 @@ exports.getProfitLoss = async (req, res) => {
         operatingProfit,
         netProfitBeforeTax,
         expenseCount: expenses.length,
+        operatingExpenseCount: expenses.filter((item) => item.costTreatment === 'operating_expense').length,
+        financeCostCount: expenses.filter((item) => item.costTreatment === 'finance_cost').length,
+        stockLandedCostCount: expenses.filter((item) => item.costTreatment === 'stock_landed_cost').length,
         scrapWeightKg,
         processLossKg,
         processLossCostEstimate,
