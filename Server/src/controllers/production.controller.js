@@ -18,7 +18,7 @@ exports.getProductionRuns = async (req, res) => {
       .lean();
     const runIds = runs.map((run) => run._id);
     const sheets = await CorrugatedSheet.find({ productionRunId: { $in: runIds } })
-      .select('productionRunId ply lengthInches widthInches sheetCount totalWeightKg status')
+      .select('productionRunId ply lengthInches widthInches sheetCount totalWeightKg unitCostPerKg costingStatus status')
       .lean();
     const sheetsByRun = new Map();
     for (const sheet of sheets) {
