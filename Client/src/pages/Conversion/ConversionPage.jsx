@@ -113,7 +113,7 @@ export default function ConversionPage() {
                 <option value="">Select available WIP sheets...</option>
                 {sheets.map(sheet => (
                   <option key={sheet._id} value={sheet._id}>
-                    {sheet.ply}Ply | {sheet.lengthInches}" x {sheet.widthInches}" ({sheet.sheetCount} available)
+                    {sheet.ply}Ply | {sheet.lengthInches}" x {sheet.widthInches}" | {sheet.sheetCount} sheets · {Number(sheet.totalWeightKg?.$numberDecimal || sheet.totalWeightKg || 0).toFixed(2)} kg | {sheet.costingStatus === 'available' ? '₹' + Number(sheet.unitCostPerKg?.$numberDecimal || sheet.unitCostPerKg || 0).toFixed(2) + '/kg' : 'Cost pending'} | {sheet.productionRunId?.runNumber || 'Legacy batch'} · {sheet.productionRunId?.runDate ? new Date(sheet.productionRunId.runDate).toLocaleDateString('en-IN') : 'date unavailable'}
                   </option>
                 ))}
               </select>
