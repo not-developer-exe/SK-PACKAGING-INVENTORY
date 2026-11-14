@@ -7,6 +7,7 @@ const FinishedBox = require('../models/FinishedBox.model');
 const writeAuditLog = require('../utils/writeAuditLog');
 const { buildDateRangeFilter, isValidDateOnly } = require('../utils/dateFilters');
 const { matchesDispatchQuantities } = require('../utils/dispatchInvoiceValidation');
+const { recalculatePartyLedger } = require('../utils/partyLedger');
 
 exports.getInvoices = async (req, res) => {
   try {
@@ -92,13 +93,12 @@ exports.createInvoice = async (req, res) => {
     }
 
     await session.withTransaction(async () => {
-      const [customer, dispatch, existingInvoice] = await Promise.all([
-        Party.findById(customerId).session(session),
-        Dispatch.findOne({ _id: dispatchId, customerId }).session(session),
-        Invoice.findOne({ dispatchId }).session(session)
-      ]);
+      // Keep all operations on the transaction session sequential.
+      const customer = await Party.findById(customerId).session(session);
+      const dispatch = await Dispatch.findOne({ _id: dispatchId, customerId }).session(session);
+      const existingInvoice = await Invoice.findOne({ dispatchId }).session(session);
 
-      if (!customer || !['Customer', 'Both'].includes(customer.type)) {
+      if (!customer || customer.isActive === false || !['Customer', 'Both'].includes(customer.type)) {
         const error = new Error('Selected customer was not found or is not a customer');
         error.statusCode = 400;
         throw error;
@@ -176,16 +176,15 @@ exports.createInvoice = async (req, res) => {
         costingStatus: costingAvailable ? 'available' : 'unavailable'
       }], { session });
 
-      const newBalance = Number((Number(customer.balance || 0) + grandTotal).toFixed(2));
       customer.ledger.push({
         date,
         type: 'Tax Invoice',
         ref: invoiceNumber,
         debit: grandTotal,
         credit: 0,
-        balance: newBalance
+        balance: 0
       });
-      customer.balance = newBalance;
+      customer.balance = recalculatePartyLedger(customer.ledger);
       await customer.save({ session });
       await writeAuditLog(req, { action: 'invoice.created', entityType: 'Invoice', entityId: created._id, entityLabel: invoiceNumber, summary: 'Sales invoice created: ' + invoiceNumber, metadata: { customerId: String(customerId), dispatchId: String(dispatchId), subTotal, gstPercent: gst, grandTotal, costOfGoods: totalCostOfGoods, grossProfit, costingStatus: costingAvailable ? 'available' : 'unavailable' } }, session);
       createdInvoice = created;
