@@ -8,12 +8,14 @@ const { calculateProductionBalance } = require('../utils/productionAccounting');
 const writeAuditLog = require('../utils/writeAuditLog');
 const { calculateWidthSubstitution } = require('../utils/widthSubstitution');
 const { resolveLandedRatePerKg, calculateMaterialCost, calculateUnitMaterialCost } = require('../utils/materialCosting');
+const { buildDateRangeFilter } = require('../utils/dateFilters');
 
 exports.getProductionRuns = async (req, res) => {
   try {
-    const runs = await ProductionRun.find()
+    const filter = buildDateRangeFilter(req.query.from, req.query.to, 'runDate');
+    const runs = await ProductionRun.find(filter)
       .sort({ runDate: -1, createdAt: -1 })
-      .limit(100)
+      .limit(1000)
       .populate('recordedBy', 'name')
       .lean();
     const runIds = runs.map((run) => run._id);
