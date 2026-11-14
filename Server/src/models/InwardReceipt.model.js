@@ -7,6 +7,7 @@ const inwardReceiptLineSchema = new mongoose.Schema({
   quality: { type: String, enum: ['Natural', 'GY'], required: true, default: 'Natural' },
   reelCount: { type: Number, required: true, min: 1 },
   totalWeightKg: { type: mongoose.Schema.Types.Decimal128, required: true },
+  reelWeightsKg: [{ type: Number, min: 0.001 }],
   isAggregateWeightOnly: { type: Boolean, default: false },
   supplierBatchRef: { type: String, trim: true },
   ratePerKg: { type: mongoose.Schema.Types.Decimal128, required: true },
