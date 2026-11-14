@@ -628,6 +628,44 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
     }
   });
   assert.equal(invoiceResponse.status, 201);
+  const blockedDispatchCancel = await api('/api/dispatch/' + dispatch._id + '/cancel', {
+    method: 'PATCH',
+    body: { reason: 'Testing cancellation while invoice is active.' }
+  });
+  assert.equal(blockedDispatchCancel.status, 409);
+  const accountantDispatchCancel = await api('/api/dispatch/' + dispatch._id + '/cancel', {
+    method: 'PATCH',
+    cookie: accountantCookie,
+    body: { reason: 'Accountants cannot cancel posted dispatches.' }
+  });
+  assert.equal(accountantDispatchCancel.status, 403);
+  assert.equal((await FinishedBox.findById(finishedBox._id)).quantityAvailable, 400);
+
+  const secondDispatchResponse = await api('/api/dispatch', {
+    method: 'POST',
+    body: {
+      customerId: String(party._id),
+      dispatchDate: '2026-10-18',
+      boxes: [{ boxId: String(finishedBox._id), dispatchQuantity: 100 }]
+    }
+  });
+  assert.equal(secondDispatchResponse.status, 201);
+  const secondDispatch = await Dispatch.findOne({ challanNumber: secondDispatchResponse.data.challanNumber });
+  assert.equal((await FinishedBox.findById(finishedBox._id)).quantityAvailable, 300);
+  const cancelledDispatch = await api('/api/dispatch/' + secondDispatch._id + '/cancel', {
+    method: 'PATCH',
+    body: { reason: 'Customer requested cancellation before vehicle departure.' }
+  });
+  assert.equal(cancelledDispatch.status, 200);
+  assert.equal(cancelledDispatch.data.dispatch.status, 'cancelled');
+  assert.equal((await FinishedBox.findById(finishedBox._id)).quantityAvailable, 400);
+  assert.ok(await StockMovement.exists({
+    referenceId: secondDispatch._id,
+    movementType: 'adjustment',
+    quantityChange: 100
+  }));
+  assert.ok(await AuditLog.exists({ action: 'dispatch.cancelled', entityId: secondDispatch._id }));
+
   const invoice = await Invoice.findOne({ dispatchId: dispatch._id });
   assert.equal(invoice.subTotal, 12000);
   assert.equal(invoice.cgstAmount, 300);
