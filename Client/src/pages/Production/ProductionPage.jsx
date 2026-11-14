@@ -4,7 +4,8 @@ import { productionService } from '../../services/productionService';
 import { Factory, Plus, Trash2, Loader2, Save } from 'lucide-react';
 
 export default function ProductionPage() {
-  const [availableReels, setAvailableReels] = useState([]);\n  const [productionRuns, setProductionRuns] = useState([]);
+  const [availableReels, setAvailableReels] = useState([]);
+  const [productionRuns, setProductionRuns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
