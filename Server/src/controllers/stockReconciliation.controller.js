@@ -138,6 +138,7 @@ exports.postStockReconciliation = async (req, res) => {
           if (updated.modifiedCount !== 1) throw new Error('Stock changed while this count was being posted. Refresh and retry.');
 
           await StockMovement.create([{
+            movementDate: parsedDate,
             movementType: 'adjustment',
             referenceId: reconciliation._id,
             referenceModel: 'StockReconciliation',
