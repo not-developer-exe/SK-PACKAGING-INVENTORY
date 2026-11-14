@@ -111,7 +111,7 @@ exports.getReceipts = async (req, res) => {
     return res.json({ receipts });
   } catch (error) {
     console.error('[INWARD] Receipt query failed:', error.message);
-    return res.status(500).json({ message: 'Error fetching receipts' });
+    return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Error fetching receipts' });
   }
 };
 
