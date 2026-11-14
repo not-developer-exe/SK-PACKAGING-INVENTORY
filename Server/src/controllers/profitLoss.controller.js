@@ -5,6 +5,8 @@ const ProductionRun = require('../models/ProductionRun.model');
 
 const { buildProfitLossGroups, isValidDateOnly } = require('../utils/profitLossAggregation');
 
+const numeric = (value) => Number(value === null || value === undefined ? 0 : value.toString());
+
 exports.getProfitLoss = async (req, res) => {
   try {
     const today = new Date();
@@ -56,12 +58,12 @@ exports.getProfitLoss = async (req, res) => {
     const balanceDue = Number(invoices.reduce((sum, invoice) => sum + Number(invoice.balanceDue || 0), 0).toFixed(2));
     const scrapRevenue = Number(scrapSales.reduce((sum, sale) => sum + Number(sale.totalAmount || 0), 0).toFixed(2));
     const scrapWeightKg = Number(scrapSales.reduce((sum, sale) => sum + Number(sale.weightSoldKg || 0), 0).toFixed(3));
-    const processLossKg = Number(productionRuns.reduce((sum, run) => sum + Number(run.processLossKg || 0), 0).toFixed(3));
+    const processLossKg = Number(productionRuns.reduce((sum, run) => sum + numeric(run.processLossKg), 0).toFixed(3));
     const processLossCostEstimate = Number(productionRuns.reduce((sum, run) => {
-      const inputWeight = Number(run.totalInputWeightKg || 0);
-      return sum + (inputWeight > 0 ? Number(run.processLossKg || 0) * Number(run.totalMaterialCost || 0) / inputWeight : 0);
+      const inputWeight = numeric(run.totalInputWeightKg);
+      return sum + (inputWeight > 0 ? Number(run.processLossKg || 0) * numeric(run.totalMaterialCost) / inputWeight : 0);
     }, 0).toFixed(2));
-    const recoverableScrapGeneratedKg = Number(productionRuns.reduce((sum, run) => sum + Number(run.recoverableWasteKg || 0), 0).toFixed(3));
+    const recoverableScrapGeneratedKg = Number(productionRuns.reduce((sum, run) => sum + numeric(run.recoverableWasteKg), 0).toFixed(3));
     const allTimeGenerated = Number(allTimeWasteTotals[0][0]?.generated || 0);
     const allTimeSold = Number(allTimeWasteTotals[1][0]?.sold || 0);
     const currentVerifiedScrapInventoryKg = Number((allTimeGenerated - allTimeSold).toFixed(3));
