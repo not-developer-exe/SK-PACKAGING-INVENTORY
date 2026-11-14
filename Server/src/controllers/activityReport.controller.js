@@ -34,7 +34,10 @@ function emptyPeriod(key) {
     invoices: 0, salesExGst: 0, receivables: 0,
     expenses: 0, expenseEntries: 0,
     scrapSales: 0, scrapWeightKg: 0, scrapRevenue: 0,
-    stockMovements: 0
+    stockMovements: 0,
+    reelQtyChange: 0, reelWeightChangeKg: 0,
+    sheetQtyChange: 0, sheetWeightChangeKg: 0,
+    finishedGoodsQtyChange: 0
   };
 }
 
@@ -191,7 +194,20 @@ exports.getActivityReport = async (req, res) => {
     }
 
     for (const movement of movements) {
-      add(movement.createdAt, (row) => { row.stockMovements += 1; });
+      add(movement.createdAt, (row) => {
+        row.stockMovements += 1;
+        const quantityChange = Number(movement.quantityChange || 0);
+        const weightChangeKg = numeric(movement.weightChangeKg);
+        if (movement.itemType === 'reel') {
+          row.reelQtyChange += quantityChange;
+          row.reelWeightChangeKg += weightChangeKg;
+        } else if (movement.itemType === 'sheet') {
+          row.sheetQtyChange += quantityChange;
+          row.sheetWeightChangeKg += weightChangeKg;
+        } else if (movement.itemType === 'finished_good') {
+          row.finishedGoodsQtyChange += quantityChange;
+        }
+      });
     }
 
     const daily = [...dailyMap.values()].sort((a, b) => a.key.localeCompare(b.key)).map(normalizePeriod);
