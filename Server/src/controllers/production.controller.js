@@ -7,7 +7,7 @@ const Sequence = require('../models/Sequence.model');
 const { calculateProductionBalance } = require('../utils/productionAccounting');
 const writeAuditLog = require('../utils/writeAuditLog');
 const { calculateWidthSubstitution } = require('../utils/widthSubstitution');
-const { calculateMaterialCost, calculateUnitMaterialCost } = require('../utils/materialCosting');
+const { resolveLandedRatePerKg, calculateMaterialCost, calculateUnitMaterialCost } = require('../utils/materialCosting');
 
 exports.getProductionRuns = async (req, res) => {
   try {
@@ -150,7 +150,7 @@ exports.recordProduction = async (req, res) => {
       }
 
       const actualWidthInches = Number(reel.reelWidthInches);
-      const landedRatePerKg = Number(reel.landedRatePerKg?.toString() || reel.ratePerKg.toString());
+      const landedRatePerKg = resolveLandedRatePerKg(reel.landedRatePerKg?.toString() || 0, reel.ratePerKg.toString());
       const materialCost = calculateMaterialCost(consumedWeight, landedRatePerKg);
       const requestedWidthInches = input.requestedWidthInches || actualWidthInches;
       const widthTrace = calculateWidthSubstitution(requestedWidthInches, actualWidthInches);
