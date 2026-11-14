@@ -68,6 +68,7 @@ exports.recordDispatch = async (req, res) => {
         await box.save({ session });
 
         await StockMovement.create([{
+          movementDate: parsedDispatchDate,
           movementType: 'dispatch',
           referenceId: box._id,
           referenceModel: 'FinishedBox',
