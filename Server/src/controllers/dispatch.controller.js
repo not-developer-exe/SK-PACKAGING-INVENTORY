@@ -7,7 +7,9 @@ const Sequence = require('../models/Sequence.model');
 const writeAuditLog = require('../utils/writeAuditLog');
 
 exports.recordDispatch = async (req, res) => {
-  const { customerId, vehicleNumber, driverName, boxes } = req.body || {};
+  const { customerId, vehicleNumber, driverName, boxes, dispatchDate } = req.body || {};
+  const parsedDispatchDate = dispatchDate ? new Date(dispatchDate) : new Date();
+  if (Number.isNaN(parsedDispatchDate.getTime())) return res.status(400).json({ message: 'Dispatch date is invalid.' });
   if (!mongoose.isValidObjectId(customerId) || !Array.isArray(boxes) || boxes.length === 0) {
     return res.status(400).json({ message: 'A valid customer and at least one box batch are required' });
   }
@@ -82,6 +84,7 @@ exports.recordDispatch = async (req, res) => {
       const [dispatch] = await Dispatch.create([{
         challanNumber,
         customerId,
+        dispatchDate: parsedDispatchDate,
         vehicleNumber: typeof vehicleNumber === 'string' ? vehicleNumber.trim() : '',
         driverName: typeof driverName === 'string' ? driverName.trim() : '',
         boxes: dispatchLines,
@@ -120,6 +123,7 @@ exports.getDispatches = async (req, res) => {
     const dispatches = await Dispatch.find()
       .populate('customerId', 'name')
       .populate('boxes.boxId', 'batchNumber itemName dimensions')
+      .sort({ dispatchDate: -1, createdAt: -1 })
       .sort({ createdAt: -1 })
       .lean();
     return res.json({ dispatches });
