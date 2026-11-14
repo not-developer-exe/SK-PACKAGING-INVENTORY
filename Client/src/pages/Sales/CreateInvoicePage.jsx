@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Loader2, Receipt, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { partiesService } from '../../services/partiesService';
 import { invoiceService } from '../../services/invoiceService';
+import { toLocalDateInput } from '../../lib/date';
 
 export default function CreateInvoicePage() {
   const navigate = useNavigate();
@@ -80,10 +81,12 @@ export default function CreateInvoicePage() {
     setItems(newItems);
   };
 
-  const subTotal = (items || []).reduce((sum, item) => sum + ((item.quantity || 0) * (item.rate || 0)), 0);
-  const cgstAmount = (subTotal * (gstPercent / 2)) / 100;
-  const sgstAmount = (subTotal * (gstPercent / 2)) / 100;
-  const grandTotal = Math.round(subTotal + cgstAmount + sgstAmount);
+  // Match the server's per-line and per-tax-component two-decimal rounding exactly.
+  const taxableAmounts = (items || []).map((item) => Number(((item.quantity || 0) * (item.rate || 0)).toFixed(2)));
+  const subTotal = Number(taxableAmounts.reduce((sum, amount) => sum + amount, 0).toFixed(2));
+  const cgstAmount = Number((subTotal * gstPercent / 200).toFixed(2));
+  const sgstAmount = Number((subTotal * gstPercent / 200).toFixed(2));
+  const grandTotal = Number((subTotal + cgstAmount + sgstAmount).toFixed(2));
 
   // Execute Live Transaction
   const handleSubmit = async (e) => {
@@ -183,7 +186,7 @@ export default function CreateInvoicePage() {
                     </div>
                     <div className="w-32 text-right">
                       <p className="text-xs text-slate-500">Taxable Val</p>
-                      <p className="font-semibold text-slate-900">₹{(item.quantity * (item.rate || 0)).toLocaleString('en-IN')}</p>
+                      <p className="font-semibold text-slate-900">₹{Number(((item.quantity || 0) * (item.rate || 0)).toFixed(2)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                     </div>
                   </div>
                 ))}
@@ -229,7 +232,7 @@ export default function CreateInvoicePage() {
 
               <div className="flex justify-between border-t border-slate-700 pt-4 text-lg font-bold text-emerald-400">
                 <span>Grand Total</span>
-                <span>₹{grandTotal.toLocaleString('en-IN')}</span>
+                <span>₹{grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
             </div>
 
