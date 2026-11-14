@@ -75,7 +75,7 @@ export default function ProfitLossPage() {
             </div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[720px] text-left text-sm">
-                <thead className="border-b text-xs uppercase text-slate-500"><tr><th className="py-3 pr-4">{group === 'party' ? 'Customer' : 'Period'}</th><th className="px-4 py-3 text-right">Invoices</th><th className="px-4 py-3 text-right">Sales</th><th className="px-4 py-3 text-right">Cost</th><th className="px-4 py-3 text-right">Gross profit*</th><th className="px-4 py-3 text-right">Process loss kg</th><th className="px-4 py-3 text-right">Scrap sales</th><th className="px-4 py-3 text-right">Balance due</th></tr></thead>
+                <thead className="border-b text-xs uppercase text-slate-500"><tr><th className="py-3 pr-4">{group === 'party' ? 'Customer' : 'Period'}</th><th className="px-4 py-3 text-right">Invoices</th><th className="px-4 py-3 text-right">Sales</th><th className="px-4 py-3 text-right">Cost</th><th className="px-4 py-3 text-right">Gross profit*</th><th className="px-4 py-3 text-right">Operating expenses</th><th className="px-4 py-3 text-right">Operating profit*</th><th className="px-4 py-3 text-right">Process loss kg</th><th className="px-4 py-3 text-right">Scrap sales</th><th className="px-4 py-3 text-right">Balance due</th></tr></thead>
                 <tbody className="divide-y">
                   {rows.map((row) => <tr key={row.key}>
                     <td className="py-3 pr-4 font-medium text-slate-800">{row.partyName || row.key}</td>
@@ -83,11 +83,13 @@ export default function ProfitLossPage() {
                     <td className="px-4 py-3 text-right">{money(row.revenue)}</td>
                     <td className="px-4 py-3 text-right">{money(row.costOfGoods)}</td>
                     <td className="px-4 py-3 text-right font-semibold">{money(row.grossProfit)}</td>
+                    <td className="px-4 py-3 text-right">{money(row.operatingExpenses)}</td>
+                    <td className="px-4 py-3 text-right font-semibold">{row.operatingProfit === null ? "—" : money(row.operatingProfit)}</td>
                     <td className="px-4 py-3 text-right">{Number(row.processLossKg || 0).toFixed(2)}</td>
                     <td className="px-4 py-3 text-right">{money(row.scrapRevenue)}</td>
                     <td className="px-4 py-3 text-right">{money(row.balanceDue)}</td>
                   </tr>)}
-                  {!rows.length && <tr><td colSpan="8" className="p-8 text-center text-slate-500">No invoice activity in this period.</td></tr>}
+                  {!rows.length && <tr><td colSpan="10" className="p-8 text-center text-slate-500">No activity in this period.</td></tr>}
                 </tbody>
               </table>
             </div>
