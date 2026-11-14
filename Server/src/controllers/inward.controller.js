@@ -86,7 +86,7 @@ exports.createDraftReceipt = async (req, res) => {
     const sequence = await Sequence.findOneAndUpdate(
       { _id: 'inward-receipt' },
       [{ $set: { value: { $add: [{ $max: [{ $ifNull: ['$value', existingCount] }, existingCount] }, 1] } } }],
-      { new: true, upsert: true }
+      { new: true, upsert: true, updatePipeline: true }
     );
     const receiptNumber = `IR-${String(sequence.value).padStart(5, '0')}`;
 
@@ -190,7 +190,7 @@ exports.postReceipt = async (req, res) => {
       const reelSequence = await Sequence.findOneAndUpdate(
         { _id: 'reel-unit' },
         [{ $set: { value: { $add: [{ $max: [{ $ifNull: ['$value', existingReelCount] }, existingReelCount] }, totalReelsToCreate] } } }],
-        { new: true, upsert: true, session }
+        { new: true, upsert: true, session, updatePipeline: true }
       );
       let reelCounter = reelSequence.value - totalReelsToCreate;
 
