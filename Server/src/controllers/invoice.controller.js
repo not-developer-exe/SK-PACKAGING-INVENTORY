@@ -3,7 +3,22 @@ const crypto = require('crypto');
 const Invoice = require('../models/Invoice.model');
 const Dispatch = require('../models/Dispatch.model');
 const Party = require('../models/Party.model');
+const FinishedBox = require('../models/FinishedBox.model');
 const writeAuditLog = require('../utils/writeAuditLog');
+
+exports.getInvoices = async (req, res) => {
+  try {
+    const invoices = await Invoice.find()
+      .populate('customerId', 'name')
+      .populate('dispatchId', 'challanNumber dispatchDate')
+      .sort({ invoiceDate: -1, createdAt: -1 })
+      .lean();
+    return res.json({ invoices });
+  } catch (error) {
+    console.error('[INVOICE] List failed:', error.message);
+    return res.status(500).json({ message: 'Unable to fetch invoices.' });
+  }
+};
 
 exports.getUninvoicedDispatches = async (req, res) => {
   try {
@@ -105,12 +120,32 @@ exports.createInvoice = async (req, res) => {
         }
       }
 
-      const invoiceItems = cleanItems.map((item) => ({
-        boxId: item.boxId,
-        quantity: item.quantity,
-        rate: item.rate,
-        taxableAmount: Number((item.quantity * item.rate).toFixed(2))
-      }));
+      const finishedBoxes = await FinishedBox.find({ _id: { $in: [...invoicedByBox.keys()] } }).session(session);
+      const finishedBoxById = new Map(finishedBoxes.map((box) => [String(box._id), box]));
+      const invoiceItems = cleanItems.map((item) => {
+        const box = finishedBoxById.get(String(item.boxId));
+        const hasCost = box?.costingStatus === 'available' && Number.isFinite(Number(box.costPerBox));
+        const taxableAmount = Number((item.quantity * item.rate).toFixed(2));
+        const costPerBox = hasCost ? Number(box.costPerBox) : null;
+        const costOfGoods = hasCost ? Number((item.quantity * costPerBox).toFixed(2)) : null;
+        return {
+          boxId: item.boxId,
+          quantity: item.quantity,
+          rate: item.rate,
+          taxableAmount,
+          costPerBox,
+          costOfGoods,
+          grossProfit: hasCost ? Number((taxableAmount - costOfGoods).toFixed(2)) : null,
+          costingStatus: hasCost ? 'available' : 'unavailable'
+        };
+      });
+      const costingAvailable = invoiceItems.every((item) => item.costingStatus === 'available');
+      const totalCostOfGoods = costingAvailable
+        ? Number(invoiceItems.reduce((sum, item) => sum + item.costOfGoods, 0).toFixed(2))
+        : null;
+      const grossProfit = costingAvailable
+        ? Number((invoiceItems.reduce((sum, item) => sum + item.taxableAmount, 0) - totalCostOfGoods).toFixed(2))
+        : null;
       const subTotal = Number(invoiceItems.reduce((sum, item) => sum + item.taxableAmount, 0).toFixed(2));
       const cgstAmount = Number((subTotal * gst / 200).toFixed(2));
       const sgstAmount = Number((subTotal * gst / 200).toFixed(2));
@@ -129,7 +164,10 @@ exports.createInvoice = async (req, res) => {
         cgstAmount,
         sgstAmount,
         grandTotal,
-        balanceDue: grandTotal
+        balanceDue: grandTotal,
+        costOfGoods: totalCostOfGoods,
+        grossProfit,
+        costingStatus: costingAvailable ? 'available' : 'unavailable'
       }], { session });
 
       const newBalance = Number((Number(customer.balance || 0) + grandTotal).toFixed(2));
@@ -143,7 +181,7 @@ exports.createInvoice = async (req, res) => {
       });
       customer.balance = newBalance;
       await customer.save({ session });
-      await writeAuditLog(req, { action: 'invoice.created', entityType: 'Invoice', entityId: created._id, entityLabel: invoiceNumber, summary: 'Sales invoice created: ' + invoiceNumber, metadata: { customerId: String(customerId), dispatchId: String(dispatchId), subTotal, gstPercent: gst, grandTotal } }, session);
+      await writeAuditLog(req, { action: 'invoice.created', entityType: 'Invoice', entityId: created._id, entityLabel: invoiceNumber, summary: 'Sales invoice created: ' + invoiceNumber, metadata: { customerId: String(customerId), dispatchId: String(dispatchId), subTotal, gstPercent: gst, grandTotal, costOfGoods: totalCostOfGoods, grossProfit, costingStatus: costingAvailable ? 'available' : 'unavailable' } }, session);
       createdInvoice = created;
     });
 

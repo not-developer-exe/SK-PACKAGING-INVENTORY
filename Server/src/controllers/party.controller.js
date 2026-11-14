@@ -2,6 +2,8 @@ const mongoose = require('mongoose');
 const Party = require('../models/Party.model');
 const writeAuditLog = require('../utils/writeAuditLog');
 const AuditLog = require('../models/AuditLog.model');
+const Invoice = require('../models/Invoice.model');
+const { allocateInvoicePayment } = require('../utils/invoicePaymentAllocation');
 
 async function auditPartyChange(req, action, party, summary, metadata = {}) {
   try {
@@ -143,7 +145,42 @@ exports.addTransaction = async (req, res) => {
         balance: newBalance
       };
       party.ledger.push(newTxn);
+      const ledgerEntryId = party.ledger[party.ledger.length - 1]._id;
       party.balance = newBalance;
+
+      let invoiceAllocations = [];
+      let unallocatedAmount = 0;
+      if (isPaymentIn) {
+        const openInvoices = await Invoice.find({ customerId: party._id, balanceDue: { $gt: 0 }, status: { $ne: 'Cancelled' } })
+          .sort({ invoiceDate: 1, createdAt: 1, _id: 1 })
+          .session(session);
+        const allocation = allocateInvoicePayment(amount, openInvoices.map((invoice) => ({
+          invoiceId: String(invoice._id),
+          balanceDue: invoice.balanceDue
+        })));
+        invoiceAllocations = allocation.allocations;
+        unallocatedAmount = allocation.unallocatedAmount;
+        for (const item of invoiceAllocations) {
+          const invoice = openInvoices.find((candidate) => String(candidate._id) === item.invoiceId);
+          if (!invoice) throw new Error('Invoice allocation target disappeared during payment posting.');
+          invoice.balanceDue = Number((invoice.balanceDue - item.amount).toFixed(2));
+          if (invoice.balanceDue <= 0.005) {
+            invoice.balanceDue = 0;
+            invoice.status = 'Paid';
+          } else {
+            invoice.status = 'Pending';
+          }
+          invoice.payments.push({
+            date: new Date(),
+            amount: item.amount,
+            mode: mode.trim(),
+            reference: ref.trim(),
+            ledgerEntryId
+          });
+          await invoice.save({ session });
+        }
+      }
+
       await party.save({ session });
       await writeAuditLog(req, {
         action: 'party.payment_recorded',
@@ -151,7 +188,7 @@ exports.addTransaction = async (req, res) => {
         entityId: party._id,
         entityLabel: party.name,
         summary: newTxn.type + ' recorded for ' + party.name,
-        metadata: { amount, mode: mode.trim(), ref: ref.trim(), direction, resultingBalance: newBalance }
+        metadata: { amount, mode: mode.trim(), ref: ref.trim(), direction, resultingBalance: newBalance, invoiceAllocations, unallocatedAmount }
       }, session);
       updatedParty = party;
     });
@@ -177,9 +214,30 @@ exports.deleteTransaction = async (req, res) => {
         throw Object.assign(new Error('Opening balance entries cannot be deleted.'), { statusCode: 409 });
       }
 
+      if (txn.type === 'Tax Invoice') {
+        throw Object.assign(new Error('Invoice ledger entries cannot be deleted directly. Use a dedicated invoice cancellation or credit-note process.'), { statusCode: 409 });
+      }
+
       const removedEntry = { type: txn.type, ref: txn.ref, debit: txn.debit, credit: txn.credit };
-      party.balance += (txn.credit || 0) - (txn.debit || 0);
+      const linkedInvoices = await Invoice.find({ customerId: party._id, 'payments.ledgerEntryId': txn._id }).session(session);
+      let reversedInvoiceAllocations = [];
+      for (const invoice of linkedInvoices) {
+        const matchingPayments = invoice.payments.filter((payment) => String(payment.ledgerEntryId) === String(txn._id));
+        const reversedAmount = Number(matchingPayments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0).toFixed(2));
+        invoice.balanceDue = Number((invoice.balanceDue + reversedAmount).toFixed(2));
+        invoice.status = invoice.balanceDue <= 0.005 ? 'Paid' : 'Pending';
+        invoice.payments = invoice.payments.filter((payment) => String(payment.ledgerEntryId) !== String(txn._id));
+        await invoice.save({ session });
+        reversedInvoiceAllocations.push({ invoiceNumber: invoice.invoiceNumber, amount: reversedAmount });
+      }
+
       party.ledger.pull({ _id: req.params.txnId });
+      let recalculatedBalance = 0;
+      for (const entry of party.ledger) {
+        recalculatedBalance = Number((recalculatedBalance + Number(entry.debit || 0) - Number(entry.credit || 0)).toFixed(2));
+        entry.balance = recalculatedBalance;
+      }
+      party.balance = recalculatedBalance;
       await party.save({ session });
       await writeAuditLog(req, {
         action: 'party.transaction_deleted',
@@ -187,7 +245,7 @@ exports.deleteTransaction = async (req, res) => {
         entityId: party._id,
         entityLabel: party.name,
         summary: 'Ledger entry deleted for ' + party.name,
-        metadata: { removedEntry, resultingBalance: party.balance }
+        metadata: { removedEntry, reversedInvoiceAllocations, resultingBalance: party.balance }
       }, session);
       updatedParty = party;
     });
