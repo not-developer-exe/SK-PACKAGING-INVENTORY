@@ -6,7 +6,8 @@
     "test": "node --test",
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test:integration": "node --test test/integration/*.integration.cjs"
+    "test:integration": "node --test test/integration/*.integration.cjs",
+    "seed:admin": "node seed.js"
   },
   "keywords": [],
   "author": "",
