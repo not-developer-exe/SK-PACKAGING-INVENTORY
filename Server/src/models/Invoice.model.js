@@ -1,5 +1,13 @@
 const mongoose = require('mongoose');
 
+const invoicePaymentSchema = new mongoose.Schema({
+  date: { type: Date, default: Date.now },
+  amount: { type: Number, required: true, min: 0.01 },
+  mode: { type: String, required: true, trim: true },
+  reference: { type: String, trim: true },
+  ledgerEntryId: { type: mongoose.Schema.Types.ObjectId, required: true }
+});
+
 const invoiceSchema = new mongoose.Schema({
   invoiceNumber: { type: String, required: true, unique: true },
   invoiceDate: { type: Date, required: true },
@@ -19,6 +27,7 @@ const invoiceSchema = new mongoose.Schema({
   sgstAmount: { type: Number, required: true },
   grandTotal: { type: Number, required: true },
   balanceDue: { type: Number, required: true },
+  payments: { type: [invoicePaymentSchema], default: [] },
   
   status: { type: String, enum: ['Paid', 'Pending', 'Overdue', 'Cancelled'], default: 'Pending' }
 }, { timestamps: true });
