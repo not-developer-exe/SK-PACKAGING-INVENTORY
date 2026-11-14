@@ -123,6 +123,41 @@ test('admin console and expense register enforce roles and keep an audit trail',
   }).lean();
   assert.deepEqual(new Set(partyAuditActions.map(item => item.action)), new Set(['party.created', 'party.updated', 'party.archived']));
 
+  const historicalParty = await Party.create({
+    name: 'Settled Historical Party',
+    type: 'Both',
+    balance: 0,
+    ledger: [
+      { type: 'Payment Received', ref: 'OLD-RECEIPT', debit: 0, credit: 500, balance: -500 },
+      { type: 'Payment Sent', ref: 'OLD-PAYMENT', debit: 500, credit: 0, balance: 0 }
+    ]
+  });
+  const historicalArchive = await api('/api/parties/' + historicalParty._id, { method: 'DELETE' });
+  assert.equal(historicalArchive.status, 200);
+  const archivedHistoricalParty = await Party.findById(historicalParty._id);
+  assert.equal(archivedHistoricalParty.isActive, false);
+  assert.equal(archivedHistoricalParty.ledger.length, 2);
+  assert.equal(archivedHistoricalParty.balance, 0);
+
+  const partyWithUnpaidInvoice = await Party.create({ name: 'Party With Outstanding Invoice', type: 'Customer', balance: 0 });
+  await Invoice.create({
+    invoiceNumber: 'INV-PARTY-ARCHIVE-BLOCK',
+    invoiceDate: new Date('2026-11-14T00:00:00.000Z'),
+    customerId: partyWithUnpaidInvoice._id,
+    dispatchId: new mongoose.Types.ObjectId(),
+    items: [],
+    subTotal: 100,
+    gstPercent: 0,
+    cgstAmount: 0,
+    sgstAmount: 0,
+    grandTotal: 100,
+    balanceDue: 100,
+    status: 'Pending'
+  });
+  const blockedPartyArchive = await api('/api/parties/' + partyWithUnpaidInvoice._id, { method: 'DELETE' });
+  assert.equal(blockedPartyArchive.status, 409);
+  assert.equal((await Party.findById(partyWithUnpaidInvoice._id)).isActive, true);
+
   const protectedInvoiceList = await api('/api/admin-records/invoices');
   assert.equal(protectedInvoiceList.status, 200);
   assert.equal(protectedInvoiceList.data.readOnly, true);
