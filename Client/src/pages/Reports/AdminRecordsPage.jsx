@@ -21,7 +21,7 @@ export default function AdminRecordsPage() {
   const [entity, setEntity] = useState('parties');
   const [records, setRecords] = useState([]);
   const [selected, setSelected] = useState(null);
-  const [json, setJson] = useState('');
+  const [draft, setDraft] = useState(null);
   const [reason, setReason] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -41,8 +41,8 @@ export default function AdminRecordsPage() {
       setTotalPages(data.totalPages || 1);
       setTotalRecords(data.total || 0);
       const next = (data.records || []).find(item => String(item._id) === String(keepId));
-      if (next) { setSelected(next); setJson(JSON.stringify(next, null, 2)); }
-      else { setSelected(null); setJson(''); }
+      if (next) { setSelected(next); setDraft(next); }
+      else { setSelected(null); setDraft(null); }
     } catch (e) { setError(e.response?.data?.message || 'Unable to load records.'); }
     finally { setLoading(false); }
   };
@@ -50,18 +50,27 @@ export default function AdminRecordsPage() {
 
   const selectRecord = record => {
     setSelected(record);
-    setJson(JSON.stringify(record, null, 2));
+    setDraft(record);
     setReason('');
     setSuccess('');
   };
 
   const save = async () => {
     setError(''); setSuccess('');
+    if (!draft || Array.isArray(draft) || typeof draft !== 'object') {
+      setError('Select a valid record before saving.'); return;
+    }
     let document;
-    try { document = JSON.parse(json); }
-    catch { setError('The record editor contains invalid JSON.'); return; }
-    if (!document || Array.isArray(document) || typeof document !== 'object') {
-      setError('The record must be a JSON object.'); return;
+    try {
+      document = { ...draft };
+      for (const [key, originalValue] of Object.entries(selected || {})) {
+        if ((originalValue === null || typeof originalValue === 'object') && typeof document[key] === 'string') {
+          document[key] = JSON.parse(document[key]);
+        }
+      }
+    } catch {
+      setError('One of the complex fields contains invalid JSON. Correct it before saving.');
+      return;
     }
     if (reason.trim().length < 10) { setError('Enter a reason of at least 10 characters for the audit log.'); return; }
     if (!window.confirm('Apply these changes to the live ' + entity + ' record? This action is recorded in the audit log.')) return;
@@ -99,9 +108,23 @@ export default function AdminRecordsPage() {
       <section className="space-y-3 rounded-2xl border bg-white p-5">
         <div><h2 className="font-semibold text-slate-900">Record editor</h2><p className="text-xs text-slate-500">Edit the JSON fields below. The record ID, timestamps and user password fields are protected.</p></div>
         {selected ? <>
-          <textarea spellCheck="false" value={json} onChange={e => setJson(e.target.value)} rows={24} className="w-full rounded-xl border bg-slate-950 p-4 font-mono text-xs leading-5 text-emerald-100 outline-none focus:border-blue-500"/>
+          <div className="max-h-[620px] space-y-3 overflow-y-auto pr-1">
+            {Object.entries(selected).filter(([key]) => key !== '__v').map(([key, originalValue]) => {
+              const protectedField = ['_id', 'createdAt', 'updatedAt', 'recordedBy', 'createdBy', 'updatedBy'].includes(key);
+              const complex = originalValue === null || typeof originalValue === 'object';
+              const isDate = typeof originalValue === 'string' && /Date$/.test(key) && /^\\d{4}-\\d{2}-\\d{2}T/.test(originalValue);
+              return <label key={key} className="block rounded-lg border border-slate-100 p-3 text-sm">
+                <span className="mb-1 block font-semibold text-slate-700">{key}{protectedField && <span className="ml-2 text-xs font-normal text-slate-400">Protected</span>}</span>
+                {complex
+                  ? <textarea spellCheck="false" rows={Math.min(8, Math.max(2, JSON.stringify(originalValue, null, 2).split('\\n').length))} disabled={protectedField} value={typeof draft?.[key] === 'string' ? draft[key] : JSON.stringify(draft?.[key] ?? originalValue, null, 2)} onChange={e => setDraft(current => ({ ...current, [key]: e.target.value }))} className="w-full rounded-lg border bg-slate-50 p-2 font-mono text-xs disabled:opacity-60"/>
+                  : typeof originalValue === 'boolean'
+                    ? <select disabled={protectedField} value={String(draft?.[key] ?? originalValue)} onChange={e => setDraft(current => ({ ...current, [key]: e.target.value === 'true' }))} className="w-full rounded-lg border bg-white px-3 py-2 disabled:opacity-60"><option value="true">True</option><option value="false">False</option></select>
+                    : <input disabled={protectedField} type={typeof originalValue === 'number' ? 'number' : isDate ? 'date' : 'text'} step={typeof originalValue === 'number' ? 'any' : undefined} value={isDate ? String(draft?.[key] ?? originalValue).slice(0, 10) : String(draft?.[key] ?? '')} onChange={e => setDraft(current => ({ ...current, [key]: typeof originalValue === 'number' ? (e.target.value === '' ? null : Number(e.target.value)) : e.target.value }))} className="w-full rounded-lg border px-3 py-2 disabled:bg-slate-50 disabled:text-slate-400"/>}
+              </label>;
+            })}
+          </div>
           <label className="block text-sm font-medium">Reason for correction (required)<textarea value={reason} onChange={e => setReason(e.target.value)} minLength={10} maxLength={500} rows={2} placeholder="Explain why this record needs correction…" className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"/></label>
-          <div className="flex flex-wrap items-center justify-between gap-3"><span className="text-xs text-slate-500">Only fields defined in the selected model schema are persisted.</span><button onClick={save} disabled={saving} className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"><Save size={15} className="mr-2 inline"/>{saving ? 'Saving…' : 'Save admin override'}</button></div>
+          <div className="flex flex-wrap items-center justify-between gap-3"><span className="text-xs text-slate-500">Complex fields (objects and arrays) can be edited as JSON. Protected identifiers and ownership fields cannot be changed.</span><button onClick={save} disabled={saving} className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"><Save size={15} className="mr-2 inline"/>{saving ? 'Saving…' : 'Save admin override'}</button></div>
         </> : <div className="flex min-h-64 flex-col items-center justify-center text-center text-slate-500"><Database size={28} className="mb-3 opacity-40"/><p className="text-sm">Select a record to inspect and edit its fields.</p></div>}
       </section>
     </div>
