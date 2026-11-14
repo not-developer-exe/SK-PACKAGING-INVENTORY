@@ -3,6 +3,7 @@ const Dispatch = require('../models/Dispatch.model');
 const FinishedBox = require('../models/FinishedBox.model');
 const StockMovement = require('../models/StockMovement.model');
 const Party = require('../models/Party.model');
+const Invoice = require('../models/Invoice.model');
 const Sequence = require('../models/Sequence.model');
 const writeAuditLog = require('../utils/writeAuditLog');
 const { buildDateRangeFilter, isValidDateOnly } = require('../utils/dateFilters');
@@ -107,6 +108,82 @@ exports.recordDispatch = async (req, res) => {
     return res.status(status).json({
       message: status >= 500 ? 'Unable to record dispatch. No stock changes were committed.' : error.message
     });
+  } finally {
+    await session.endSession();
+  }
+};
+
+
+exports.cancelDispatch = async (req, res) => {
+  const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
+  if (reason.length < 10 || reason.length > 500) {
+    return res.status(400).json({ message: 'Enter a cancellation reason between 10 and 500 characters.' });
+  }
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    return res.status(400).json({ message: 'Invalid dispatch ID.' });
+  }
+
+  const session = await mongoose.startSession();
+  try {
+    let cancelled;
+    await session.withTransaction(async () => {
+      const dispatch = await Dispatch.findById(req.params.id).session(session);
+      if (!dispatch) throw Object.assign(new Error('Dispatch not found.'), { statusCode: 404 });
+      if (dispatch.status === 'cancelled') {
+        throw Object.assign(new Error('This dispatch is already cancelled.'), { statusCode: 409 });
+      }
+      if (dispatch.status === 'delivered') {
+        throw Object.assign(new Error('A delivered dispatch cannot be cancelled. Use a return/credit workflow.'), { statusCode: 409 });
+      }
+      const linkedInvoice = await Invoice.findOne({
+        dispatchId: dispatch._id,
+        status: { $ne: 'Cancelled' }
+      }).session(session);
+      if (linkedInvoice) {
+        throw Object.assign(new Error('This challan is linked to invoice ' + linkedInvoice.invoiceNumber + '. Cancel or credit the invoice through the accounting workflow before cancelling dispatch.'), { statusCode: 409 });
+      }
+
+      for (const line of dispatch.boxes) {
+        const box = await FinishedBox.findById(line.boxId).session(session);
+        if (!box) {
+          throw Object.assign(new Error('A finished-goods batch linked to this challan no longer exists. No changes were committed.'), { statusCode: 409 });
+        }
+        box.quantityAvailable += line.dispatchQuantity;
+        if (box.quantityAvailable > 0) box.status = 'available';
+        await box.save({ session });
+        await StockMovement.create([{
+          movementDate: new Date(),
+          movementType: 'adjustment',
+          referenceId: dispatch._id,
+          referenceModel: 'Dispatch',
+          itemType: 'finished_good',
+          specificationSummary: box.itemName + ' | ' + box.dimensions.length + 'x' + box.dimensions.width + 'x' + box.dimensions.height,
+          quantityChange: line.dispatchQuantity,
+          weightChangeKg: 0,
+          notes: 'Stock restored after cancellation of ' + dispatch.challanNumber + ': ' + reason,
+          performedBy: req.user._id
+        }], { session });
+      }
+
+      dispatch.status = 'cancelled';
+      dispatch.cancelledAt = new Date();
+      dispatch.cancelledBy = req.user._id;
+      dispatch.cancellationReason = reason;
+      await dispatch.save({ session });
+      await writeAuditLog(req, {
+        action: 'dispatch.cancelled',
+        entityType: 'Dispatch',
+        entityId: dispatch._id,
+        entityLabel: dispatch.challanNumber,
+        summary: 'Dispatch cancelled: ' + dispatch.challanNumber,
+        metadata: { reason, restoredLines: dispatch.boxes.map(line => ({ boxId: String(line.boxId), quantity: line.dispatchQuantity })) }
+      }, session);
+      cancelled = dispatch;
+    });
+    return res.json({ message: 'Dispatch cancelled and finished-goods stock restored.', dispatch: cancelled });
+  } catch (error) {
+    console.error('[DISPATCH] Cancellation failed:', error.message);
+    return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Unable to cancel dispatch. No stock changes were committed.' });
   } finally {
     await session.endSession();
   }
