@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { inwardService } from '../../services/inwardService';
 import { partiesService } from '../../services/partiesService';
 import DateRangeFilter from '../../components/DateRangeFilter';
+import { toLocalDateInput } from '../../lib/date';
 import { ArrowDownToLine, Plus, ShieldCheck, CheckCircle2, FileText, Loader2, X } from 'lucide-react';
 
 export default function StockInwardPage() {
@@ -18,7 +19,7 @@ export default function StockInwardPage() {
   // Form state
   const [supplierId, setSupplierId] = useState('');
   const [invoiceReference, setInvoiceReference] = useState('');
-  const [receiptDate, setReceiptDate] = useState(new Date().toISOString().split('T')[0]);
+  const [receiptDate, setReceiptDate] = useState(toLocalDateInput());
   const [notes, setNotes] = useState('');
   
   // Line items state
