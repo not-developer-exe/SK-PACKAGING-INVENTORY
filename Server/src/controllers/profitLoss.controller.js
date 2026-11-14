@@ -82,7 +82,7 @@ exports.getProfitLoss = async (req, res) => {
     const allTimeSold = Number(allTimeWasteTotals[1][0]?.sold || 0);
     const currentVerifiedScrapInventoryKg = Number((allTimeGenerated - allTimeSold).toFixed(3));
 
-    const { daily, monthly, partyWise } = buildProfitLossGroups(invoices, productionRuns, scrapSales);
+    const { daily, monthly, partyWise } = buildProfitLossGroups(invoices, productionRuns, scrapSales, expenses);
 
     return res.json({
       period: { from, to },
