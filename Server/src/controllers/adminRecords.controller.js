@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const AuditLog = require('../models/AuditLog.model');
 const writeAuditLog = require('../utils/writeAuditLog');
 
 const models = {
@@ -15,7 +16,8 @@ const models = {
   stockMovements: require('../models/StockMovement.model'),
   openingStockAdjustments: require('../models/OpeningStockAdjustment.model'),
   stockReconciliations: require('../models/StockReconciliation.model'),
-  expenses: require('../models/Expense.model')
+  expenses: require('../models/Expense.model'),
+  auditLogs: AuditLog
 };
 
 const immutableFields = new Set(['_id', '__v', 'createdAt', 'updatedAt', 'password']);
@@ -76,6 +78,7 @@ exports.listAdminRecords = async (req, res) => {
 exports.updateAdminRecord = async (req, res) => {
   const Model = models[req.params.entity];
   if (!Model) return res.status(404).json({ message: 'Unsupported record type.' });
+  if (req.params.entity === 'auditLogs') return res.status(403).json({ message: 'Audit history is read-only.' });
   if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid record ID.' });
   const { document, reason } = req.body || {};
   if (!document || typeof document !== 'object' || Array.isArray(document)) {
