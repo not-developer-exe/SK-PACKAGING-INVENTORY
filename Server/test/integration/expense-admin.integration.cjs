@@ -138,6 +138,14 @@ test('admin console and expense register enforce roles and keep an audit trail',
   assert.equal(archivedHistoricalParty.isActive, false);
   assert.equal(archivedHistoricalParty.ledger.length, 2);
   assert.equal(archivedHistoricalParty.balance, 0);
+  const archivedPartyList = await api('/api/parties/archived');
+  assert.equal(archivedPartyList.status, 200);
+  assert.ok(archivedPartyList.data.parties.some(item => String(item._id) === String(historicalParty._id)));
+  const restoredHistoricalParty = await api('/api/parties/' + historicalParty._id + '/restore', { method: 'PATCH' });
+  assert.equal(restoredHistoricalParty.status, 200);
+  assert.equal(restoredHistoricalParty.data.party.isActive, true);
+  assert.equal((await Party.findById(historicalParty._id)).ledger.length, 2);
+  assert.ok(await AuditLog.exists({ action: 'party.restored', entityId: historicalParty._id }));
 
   const partyWithUnpaidInvoice = await Party.create({ name: 'Party With Outstanding Invoice', type: 'Customer', balance: 0 });
   await Invoice.create({
