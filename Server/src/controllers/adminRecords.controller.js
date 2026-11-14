@@ -48,10 +48,7 @@ exports.listAdminRecords = async (req, res) => {
     const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 100) : '';
     const filter = {};
     if (search) {
-      const escaped = search.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\  try {
-    const records = await Model.find().sort({ updatedAt: -1, createdAt: -1 }).limit(100).lean();
-    return res.json({ entity: req.params.entity, records: records.map(serialize) });
-  } catch (error) {');
+      const escaped = search.replace(/[.*+?^$()|[\]\\]/g, '\\$&').replaceAll('{', '\\{').replaceAll('}', '\\}');
       const expression = new RegExp(escaped, 'i');
       const searchableStrings = Object.entries(Model.schema.paths)
         .filter(([path, schema]) => schema.instance === 'String' && !path.toLowerCase().includes('password'))
