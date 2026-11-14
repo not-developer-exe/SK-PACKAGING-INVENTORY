@@ -11,6 +11,8 @@ const corrugatedSheetSchema = new mongoose.Schema({
   // Quantity and Weight
   sheetCount: { type: Number, required: true },
   totalWeightKg: { type: mongoose.Schema.Types.Decimal128, required: true },
+  unitCostPerKg: { type: mongoose.Schema.Types.Decimal128, default: 0 },
+  costingStatus: { type: String, enum: ['available', 'unavailable'], default: 'unavailable' },
   
   status: { type: String, enum: ['available', 'consumed'], default: 'available' }
 }, { timestamps: true });
