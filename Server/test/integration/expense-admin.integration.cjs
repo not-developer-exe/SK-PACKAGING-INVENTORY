@@ -263,3 +263,82 @@ test('configured ADMIN_EMAIL promotes an existing owner login to active admin', 
   assert.equal(promoted.role, 'admin');
   assert.equal(promoted.isActive, true);
 });
+
+
+test('inward posting preserves individual reel weights, landed cost and stock ledger totals', async () => {
+  const supplier = await Party.create({ name: 'Inward Integration Supplier', type: 'Supplier' });
+  const draft = await api('/api/inward', {
+    method: 'POST',
+    body: {
+      supplierId: String(supplier._id),
+      invoiceReference: 'SUP-INV-REELS-001',
+      receiptDate: '2026-11-14',
+      lines: [{
+        reelWidthInches: 36,
+        bf: 18,
+        gsm: 140,
+        quality: 'Natural',
+        reelCount: 3,
+        totalWeightKg: 450,
+        reelWeightsKg: [149, 150, 151],
+        ratePerKg: 40,
+        freightCharges: 1500,
+        otherCharges: 300
+      }]
+    }
+  });
+  assert.equal(draft.status, 201);
+  assert.deepEqual(draft.data.receipt.lines[0].reelWeightsKg, [149, 150, 151]);
+  assert.equal(draft.data.receipt.lines[0].isAggregateWeightOnly, false);
+
+  const mismatch = await api('/api/inward', {
+    method: 'POST',
+    body: {
+      supplierId: String(supplier._id),
+      invoiceReference: 'SUP-INV-REELS-BAD',
+      receiptDate: '2026-11-14',
+      lines: [{
+        reelWidthInches: 36, bf: 18, gsm: 140, quality: 'Natural',
+        reelCount: 3, totalWeightKg: 450, reelWeightsKg: [149, 150, 150],
+        ratePerKg: 40
+      }]
+    }
+  });
+  assert.equal(mismatch.status, 400);
+
+  const receiptId = draft.data.receipt._id;
+  const posted = await api('/api/inward/' + receiptId + '/post', { method: 'POST' });
+  assert.equal(posted.status, 200);
+  const reels = await ReelUnit.find({ inwardReceiptId: receiptId }).sort({ reelCode: 1 });
+  assert.deepEqual(reels.map(reel => Number(reel.originalWeightKg.toString())), [149, 150, 151]);
+  assert.ok(reels.every(reel => Number(reel.landedRatePerKg.toString()) === 44));
+
+  const movement = await StockMovement.findOne({ referenceId: receiptId, movementType: 'inward_receipt' });
+  assert.equal(movement.quantityChange, 3);
+  assert.equal(Number(movement.weightChangeKg.toString()), 450);
+
+  const duplicatePost = await api('/api/inward/' + receiptId + '/post', { method: 'POST' });
+  assert.equal(duplicatePost.status, 409);
+  assert.equal(await ReelUnit.countDocuments({ inwardReceiptId: receiptId }), 3);
+  assert.equal(await StockMovement.countDocuments({ referenceId: receiptId, movementType: 'inward_receipt' }), 1);
+
+  const aggregateDraft = await api('/api/inward', {
+    method: 'POST',
+    body: {
+      supplierId: String(supplier._id),
+      invoiceReference: 'SUP-INV-REELS-002',
+      receiptDate: '2026-11-14',
+      lines: [{
+        reelWidthInches: 30, bf: 18, gsm: 120, quality: 'GY',
+        reelCount: 2, totalWeightKg: 100, ratePerKg: 35
+      }]
+    }
+  });
+  assert.equal(aggregateDraft.status, 201);
+  assert.equal(aggregateDraft.data.receipt.lines[0].isAggregateWeightOnly, true);
+  const aggregateId = aggregateDraft.data.receipt._id;
+  const aggregatePosted = await api('/api/inward/' + aggregateId + '/post', { method: 'POST' });
+  assert.equal(aggregatePosted.status, 200);
+  const aggregateReels = await ReelUnit.find({ inwardReceiptId: aggregateId });
+  assert.deepEqual(aggregateReels.map(reel => Number(reel.originalWeightKg.toString())), [50, 50]);
+});
