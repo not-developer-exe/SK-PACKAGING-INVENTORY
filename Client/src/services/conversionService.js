@@ -5,6 +5,10 @@ export const conversionService = {
     const { data } = await axiosClient.get('/conversion/sheets');
     return data.sheets;
   },
+  async getFinishedGoods(params = {}) {
+    const { data } = await axiosClient.get('/conversion/finished-goods', { params });
+    return data.finishedGoods;
+  },
   async recordConversion(payload) {
     const { data } = await axiosClient.post('/conversion', payload);
     return data;
