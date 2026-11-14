@@ -110,7 +110,7 @@ export default function AdminRecordsPage() {
         {selected ? <>
           <div className="max-h-[620px] space-y-3 overflow-y-auto pr-1">
             {Object.entries(selected).filter(([key]) => key !== '__v').map(([key, originalValue]) => {
-              const protectedField = ['_id', 'createdAt', 'updatedAt', 'recordedBy', 'createdBy', 'updatedBy'].includes(key);
+              const protectedField = entity === 'auditLogs' || ['_id', 'createdAt', 'updatedAt', 'recordedBy', 'createdBy', 'updatedBy'].includes(key);
               const complex = originalValue === null || typeof originalValue === 'object';
               const isDate = typeof originalValue === 'string' && /Date$/.test(key) && /^\d{4}-\d{2}-\d{2}T/.test(originalValue);
               return <label key={key} className="block rounded-lg border border-slate-100 p-3 text-sm">
@@ -124,7 +124,7 @@ export default function AdminRecordsPage() {
             })}
           </div>
           <label className="block text-sm font-medium">Reason for correction (required)<textarea value={reason} onChange={e => setReason(e.target.value)} minLength={10} maxLength={500} rows={2} placeholder="Explain why this record needs correction…" className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"/></label>
-          <div className="flex flex-wrap items-center justify-between gap-3"><span className="text-xs text-slate-500">Complex fields (objects and arrays) can be edited as JSON. Protected identifiers and ownership fields cannot be changed.</span><button onClick={save} disabled={saving} className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"><Save size={15} className="mr-2 inline"/>{saving ? 'Saving…' : 'Save admin override'}</button></div>
+          <div className="flex flex-wrap items-center justify-between gap-3"><span className="text-xs text-slate-500">Complex fields (objects and arrays) can be edited as JSON. Protected identifiers and ownership fields cannot be changed.</span><button onClick={save} disabled={saving || entity === 'auditLogs'} className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"><Save size={15} className="mr-2 inline"/>{entity === 'auditLogs' ? 'Read-only audit history' : saving ? 'Saving…' : 'Save admin override'}</button></div>
         </> : <div className="flex min-h-64 flex-col items-center justify-center text-center text-slate-500"><Database size={28} className="mb-3 opacity-40"/><p className="text-sm">Select a record to inspect and edit its fields.</p></div>}
       </section>
     </div>
