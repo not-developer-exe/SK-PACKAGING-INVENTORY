@@ -32,7 +32,13 @@ exports.recordProduction = async (req, res) => {
     return res.status(400).json({ message: 'Measured recoverable scrap must be a non-negative number.' });
   }
 
-  const inputs = inputReels.map((item) => ({ ...item, weightConsumedKg: Number(item.weightConsumedKg) }));
+  const inputs = inputReels.map((item) => ({
+    ...item,
+    weightConsumedKg: Number(item.weightConsumedKg),
+    requestedWidthInches: item.requestedWidthInches === undefined || item.requestedWidthInches === ''
+      ? null
+      : Number(item.requestedWidthInches)
+  }));
   const outputs = outputSheets.map((item) => ({
     ...item,
     totalWeightKg: Number(item.totalWeightKg),
@@ -41,13 +47,17 @@ exports.recordProduction = async (req, res) => {
     widthInches: Number(item.widthInches)
   }));
 
-  if (inputs.some((item) => !mongoose.isValidObjectId(item.reelId) || !Number.isFinite(item.weightConsumedKg) || item.weightConsumedKg <= 0)) {
-    return res.status(400).json({ message: 'Every input reel must have a valid ID and a positive consumed weight.' });
+  if (inputs.some((item) => !mongoose.isValidObjectId(item.reelId) || !Number.isFinite(item.weightConsumedKg) || item.weightConsumedKg <= 0 ||
+      (item.requestedWidthInches !== null && (!Number.isFinite(item.requestedWidthInches) || item.requestedWidthInches <= 0)))) {
+    return res.status(400).json({ message: 'Every input reel needs a valid ID, positive consumed weight and, when supplied, a positive requested width.' });
+  }
+  if (new Set(inputs.map((item) => String(item.reelId))).size !== inputs.length) {
+    return res.status(400).json({ message: 'A reel can appear only once in a production run. Combine its consumed weight into one line.' });
   }
   if (outputs.some((item) => !Number.isFinite(item.totalWeightKg) || item.totalWeightKg <= 0 ||
       !Number.isInteger(item.sheetCount) || item.sheetCount <= 0 ||
       !Number.isFinite(item.lengthInches) || item.lengthInches <= 0 ||
-      !Number.isFinite(item.widthInches) || item.widthInches <= 0)) {
+      !Number.isFinite(item.widthInches) || item.widthInches <= 0 || ![3, 5, 7, 9].includes(Number(item.ply)))) {
     return res.status(400).json({ message: 'Every output line must have positive dimensions, weight and a whole-number sheet count.' });
   }
 
@@ -72,36 +82,65 @@ exports.recordProduction = async (req, res) => {
     );
     const runNumber = 'PR-' + String(sequence.value).padStart(5, '0');
 
+    const tracedInputs = [];
     for (const input of inputs) {
       const consumedWeight = input.weightConsumedKg;
       const reel = await ReelUnit.findById(input.reelId).session(session);
-      if (!reel) {
-        const error = new Error('Reel ' + input.reelId + ' not found.');
-        error.statusCode = 404;
+      if (!reel || !['available', 'partial'].includes(reel.status)) {
+        const error = new Error('Reel ' + input.reelId + ' is not available for production.');
+        error.statusCode = 409;
         throw error;
       }
 
       const currentWeight = Number(reel.remainingWeightKg.toString());
-      if (currentWeight < consumedWeight) {
+      if (currentWeight + 1e-9 < consumedWeight) {
         const error = new Error('Insufficient weight in Reel ' + reel.reelCode + '. Available: ' + currentWeight + 'kg, Requested: ' + consumedWeight + 'kg');
         error.statusCode = 409;
         throw error;
       }
 
-      const newWeight = currentWeight - consumedWeight;
-      reel.remainingWeightKg = newWeight;
-      reel.status = newWeight <= 2 ? 'consumed' : 'partial';
-      await reel.save({ session });
+      const newWeight = Math.max(0, currentWeight - consumedWeight);
+      const newStatus = newWeight <= 0.001 ? 'consumed' : 'partial';
+      const updatedReel = await ReelUnit.findOneAndUpdate(
+        { _id: reel._id, remainingWeightKg: reel.remainingWeightKg, status: reel.status },
+        {
+          $set: {
+            remainingWeightKg: mongoose.Types.Decimal128.fromString(String(newWeight)),
+            status: newStatus
+          }
+        },
+        { new: true, session }
+      );
+      if (!updatedReel) {
+        const error = new Error('Reel ' + reel.reelCode + ' stock changed during this entry. Refresh and try again.');
+        error.statusCode = 409;
+        throw error;
+      }
+
+      const actualWidthInches = Number(reel.reelWidthInches);
+      const requestedWidthInches = input.requestedWidthInches || actualWidthInches;
+      tracedInputs.push({
+        reelId: reel._id,
+        reelCode: reel.reelCode,
+        requestedWidthInches,
+        actualWidthInches,
+        widthVarianceInches: actualWidthInches - requestedWidthInches,
+        bf: reel.bf,
+        gsm: reel.gsm,
+        quality: reel.quality,
+        weightConsumedKg: consumedWeight
+      });
 
       await StockMovement.create([{
         movementType: 'production_issue',
         referenceId: reel._id,
         referenceModel: 'ReelUnit',
         itemType: 'reel',
-        specificationSummary: 'Reel ' + reel.reelCode + ' consumed for ' + runNumber,
-        quantityChange: newWeight <= 2 ? -1 : 0,
-        weightChangeKg: -consumedWeight,
-        notes: 'Issued to Production Run ' + runNumber,
+        specificationSummary: 'Reel ' + reel.reelCode + ' | Actual ' + actualWidthInches + '" | Required ' + requestedWidthInches + '" | ' + runNumber,
+        quantityChange: newStatus === 'consumed' ? -1 : 0,
+        weightChangeKg: mongoose.Types.Decimal128.fromString(String(-consumedWeight)),
+        notes: 'Issued to Production Run ' + runNumber +
+          (actualWidthInches !== requestedWidthInches ? '; width substitution ' + requestedWidthInches + '" required, ' + actualWidthInches + '" used' : ''),
         performedBy: req.user._id
       }], { session, ordered: true });
     }
@@ -110,7 +149,7 @@ exports.recordProduction = async (req, res) => {
       runNumber,
       shift,
       operatorName,
-      inputReels: inputs,
+      inputReels: tracedInputs,
       totalInputWeightKg: totalInputWeight,
       totalOutputWeightKg: totalOutputWeight,
       recoverableWasteKg,
@@ -144,7 +183,7 @@ exports.recordProduction = async (req, res) => {
       }], { session, ordered: true });
     }
 
-    await writeAuditLog(req, { action: 'production.recorded', entityType: 'ProductionRun', entityId: run._id, entityLabel: runNumber, summary: 'Production run recorded: ' + runNumber, metadata: { totalInputWeightKg: totalInputWeight, totalOutputWeightKg: totalOutputWeight, recoverableWasteKg, processLossKg, inputReelCount: inputs.length, outputLineCount: outputs.length } }, session);
+    await writeAuditLog(req, { action: 'production.recorded', entityType: 'ProductionRun', entityId: run._id, entityLabel: runNumber, summary: 'Production run recorded: ' + runNumber, metadata: { totalInputWeightKg: totalInputWeight, totalOutputWeightKg: totalOutputWeight, recoverableWasteKg, processLossKg, inputReelCount: tracedInputs.length, outputLineCount: outputs.length, widthSubstitutions: tracedInputs.filter((item) => item.widthVarianceInches !== 0).map((item) => ({ reelCode: item.reelCode, requestedWidthInches: item.requestedWidthInches, actualWidthInches: item.actualWidthInches, varianceInches: item.widthVarianceInches })) } }, session);
     await session.commitTransaction();
     return res.status(201).json({
       message: 'Production run recorded successfully',
