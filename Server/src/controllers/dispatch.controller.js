@@ -19,6 +19,9 @@ exports.recordDispatch = async (req, res) => {
 
   const quantities = new Map();
   for (const item of boxes) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      return res.status(400).json({ message: 'Each dispatch line must be a valid object.' });
+    }
     const id = String(item.boxId || '');
     const quantity = Number(item.dispatchQuantity);
     if (!mongoose.isValidObjectId(id) || !Number.isInteger(quantity) || quantity <= 0) {
@@ -32,7 +35,7 @@ exports.recordDispatch = async (req, res) => {
   try {
     await session.withTransaction(async () => {
       const customer = await Party.findById(customerId).session(session);
-      if (!customer || !['Customer', 'Both'].includes(customer.type)) {
+      if (!customer || customer.isActive === false || !['Customer', 'Both'].includes(customer.type)) {
         const error = new Error('Selected party is not a valid customer');
         error.statusCode = 400;
         throw error;
