@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
 const stockMovementSchema = new mongoose.Schema({
+  movementDate: { type: Date, default: Date.now },
   movementType: {
     type: String,
     required: true,
