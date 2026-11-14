@@ -2,6 +2,13 @@ const mongoose = require('mongoose');
 
 const consumedReelSchema = new mongoose.Schema({
   reelId: { type: mongoose.Schema.Types.ObjectId, ref: 'ReelUnit', required: true },
+  reelCode: { type: String, trim: true },
+  requestedWidthInches: { type: Number, min: 0 },
+  actualWidthInches: { type: Number, min: 0 },
+  widthVarianceInches: { type: Number },
+  bf: { type: Number },
+  gsm: { type: Number },
+  quality: { type: String, enum: ['Natural', 'GY'] },
   weightConsumedKg: { type: mongoose.Schema.Types.Decimal128, required: true }
 });
 
