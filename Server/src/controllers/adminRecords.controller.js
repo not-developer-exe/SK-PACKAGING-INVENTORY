@@ -87,11 +87,7 @@ exports.listAdminRecords = async (req, res) => {
       }
     }
     if (search) {
-      const escaped = search.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\    const filter = {};
-    if (search) {
-      const escaped = search.replace(/[.*+?^$()|[\\]\\\\]/g, '\\$&').replaceAll('{', '\\{').replaceAll('}', '\\}');
-      const expression = new RegExp(escaped, 'i');');
-      const expression = new RegExp(escaped, 'i');
+      const expression = new RegExp(search.split('').map(char => /[.*+?^${}()|[\]\\]/.test(char) ? String.fromCharCode(92) + char : char).join(''), 'i');
       const searchableStrings = Object.entries(Model.schema.paths)
         .filter(([path, schema]) => schema.instance === 'String' && !path.toLowerCase().includes('password'))
         .map(([path]) => ({ [path]: expression }));
