@@ -24,23 +24,29 @@ export default function AdminRecordsPage() {
   const [json, setJson] = useState('');
   const [reason, setReason] = useState('');
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const load = async (keepId = null) => {
+  const load = async (requestedPage = page, keepId = null) => {
     setLoading(true); setError('');
     try {
-      const { data } = await axiosClient.get('/admin-records/' + entity);
+      const { data } = await axiosClient.get('/admin-records/' + entity, { params: { page: requestedPage, limit: 50, search } });
       setRecords(data.records || []);
+      setPage(data.page || requestedPage);
+      setTotalPages(data.totalPages || 1);
+      setTotalRecords(data.total || 0);
       const next = (data.records || []).find(item => String(item._id) === String(keepId));
       if (next) { setSelected(next); setJson(JSON.stringify(next, null, 2)); }
       else { setSelected(null); setJson(''); }
     } catch (e) { setError(e.response?.data?.message || 'Unable to load records.'); }
     finally { setLoading(false); }
   };
-  useEffect(() => { load(); }, [entity]);
+  useEffect(() => { setPage(1); load(1); }, [entity]);
 
   const selectRecord = record => {
     setSelected(record);
@@ -63,28 +69,31 @@ export default function AdminRecordsPage() {
     try {
       const { data } = await axiosClient.patch('/admin-records/' + entity + '/' + selected._id, { document, reason });
       setSuccess('Record updated. Changed fields: ' + (data.changedFields || []).join(', '));
-      await load(selected._id);
+      await load(page, selected._id);
     } catch (e) { setError(e.response?.data?.message || 'Unable to update record.'); }
     finally { setSaving(false); }
   };
-
-  const filtered = records.filter(record => JSON.stringify(record).toLowerCase().includes(search.toLowerCase()));
 
   return <div className="mx-auto max-w-7xl space-y-6">
     <header><h1 className="text-2xl font-bold text-slate-900">Administrator Data Console</h1><p className="mt-1 text-sm text-slate-500">Inspect and correct schema fields across the ERP. Every override requires a reason and is written to the audit log.</p></header>
     <div className="flex flex-wrap items-center gap-3 rounded-2xl border bg-white p-4">
       <label className="text-sm font-medium">Record type<select value={entity} onChange={e => setEntity(e.target.value)} className="mt-1 block min-w-56 rounded-lg border bg-white px-3 py-2">{entities.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-      <label className="min-w-56 flex-1 text-sm font-medium">Search loaded records<div className="mt-1 flex items-center gap-2 rounded-lg border px-3"><Search size={15} className="text-slate-400"/><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search fields or values" className="w-full py-2 outline-none"/></div></label>
-      <button onClick={() => load(selected?._id)} disabled={loading} className="mt-5 rounded-lg border px-3 py-2 text-sm"><RefreshCw size={15} className="mr-1 inline"/>Refresh</button>
+      <label className="min-w-56 flex-1 text-sm font-medium">Search all records<div className="mt-1 flex items-center gap-2 rounded-lg border px-3"><Search size={15} className="text-slate-400"/><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search fields or values" className="w-full py-2 outline-none"/></div></label>
+      <button onClick={() => load(1)} disabled={loading} className="mt-5 rounded-lg border px-3 py-2 text-sm">Search</button><button onClick={() => load(page, selected?._id)} disabled={loading} className="mt-5 rounded-lg border px-3 py-2 text-sm"><RefreshCw size={15} className="mr-1 inline"/>Refresh</button>
     </div>
     {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     {success && <p role="status" className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700">{success}</p>}
     <div className="grid gap-5 xl:grid-cols-[minmax(280px,0.8fr)_minmax(0,1.5fr)]">
       <section className="overflow-hidden rounded-2xl border bg-white">
-        <div className="flex items-center justify-between border-b p-4"><h2 className="font-semibold"><Database size={16} className="mr-2 inline"/>Records</h2><span className="text-xs text-slate-500">{filtered.length} shown · max 100</span></div>
+        <div className="flex items-center justify-between border-b p-4"><h2 className="font-semibold"><Database size={16} className="mr-2 inline"/>Records</h2><span className="text-xs text-slate-500">{totalRecords} records · page {page} of {totalPages}</span></div>
         <div className="max-h-[680px] divide-y overflow-y-auto">
-          {loading ? <p className="p-6 text-sm text-slate-500">Loading records…</p> : filtered.map(record => <button key={record._id} onClick={() => selectRecord(record)} className={'block w-full px-4 py-3 text-left hover:bg-slate-50 ' + (selected?._id === record._id ? 'bg-blue-50' : '')}><span className="block truncate text-sm font-medium text-slate-800">{record.name || record.invoiceNumber || record.reelCode || record.batchNumber || record.challanNumber || record.runNumber || record._id}</span><span className="mt-1 block truncate text-xs text-slate-500">{record._id} · {record.updatedAt ? new Date(record.updatedAt).toLocaleString('en-IN') : 'No update timestamp'}</span></button>)}
-          {!loading && !filtered.length && <p className="p-6 text-sm text-slate-500">No records found in the latest 100.</p>}
+          {loading ? <p className="p-6 text-sm text-slate-500">Loading records…</p> : records.map(record => <button key={record._id} onClick={() => selectRecord(record)} className={'block w-full px-4 py-3 text-left hover:bg-slate-50 ' + (selected?._id === record._id ? 'bg-blue-50' : '')}><span className="block truncate text-sm font-medium text-slate-800">{record.name || record.invoiceNumber || record.reelCode || record.batchNumber || record.challanNumber || record.runNumber || record._id}</span><span className="mt-1 block truncate text-xs text-slate-500">{record._id} · {record.updatedAt ? new Date(record.updatedAt).toLocaleString('en-IN') : 'No update timestamp'}</span></button>)}
+          {!loading && !records.length && <p className="p-6 text-sm text-slate-500">No matching records found.</p>}
+        </div>
+        <div className="flex items-center justify-between border-t p-3 text-xs text-slate-500">
+          <button disabled={loading || page <= 1} onClick={() => load(page - 1)} className="rounded border px-3 py-2 disabled:opacity-40">Previous</button>
+          <span>Page {page} / {totalPages}</span>
+          <button disabled={loading || page >= totalPages} onClick={() => load(page + 1)} className="rounded border px-3 py-2 disabled:opacity-40">Next</button>
         </div>
       </section>
       <section className="space-y-3 rounded-2xl border bg-white p-5">
