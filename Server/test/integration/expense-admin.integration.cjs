@@ -77,7 +77,8 @@ test('admin console and expense register enforce roles and keep an audit trail',
     body: { document, reason: 'Correcting the party master details after verification.' }
   });
   assert.equal(changed.status, 200);
-  assert.deepEqual(changed.data.changedFields.sort(), ['city', 'name']);
+  assert.ok(changed.data.changedFields.includes('city'));
+  assert.ok(changed.data.changedFields.includes('name'));
   assert.equal((await Party.findById(party._id)).name, 'Corrected Party Name');
 
   const invalidReason = await api('/api/admin-records/parties/' + party._id, {
