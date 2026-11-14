@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../context/AuthContext';
 import { dispatchService } from '../../services/dispatchService';
 import DateRangeFilter from '../../components/DateRangeFilter';
 import { toLocalDateInput } from '../../lib/date';
 import { partiesService } from '../../services/partiesService';
-import { Truck, Plus, Trash2, Loader2, FileText, Printer, Download, X } from 'lucide-react';
+import { Truck, Plus, Trash2, Loader2, FileText, Printer, Download, X, Ban } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 
@@ -90,6 +91,24 @@ export default function DispatchPage() {
       alert(err.response?.data?.message || 'Error recording dispatch');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleCancelDispatch = async (dispatch) => {
+    const reason = window.prompt('Reason for cancelling ' + dispatch.challanNumber + ' (minimum 10 characters):');
+    if (reason === null) return;
+    if (reason.trim().length < 10) {
+      alert('Please enter a clear cancellation reason of at least 10 characters.');
+      return;
+    }
+    if (!window.confirm('Cancel ' + dispatch.challanNumber + ' and restore its finished-goods quantities to stock?')) return;
+    try {
+      await dispatchService.cancelDispatch(dispatch._id, reason.trim());
+      await fetchData({ from, to, customerId: customerFilter });
+      setSelectedChallan(null);
+      alert('Dispatch cancelled. Finished-goods stock has been restored.');
+    } catch (err) {
+      alert(err.response?.data?.message || 'Unable to cancel dispatch.');
     }
   };
 
@@ -217,7 +236,7 @@ export default function DispatchPage() {
                 <th className="px-5 py-3 font-semibold">Date</th>
                 <th className="px-5 py-3 font-semibold">Customer</th>
                 <th className="px-5 py-3 font-semibold">Items Dispatched</th>
-                <th className="px-5 py-3 font-semibold">Vehicle & Driver</th>
+                <th className="px-5 py-3 font-semibold">Vehicle & Driver</th>\n                {isAdmin && <th className="px-5 py-3 font-semibold">Actions</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -236,10 +255,16 @@ export default function DispatchPage() {
                   <td className="px-5 py-4 text-slate-600">
                     <div>{dispatch.vehicleNumber || '-'}</div>
                     <div className="text-xs text-slate-400">{dispatch.driverName || '-'}</div>
+                    {dispatch.status === 'cancelled' && <span className="mt-1 inline-block text-xs font-semibold text-red-600">Cancelled</span>}
                   </td>
+                  {isAdmin && <td className="px-5 py-4" onClick={e => e.stopPropagation()}>
+                    {dispatch.status !== 'cancelled' && dispatch.status !== 'delivered'
+                      ? <button onClick={() => handleCancelDispatch(dispatch)} className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-800"><Ban size={14}/> Cancel</button>
+                      : <span className="text-xs text-slate-400">{dispatch.status === 'cancelled' ? 'Cancelled' : 'Delivered'}</span>}
+                  </td>}
                 </tr>
               ))}
-              {dispatches.length === 0 && (<tr><td colSpan={5} className="p-8 text-center text-slate-500">No dispatches recorded yet.</td></tr>)}
+              {dispatches.length === 0 && (<tr><td colSpan={isAdmin ? 6 : 5} className="p-8 text-center text-slate-500">No dispatches recorded yet.</td></tr>)}
             </tbody>
           </table>
           </div>
