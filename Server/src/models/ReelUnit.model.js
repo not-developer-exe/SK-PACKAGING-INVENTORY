@@ -14,6 +14,7 @@ const reelUnitSchema = new mongoose.Schema({
   originalWeightKg: { type: mongoose.Schema.Types.Decimal128, required: true },
   remainingWeightKg: { type: mongoose.Schema.Types.Decimal128, required: true },
   ratePerKg: { type: mongoose.Schema.Types.Decimal128, required: true },
+  landedRatePerKg: { type: mongoose.Schema.Types.Decimal128, default: 0 },
   status: { type: String, enum: ['available', 'partial', 'consumed'], default: 'available' }
 }, { timestamps: true });
 
