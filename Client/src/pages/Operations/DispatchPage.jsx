@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { dispatchService } from '../../services/dispatchService';
+import DateRangeFilter from '../../components/DateRangeFilter';
 import { partiesService } from '../../services/partiesService';
 import { Truck, Plus, Trash2, Loader2, FileText, Printer, Download, X } from 'lucide-react';
 import html2canvas from 'html2canvas';
@@ -22,14 +23,16 @@ export default function DispatchPage() {
   const [vehicleNumber, setVehicleNumber] = useState('');
   const [driverName, setDriverName] = useState('');
   const [dispatchBoxes, setDispatchBoxes] = useState([{ boxId: '', dispatchQuantity: '' }]);
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
 
-  const fetchData = async () => {
+  const fetchData = async (dateParams = {}) => {
     try {
       setLoading(true);
       const [customersData, boxesData, historyData] = await Promise.all([
         partiesService.getCustomers(),
         dispatchService.getAvailableBoxes(),
-        dispatchService.getDispatches() 
+        dispatchService.getDispatches(dateParams) 
       ]);
       setCustomers(customersData);
       setAvailableBoxes(boxesData);
