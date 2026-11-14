@@ -42,8 +42,8 @@ exports.recordConversion = async (req, res) => {
   const session = await mongoose.startSession();
   let response;
   try {
-    await session.withTransaction(async () => {
-      const [sheet, customer] = await Promise.all([
+    session.startTransaction();
+    const [sheet, customer] = await Promise.all([
         CorrugatedSheet.findById(sheetId).session(session),
         Party.findById(customerId).session(session)
       ]);
@@ -167,14 +167,15 @@ exports.recordConversion = async (req, res) => {
         }
       }, session);
 
-      response = { batchNumber, box, remainingSheets: consumption.remainingSheets };
-    });
+    response = { batchNumber, box, remainingSheets: consumption.remainingSheets };
+    await session.commitTransaction();
 
     return res.status(201).json({
       message: 'Sheet-to-box conversion recorded. Sheet stock, finished goods and stock ledger updated.',
       ...response
     });
   } catch (error) {
+    if (session.inTransaction()) await session.abortTransaction();
     console.error('[CONVERSION ERROR]', error.message);
     const status = error.statusCode || (error.code === 11000 ? 409 : error.name === 'ValidationError' ? 400 : 500);
     return res.status(status).json({
