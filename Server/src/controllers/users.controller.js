@@ -75,7 +75,7 @@ exports.updateUser = async (req, res) => {
       await Sequence.findOneAndUpdate(
         { _id: 'admin-management-lock' },
         [{ $set: { value: { $add: [{ $ifNull: ['$value', 0] }, 1] } } }],
-        { new: true, upsert: true, session }
+        { new: true, upsert: true, session, updatePipeline: true }
       );
 
       const user = await User.findById(req.params.id).session(session);
