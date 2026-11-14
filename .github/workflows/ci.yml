@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - fix/production-readiness-foundation
+      - feat/operating-expenses-and-admin-controls
   pull_request:
     branches:
       - main
