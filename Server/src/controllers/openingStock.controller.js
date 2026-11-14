@@ -67,12 +67,12 @@ exports.createOpeningStockAdjustment = async (req, res) => {
       const sequence = await Sequence.findOneAndUpdate(
         { _id: 'opening-stock-adjustment' },
         [{ $set: { value: { $add: [{ $max: [{ $ifNull: ['$value', 0] }, 0] }, 1] } } }],
-        { new: true, upsert: true, session }
+        { new: true, upsert: true, session, updatePipeline: true }
       );
       const reelSequence = await Sequence.findOneAndUpdate(
         { _id: 'reel-unit' },
         [{ $set: { value: { $add: [{ $max: [{ $ifNull: ['$value', existingCount] }, existingCount] }, totalReels] } } }],
-        { new: true, upsert: true, session }
+        { new: true, upsert: true, session, updatePipeline: true }
       );
       let reelCodeCounter = reelSequence.value - totalReels;
       const adjustmentNumber = 'OS-' + String(sequence.value).padStart(5, '0');
