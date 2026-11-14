@@ -2,19 +2,40 @@ require('dotenv').config();
 const mongoose = require('mongoose');
 const User = require('./src/models/User.model');
 
-mongoose.connect(process.env.MONGODB_URI).then(async () => {
-  console.log('Connected to DB. Creating Admin User...');
-  
-  // Wipe old test users just in case
-  await User.deleteMany({ email: 'admin@skpackaging.com' });
+async function seedAdmin() {
+  const email = typeof process.env.ADMIN_EMAIL === 'string'
+    ? process.env.ADMIN_EMAIL.trim().toLowerCase()
+    : '';
+  const password = process.env.ADMIN_PASSWORD;
+  const name = typeof process.env.ADMIN_NAME === 'string' && process.env.ADMIN_NAME.trim()
+    ? process.env.ADMIN_NAME.trim()
+    : 'System Administrator';
 
-  const admin = await User.create({
-    name: 'Stark', // Or your actual name
-    email: 'admin@skpackaging.com',
-    password: 'password123', // You can change this later
-    role: 'admin'
+  if (!process.env.MONGODB_URI) throw new Error('MONGODB_URI is required.');
+  if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) throw new Error('Set a valid ADMIN_EMAIL.');
+  if (typeof password !== 'string' || password.length < 12 || password.length > 128) {
+    throw new Error('Set ADMIN_PASSWORD to a unique password between 12 and 128 characters.');
+  }
+
+  await mongoose.connect(process.env.MONGODB_URI);
+  let admin = await User.findOne({ email });
+  if (admin) {
+    admin.role = 'admin';
+    admin.isActive = true;
+    if (name && admin.name !== name) admin.name = name;
+    await admin.save();
+    console.log('Existing owner account promoted to active administrator:', admin.email);
+  } else {
+    admin = await User.create({ name, email, password, role: 'admin', isActive: true });
+    console.log('Owner administrator account created:', admin.email);
+  }
+}
+
+seedAdmin()
+  .catch((error) => {
+    console.error('[ADMIN SEED] Failed:', error.message);
+    process.exitCode = 1;
+  })
+  .finally(async () => {
+    if (mongoose.connection.readyState !== 0) await mongoose.disconnect();
   });
-
-  console.log('Admin created successfully:', admin.email);
-  process.exit();
-}).catch(err => console.error(err));
