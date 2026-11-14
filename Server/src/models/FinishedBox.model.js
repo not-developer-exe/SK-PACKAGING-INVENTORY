@@ -17,6 +17,9 @@ const finishedBoxSchema = new mongoose.Schema({
   sourceSheetId: { type: mongoose.Schema.Types.ObjectId, ref: 'CorrugatedSheet', required: true },
   quantityProduced: { type: Number, required: true },
   quantityAvailable: { type: Number, required: true },
+  materialCost: { type: Number, default: 0, min: 0 },
+  costPerBox: { type: Number, default: 0, min: 0 },
+  costingStatus: { type: String, enum: ['available', 'unavailable'], default: 'unavailable' },
   
   status: { type: String, enum: ['available', 'dispatched'], default: 'available' },
   manufacturedAt: { type: Date, default: Date.now },
