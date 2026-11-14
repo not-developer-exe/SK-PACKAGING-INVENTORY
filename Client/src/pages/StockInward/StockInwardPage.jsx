@@ -24,7 +24,7 @@ export default function StockInwardPage() {
   
   // Line items state
   const [lines, setLines] = useState([
-    { reelWidthInches: '', bf: '', gsm: '', quality: 'Natural', reelCount: '', totalWeightKg: '', ratePerKg: '', freightCharges: 0, otherCharges: 0, supplierBatchRef: '' }
+    { reelWidthInches: '', bf: '', gsm: '', quality: 'Natural', reelCount: '', totalWeightKg: '', ratePerKg: '', freightCharges: 0, otherCharges: 0, supplierBatchRef: '', reelWeightsKg: '' }
   ]);
 
   const fetchData = async (dateParams = {}) => {
@@ -90,7 +90,8 @@ export default function StockInwardPage() {
           totalWeightKg: Number(l.totalWeightKg),
           ratePerKg: Number(l.ratePerKg),
           freightCharges: Number(l.freightCharges || 0),
-          otherCharges: Number(l.otherCharges || 0)
+          otherCharges: Number(l.otherCharges || 0),
+          reelWeightsKg: l.reelWeightsKg.trim() ? l.reelWeightsKg.split(',').map(value => Number(value.trim())) : []
         }))
       });
 
@@ -291,6 +292,19 @@ export default function StockInwardPage() {
                     <div className="sm:col-span-2">
                       <label className="mb-1 block text-xs font-medium text-slate-600">Rate per kg (₹) *</label>
                       <input type="number" step="any" value={line.ratePerKg} onChange={(e) => handleLineChange(idx, 'ratePerKg', e.target.value)} placeholder="42.50" required className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm" />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-slate-600">Freight (₹)</label>
+                      <input type="number" min="0" step="any" value={line.freightCharges} onChange={(e) => handleLineChange(idx, 'freightCharges', e.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm" />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-slate-600">Other charges (₹)</label>
+                      <input type="number" min="0" step="any" value={line.otherCharges} onChange={(e) => handleLineChange(idx, 'otherCharges', e.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm" />
+                    </div>
+                    <div className="sm:col-span-6">
+                      <label className="mb-1 block text-xs font-medium text-slate-600">Individual reel weights in kg (optional, comma-separated)</label>
+                      <input type="text" value={line.reelWeightsKg} onChange={(e) => handleLineChange(idx, 'reelWeightsKg', e.target.value)} placeholder="150.5, 148.2, 151.3" className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm" />
+                      <p className="mt-1 text-[11px] text-slate-500">Enter one weight per reel. Their sum must match Total Wt. If left blank, the total is divided equally and flagged as estimated.</p>
                     </div>
                     <div className="sm:col-span-3 flex items-end">
                       {lines.length > 1 && (
