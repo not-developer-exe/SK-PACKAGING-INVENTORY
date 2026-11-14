@@ -15,6 +15,7 @@ const Invoice = require('../../src/models/Invoice.model');
 const ReelUnit = require('../../src/models/ReelUnit.model');
 const ProductionRun = require('../../src/models/ProductionRun.model');
 const StockMovement = require('../../src/models/StockMovement.model');
+const StockReconciliation = require('../../src/models/StockReconciliation.model');
 const connectDB = require('../../src/config/db');
 
 let server;
@@ -327,6 +328,28 @@ test('inward posting preserves individual reel weights, landed cost and stock le
   assert.equal(duplicatePost.status, 409);
   assert.equal(await ReelUnit.countDocuments({ inwardReceiptId: receiptId }), 3);
   assert.equal(await StockMovement.countDocuments({ referenceId: receiptId, movementType: 'inward_receipt' }), 1);
+
+  const firstReel = reels[0];
+  const reconciliation = await api('/api/controls/stock-reconciliation', {
+    method: 'POST',
+    body: {
+      countedAt: '2026-11-14',
+      reason: 'Verified physical reel weight',
+      lines: [{ reelId: String(firstReel._id), countedWeightKg: 148.5 }]
+    }
+  });
+  assert.equal(reconciliation.status, 201);
+  assert.equal(Number(reconciliation.data.reconciliation.totalVarianceKg.toString()), -0.5);
+  const reconciledReel = await ReelUnit.findById(firstReel._id);
+  assert.equal(Number(reconciledReel.originalWeightKg.toString()), 149);
+  assert.equal(Number(reconciledReel.remainingWeightKg.toString()), 148.5);
+  assert.equal(reconciledReel.status, 'partial');
+  const adjustmentMovement = await StockMovement.findOne({
+    referenceId: reconciliation.data.reconciliation._id,
+    movementType: 'adjustment'
+  });
+  assert.equal(Number(adjustmentMovement.weightChangeKg.toString()), -0.5);
+  assert.equal(await StockReconciliation.countDocuments({ _id: reconciliation.data.reconciliation._id }), 1);
 
   const aggregateDraft = await api('/api/inward', {
     method: 'POST',
