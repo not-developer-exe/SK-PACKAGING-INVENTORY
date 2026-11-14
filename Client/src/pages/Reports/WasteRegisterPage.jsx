@@ -1,22 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { wasteService } from '../../services/wasteService';
+import DateRangeFilter from '../../components/DateRangeFilter';
 import { Trash2, IndianRupee, Loader2 } from 'lucide-react';
 
 export default function WasteRegisterPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState('inventory'); // 'inventory' or 'sales'
+  const [activeTab, setActiveTab] = useState('inventory');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState(''); // 'inventory' or 'sales'
 
   // Sale form state
   const [buyerName, setBuyerName] = useState('');
   const [weightSoldKg, setWeightSoldKg] = useState('');
   const [ratePerKg, setRatePerKg] = useState('');
 
-  const fetchData = async () => {
+  const fetchData = async (dateParams = {}) => {
     try {
       setLoading(true);
-      const res = await wasteService.getWasteData();
+      const res = await wasteService.getWasteData(dateParams);
       setData(res);
     } catch (error) {
       console.error('Error fetching waste data', error);
@@ -43,7 +46,7 @@ export default function WasteRegisterPage() {
       setBuyerName('');
       setWeightSoldKg('');
       setRatePerKg('');
-      fetchData();
+      fetchData({ from, to });
     } catch (error) {
       alert(error.response?.data?.message || 'Error recording sale');
     } finally {
@@ -59,6 +62,8 @@ export default function WasteRegisterPage() {
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">Waste Register</h1>
         <p className="mt-1 text-sm text-slate-500">Track corrugation machine waste and log scrap sales.</p>
       </div>
+
+      <DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => fetchData({ from, to })} onReset={() => { setFrom(''); setTo(''); fetchData({}); }} loading={loading} label="Waste / scrap date range" />
 
       {/* Top Metrics */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -158,7 +163,7 @@ export default function WasteRegisterPage() {
             <tbody className="divide-y divide-slate-100">
               {data.scrapSales.map((sale) => (
                 <tr key={sale._id} className="hover:bg-slate-50">
-                  <td className="px-5 py-4 text-slate-600">{new Date(sale.createdAt).toLocaleDateString('en-IN')}</td>
+                  <td className="px-5 py-4 text-slate-600">{new Date(sale.saleDate || sale.createdAt).toLocaleDateString('en-IN')}</td>
                   <td className="px-5 py-4 font-medium text-slate-900">{sale.buyerName}</td>
                   <td className="px-5 py-4 text-right text-slate-700">{sale.weightSoldKg.toFixed(1)} kg</td>
                   <td className="px-5 py-4 text-right text-slate-700">₹{sale.ratePerKg.toFixed(2)}</td>
