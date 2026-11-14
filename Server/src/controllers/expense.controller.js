@@ -1,22 +1,16 @@
 const mongoose = require('mongoose');
 const Expense = require('../models/Expense.model');
 const writeAuditLog = require('../utils/writeAuditLog');
+const { isValidDateOnly, buildDateRangeFilter } = require('../utils/dateFilters');
 
 const categories = ['electricity', 'labour', 'rent', 'freight', 'repairs', 'admin', 'bank_charges', 'interest', 'miscellaneous'];
 const treatments = ['operating_expense', 'finance_cost', 'stock_landed_cost'];
 const modes = ['cash', 'upi', 'bank_transfer', 'cheque', 'card', 'other'];
 
-function validDateOnly(value) {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const [year, month, day] = value.split('-').map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
-}
-
 function validateExpense(body, partial = false) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return 'Invalid expense data.';
   if (!partial || body.expenseDate !== undefined) {
-    if (!validDateOnly(body.expenseDate)) return 'Enter a real calendar date in YYYY-MM-DD format.';
+    if (!isValidDateOnly(body.expenseDate)) return 'Enter a real calendar date in YYYY-MM-DD format.';
   }
   if (!partial || body.category !== undefined) if (!categories.includes(body.category)) return 'Choose a valid expense category.';
   if (!partial || body.amount !== undefined) {
@@ -33,19 +27,7 @@ function validateExpense(body, partial = false) {
 
 exports.listExpenses = async (req, res) => {
   try {
-    const filter = {};
-    if ((req.query.from && !validDateOnly(req.query.from)) || (req.query.to && !validDateOnly(req.query.to))) {
-      return res.status(400).json({ message: 'Use real calendar dates in YYYY-MM-DD format.' });
-    }
-    if (req.query.from || req.query.to) {
-      filter.expenseDate = {};
-      if (req.query.from) filter.expenseDate.$gte = new Date(req.query.from + 'T00:00:00+05:30');
-      if (req.query.to) {
-        const end = new Date(req.query.to + 'T00:00:00+05:30');
-        end.setDate(end.getDate() + 1);
-        filter.expenseDate.$lt = end;
-      }
-    }
+    const filter = buildDateRangeFilter(req.query.from, req.query.to, 'expenseDate');
     const expenses = await Expense.find(filter).populate('recordedBy', 'name').sort({ expenseDate: -1, createdAt: -1 }).limit(1000).lean();
     return res.json({ expenses });
   } catch (error) {
