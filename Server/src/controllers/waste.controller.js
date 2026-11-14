@@ -4,6 +4,7 @@ const ScrapSale = require('../models/ScrapSale.model');
 const WasteInventory = require('../models/WasteInventory.model');
 const { calculateScrapAvailability } = require('../utils/productionAccounting');
 const writeAuditLog = require('../utils/writeAuditLog');
+const { buildDateRangeFilter } = require('../utils/dateFilters');
 
 const asNumber = (value) => {
   if (value === null || value === undefined) return 0;
@@ -12,12 +13,17 @@ const asNumber = (value) => {
 
 exports.getWasteStats = async (req, res) => {
   try {
+    const productionFilter = { recoverableWasteKg: { $gt: 0 }, ...buildDateRangeFilter(req.query.from, req.query.to, 'runDate') };
+    const salesFilter = buildDateRangeFilter(req.query.from, req.query.to, 'saleDate');
+    if (req.query.buyer) salesFilter.buyerName = { $regex: req.query.buyer.trim().replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\    const [productionWaste, scrapSales, legacyRows] = await Promise.all([
+      ProductionRun.find({ recoverableWasteKg: { $gt: 0 } })'), $options: 'i' };
     const [productionWaste, scrapSales, legacyRows] = await Promise.all([
-      ProductionRun.find({ recoverableWasteKg: { $gt: 0 } })
-        .sort({ createdAt: -1 })
-        .select('runNumber createdAt recoverableWasteKg processLossKg operatorName')
+      ProductionRun.find(productionFilter)
+        .sort({ runDate: -1, createdAt: -1 })
+        .limit(1000)
+        .select('runNumber runDate createdAt recoverableWasteKg processLossKg operatorName')
         .lean(),
-      ScrapSale.find().sort({ createdAt: -1 }).lean(),
+      ScrapSale.find(salesFilter).sort({ saleDate: -1, createdAt: -1 }).limit(1000).lean(),
       ProductionRun.aggregate([
         { $match: { recoverableWasteKg: { $exists: false }, wasteGeneratedKg: { $gt: 0 } } },
         { $group: { _id: null, total: { $sum: '$wasteGeneratedKg' } } }
