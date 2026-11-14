@@ -50,7 +50,7 @@ export default function ExpensesPage() {
 
   const startEdit = item => {
     setEditing(item._id);
-    setForm({ expenseDate: new Date(item.expenseDate).toISOString().slice(0, 10), category: item.category, amount: String(item.amount), vendor: item.vendor || '', paymentMode: item.paymentMode, reference: item.reference || '', description: item.description || '', costTreatment: item.costTreatment || 'operating_expense' });
+    setForm({ expenseDate: toLocalDateInput(new Date(item.expenseDate)), category: item.category, amount: String(item.amount), vendor: item.vendor || '', paymentMode: item.paymentMode, reference: item.reference || '', description: item.description || '', costTreatment: item.costTreatment || 'operating_expense' });
   };
   const remove = async item => {
     if (!window.confirm('Delete this expense? The action will be written to the audit log.')) return;
