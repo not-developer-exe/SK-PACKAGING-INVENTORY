@@ -6,6 +6,7 @@ const Party = require('../models/Party.model');
 const FinishedBox = require('../models/FinishedBox.model');
 const writeAuditLog = require('../utils/writeAuditLog');
 const { buildDateRangeFilter, isValidDateOnly } = require('../utils/dateFilters');
+const { matchesDispatchQuantities } = require('../utils/dispatchInvoiceValidation');
 
 exports.getInvoices = async (req, res) => {
   try {
@@ -113,23 +114,16 @@ exports.createInvoice = async (req, res) => {
         throw error;
       }
 
-      const dispatchedByBox = new Map();
-      for (const line of dispatch.boxes) {
-        const key = String(line.boxId);
-        dispatchedByBox.set(key, (dispatchedByBox.get(key) || 0) + Number(line.dispatchQuantity));
+      if (!matchesDispatchQuantities(dispatch.boxes, cleanItems)) {
+        const error = new Error('Invoice quantities must exactly match every box quantity on the selected delivery challan. Partial or omitted challan lines cannot be invoiced.');
+        error.statusCode = 400;
+        throw error;
       }
 
       const invoicedByBox = new Map();
       for (const item of cleanItems) {
         const key = String(item.boxId);
         invoicedByBox.set(key, (invoicedByBox.get(key) || 0) + item.quantity);
-      }
-      for (const [boxId, quantity] of invoicedByBox) {
-        if (!dispatchedByBox.has(boxId) || quantity > dispatchedByBox.get(boxId)) {
-          const error = new Error('Invoice quantities must not exceed the selected challan quantities');
-          error.statusCode = 400;
-          throw error;
-        }
       }
 
       const finishedBoxes = await FinishedBox.find({ _id: { $in: [...invoicedByBox.keys()] } }).session(session);
