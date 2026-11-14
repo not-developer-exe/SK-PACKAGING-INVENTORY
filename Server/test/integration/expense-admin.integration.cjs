@@ -339,7 +339,8 @@ test('inward posting preserves individual reel weights, landed cost and stock le
     }
   });
   assert.equal(reconciliation.status, 201);
-  assert.equal(Number(reconciliation.data.reconciliation.totalVarianceKg.toString()), -0.5);
+  const savedReconciliation = await StockReconciliation.findById(reconciliation.data.reconciliation._id);
+  assert.equal(Number(savedReconciliation.totalVarianceKg.toString()), -0.5);
   const reconciledReel = await ReelUnit.findById(firstReel._id);
   assert.equal(Number(reconciledReel.originalWeightKg.toString()), 149);
   assert.equal(Number(reconciledReel.remainingWeightKg.toString()), 148.5);
