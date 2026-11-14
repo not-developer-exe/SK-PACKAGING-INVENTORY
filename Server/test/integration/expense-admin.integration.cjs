@@ -321,7 +321,7 @@ test('inward posting preserves individual reel weights, landed cost and stock le
   const receivedSpec = liveStock.data.stock.find(item =>
     item.width === 36 && item.bf === 18 && item.gsm === 140 && item.quality === 'Natural'
   );
-  assert.equal(new Date(receivedSpec.dateAdded).toISOString().slice(0, 10), '2026-11-01');
+  assert.equal(new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(receivedSpec.dateAdded)), '2026-11-01');
 
   const duplicatePost = await api('/api/inward/' + receiptId + '/post', { method: 'POST' });
   assert.equal(duplicatePost.status, 409);
