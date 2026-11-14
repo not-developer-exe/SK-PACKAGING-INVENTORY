@@ -6,6 +6,7 @@ const Party = require('../models/Party.model');
 const Sequence = require('../models/Sequence.model');
 const writeAuditLog = require('../utils/writeAuditLog');
 const { calculateLandedRatePerKg } = require('../utils/materialCosting');
+const { buildDateRangeFilter } = require('../utils/dateFilters');
 
 const toFiniteNumber = (value) => {
   if (value === null || value === undefined || value === '') return NaN;
@@ -99,7 +100,14 @@ exports.createDraftReceipt = async (req, res) => {
 // Get all receipts
 exports.getReceipts = async (req, res) => {
   try {
-    const receipts = await InwardReceipt.find().populate('supplierId', 'name gstin').sort({ createdAt: -1 });
+    const filter = buildDateRangeFilter(req.query.from, req.query.to, 'receiptDate');
+    if (req.query.supplierId) {
+      if (!mongoose.isValidObjectId(req.query.supplierId)) return res.status(400).json({ message: 'Invalid supplier ID.' });
+      filter.supplierId = req.query.supplierId;
+    }
+    if (req.query.status && !['draft', 'posted', 'cancelled'].includes(req.query.status)) return res.status(400).json({ message: 'Invalid receipt status.' });
+    if (req.query.status) filter.status = req.query.status;
+    const receipts = await InwardReceipt.find(filter).populate('supplierId', 'name gstin').sort({ receiptDate: -1, createdAt: -1 }).limit(1000);
     return res.json({ receipts });
   } catch (error) {
     console.error('[INWARD] Receipt query failed:', error.message);
