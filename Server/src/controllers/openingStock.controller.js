@@ -4,6 +4,7 @@ const ReelUnit = require('../models/ReelUnit.model');
 const StockMovement = require('../models/StockMovement.model');
 const Sequence = require('../models/Sequence.model');
 const AuditLog = require('../models/AuditLog.model');
+const { buildDateRangeFilter } = require('../utils/dateFilters');
 
 const number = (value) => {
   if (value === '' || value === null || value === undefined) return NaN;
@@ -12,15 +13,16 @@ const number = (value) => {
 
 exports.getOpeningStockAdjustments = async (req, res) => {
   try {
-    const adjustments = await OpeningStockAdjustment.find()
+    const filter = buildDateRangeFilter(req.query.from, req.query.to, 'adjustmentDate');
+    const adjustments = await OpeningStockAdjustment.find(filter)
       .populate('createdBy', 'name email')
       .sort({ adjustmentDate: -1, createdAt: -1 })
-      .limit(200)
+      .limit(1000)
       .lean();
     return res.json({ adjustments });
   } catch (error) {
     console.error('[OPENING STOCK] History failed:', error.message);
-    return res.status(500).json({ message: 'Unable to fetch opening stock history.' });
+    return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Unable to fetch opening stock history.' });
   }
 };
 
@@ -160,14 +162,15 @@ exports.createOpeningStockAdjustment = async (req, res) => {
 
 exports.getAuditLogs = async (req, res) => {
   try {
-    const logs = await AuditLog.find()
+    const filter = buildDateRangeFilter(req.query.from, req.query.to, 'createdAt');
+    const logs = await AuditLog.find(filter)
       .populate('actorId', 'name email')
       .sort({ createdAt: -1 })
-      .limit(250)
+      .limit(1000)
       .lean();
     return res.json({ logs });
   } catch (error) {
     console.error('[AUDIT] Query failed:', error.message);
-    return res.status(500).json({ message: 'Unable to fetch audit history.' });
+    return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Unable to fetch audit history.' });
   }
 };
