@@ -5,6 +5,7 @@ import { Factory, Plus, Trash2, Loader2, Save } from 'lucide-react';
 
 export default function ProductionPage() {
   const [availableReels, setAvailableReels] = useState([]);
+  const [productionRuns, setProductionRuns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -16,7 +17,7 @@ export default function ProductionPage() {
   const [recoverableWasteKg, setRecoverableWasteKg] = useState('');
   
   const [inputReels, setInputReels] = useState([
-    { reelId: '', weightConsumedKg: '' }
+    { reelId: '', requestedWidthInches: '', weightConsumedKg: '' }
   ]);
   
   const [outputSheets, setOutputSheets] = useState([
@@ -30,8 +31,9 @@ export default function ProductionPage() {
   const fetchReels = async () => {
     try {
       setLoading(true);
-      const data = await inventoryService.getPhysicalReels();
-      setAvailableReels(data);
+      const [reels, runs] = await Promise.all([inventoryService.getPhysicalReels(), productionService.getRuns()]);
+      setAvailableReels(reels);
+      setProductionRuns(runs);
     } catch (err) {
       console.error('Error fetching reels:', err);
     } finally {
@@ -70,7 +72,7 @@ export default function ProductionPage() {
         shift,
         operatorName,
         recoverableWasteKg: measuredScrap,
-        inputReels: inputReels.map(r => ({ ...r, weightConsumedKg: Number(r.weightConsumedKg) })),
+        inputReels: inputReels.map(r => ({ ...r, requestedWidthInches: r.requestedWidthInches === '' ? undefined : Number(r.requestedWidthInches), weightConsumedKg: Number(r.weightConsumedKg) })),
         outputSheets: outputSheets.map(s => ({
           ...s,
           ply: Number(s.ply),
@@ -86,7 +88,7 @@ export default function ProductionPage() {
       // Reset form
       setOperatorName('');
       setRecoverableWasteKg('');
-      setInputReels([{ reelId: '', weightConsumedKg: '' }]);
+      setInputReels([{ reelId: '', requestedWidthInches: '', weightConsumedKg: '' }]);
       setOutputSheets([{ ply: 3, lengthInches: '', widthInches: '', sheetCount: '', totalWeightKg: '' }]);
       fetchReels(); // Refresh physical reels drop-down
 
@@ -127,7 +129,7 @@ export default function ProductionPage() {
           <div className="rounded-2xl border border-amber-200 bg-amber-50/30 p-5">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-amber-900">Input Materials</h2>
-              <button type="button" onClick={() => setInputReels([...inputReels, { reelId: '', weightConsumedKg: '' }])} className="flex items-center gap-1 text-sm font-medium text-amber-700 hover:text-amber-900">
+              <button type="button" onClick={() => setInputReels([...inputReels, { reelId: '', requestedWidthInches: '', weightConsumedKg: '' }])} className="flex items-center gap-1 text-sm font-medium text-amber-700 hover:text-amber-900">
                 <Plus size={16} /> Add Reel
               </button>
             </div>
@@ -139,6 +141,8 @@ export default function ProductionPage() {
                     <select required value={input.reelId} onChange={e => {
                         const newReels = [...inputReels];
                         newReels[idx].reelId = e.target.value;
+                        const selectedReel = availableReels.find(reel => reel._id === e.target.value);
+                        if (selectedReel && !newReels[idx].requestedWidthInches) newReels[idx].requestedWidthInches = String(selectedReel.reelWidthInches);
                         setInputReels(newReels);
                       }}
                       className="w-full rounded-lg border border-amber-200 px-3 py-2 text-sm outline-none focus:border-amber-400 bg-white"
@@ -151,8 +155,17 @@ export default function ProductionPage() {
                       ))}
                     </select>
                   </div>
-                  <div className="w-32">
-                    <input type="number" step="any" required placeholder="Kg Used" value={input.weightConsumedKg} onChange={e => {
+                  <div className="w-24">
+                    <label className="mb-1 block text-xs text-amber-800">Required width</label>
+                    <input type="number" min="0.1" step="0.1" required placeholder="Inches" value={input.requestedWidthInches} onChange={e => {
+                        const newReels = [...inputReels];
+                        newReels[idx].requestedWidthInches = e.target.value;
+                        setInputReels(newReels);
+                      }} className="w-full rounded-lg border border-amber-200 px-2 py-2 text-sm outline-none focus:border-amber-400 bg-white" />
+                  </div>
+                  <div className="w-28">
+                    <label className="mb-1 block text-xs text-amber-800">Consumed kg</label>
+                    <input type="number" min="0.001" step="any" required placeholder="Kg Used" value={input.weightConsumedKg} onChange={e => {
                         const newReels = [...inputReels];
                         newReels[idx].weightConsumedKg = e.target.value;
                         setInputReels(newReels);
@@ -167,6 +180,9 @@ export default function ProductionPage() {
                   )}
                 </div>
               ))}
+              <div className="rounded-lg bg-amber-100/70 p-3 text-xs text-amber-900">
+                Enter the width you intended to use. The selected reel's actual width is captured separately; any difference is recorded as a width substitution.
+              </div>
               <div className="pt-2 text-right text-sm font-semibold text-amber-800">
                 Total Input: {totalInputWeight.toFixed(2)} kg
               </div>
@@ -275,6 +291,54 @@ export default function ProductionPage() {
         {error && <div className="rounded-xl bg-red-50 p-4 text-sm font-medium text-red-700 border border-red-100">{error}</div>}
         {success && <div className="rounded-xl bg-emerald-50 p-4 text-sm font-medium text-emerald-700 border border-emerald-100">{success}</div>}
       </form>
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Recent Production Runs</h2>
+            <p className="text-sm text-slate-500">Latest 100 runs with reel-to-sheet traceability and width substitutions</p>
+          </div>
+          <button type="button" onClick={fetchReels} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Refresh</button>
+        </div>
+        {productionRuns.length === 0 ? (
+          <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500">No production runs recorded yet.</p>
+        ) : (
+          <div className="space-y-3">
+            {productionRuns.map(run => (
+              <details key={run._id} className="rounded-xl border border-slate-200 p-4">
+                <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-3 text-sm">
+                  <span className="font-semibold text-slate-900">{run.runNumber} · {new Date(run.runDate).toLocaleDateString()}</span>
+                  <span className="text-slate-600">{Number(run.totalInputWeightKg?.$numberDecimal || run.totalInputWeightKg || 0).toFixed(2)} kg input → {Number(run.totalOutputWeightKg?.$numberDecimal || run.totalOutputWeightKg || 0).toFixed(2)} kg sheets · ₹{Number(run.totalMaterialCost?.$numberDecimal || run.totalMaterialCost || 0).toFixed(2)} material cost</span>
+                  <span className={run.widthSubstitutions?.length ? "rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800" : "rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800"}>{run.widthSubstitutions?.length || 0} width substitutions</span>
+                </summary>
+                <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                  <div>
+                    <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Reels consumed</h3>
+                    <div className="space-y-2">
+                      {(run.inputReels || []).map((input, index) => (
+                        <div key={input._id || input.reelId || index} className="rounded-lg bg-slate-50 p-3 text-sm">
+                          <div className="font-medium text-slate-800">{input.reelCode || 'Reel'} · {Number(input.weightConsumedKg?.$numberDecimal || input.weightConsumedKg || 0).toFixed(2)} kg</div>
+                          <div className="text-xs text-slate-500">Required {input.requestedWidthInches || '—'}" · Actual {input.actualWidthInches || '—'}" · Difference {Number(input.widthVarianceInches || 0) > 0 ? '+' : ''}{Number(input.widthVarianceInches || 0).toFixed(2)}"</div>
+                          <div className="text-xs text-slate-500">Landed rate ₹{Number(input.landedRatePerKg?.$numberDecimal || input.landedRatePerKg || 0).toFixed(2)}/kg · Material ₹{Number(input.materialCost?.$numberDecimal || input.materialCost || 0).toFixed(2)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Sheets produced</h3>
+                    <div className="space-y-2">
+                      {(run.outputSheets || []).map((sheet, index) => (
+                        <div key={sheet._id || index} className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
+                          {sheet.ply} Ply · {sheet.lengthInches}" × {sheet.widthInches}" · {sheet.sheetCount} sheets · {Number(sheet.totalWeightKg?.$numberDecimal || sheet.totalWeightKg || 0).toFixed(2)} kg · ₹{Number(sheet.unitCostPerKg?.$numberDecimal || sheet.unitCostPerKg || 0).toFixed(2)}/kg
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </details>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
