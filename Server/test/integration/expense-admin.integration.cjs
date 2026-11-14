@@ -522,6 +522,81 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
   assert.equal(dispatchHistory.status, 200);
   assert.ok(dispatchHistory.data.dispatches.some(item => item.challanNumber === dispatch.challanNumber));
 
+  const incompleteInvoice = await api('/api/invoices', {
+    method: 'POST',
+    body: {
+      invoiceDate: '2026-10-17',
+      customerId: String(party._id),
+      dispatchId: String(dispatch._id),
+      items: [{ boxId: String(finishedBox._id), quantity: 599, rate: 20 }],
+      gstPercent: 5
+    }
+  });
+  assert.equal(incompleteInvoice.status, 400);
+  assert.equal(await Invoice.countDocuments({ dispatchId: dispatch._id }), 0);
+
+  const invoiceResponse = await api('/api/invoices', {
+    method: 'POST',
+    body: {
+      invoiceDate: '2026-10-17',
+      customerId: String(party._id),
+      dispatchId: String(dispatch._id),
+      items: [{ boxId: String(finishedBox._id), quantity: 600, rate: 20 }],
+      gstPercent: 5
+    }
+  });
+  assert.equal(invoiceResponse.status, 201);
+  const invoice = await Invoice.findOne({ dispatchId: dispatch._id });
+  assert.equal(invoice.subTotal, 12000);
+  assert.equal(invoice.cgstAmount, 300);
+  assert.equal(invoice.sgstAmount, 300);
+  assert.equal(invoice.grandTotal, 12600);
+  assert.equal(invoice.costOfGoods, 882);
+  assert.equal(invoice.grossProfit, 11118);
+  assert.equal((await Party.findById(party._id)).balance, 12600);
+
+  const duplicateInvoice = await api('/api/invoices', {
+    method: 'POST',
+    body: {
+      invoiceDate: '2026-10-17',
+      customerId: String(party._id),
+      dispatchId: String(dispatch._id),
+      items: [{ boxId: String(finishedBox._id), quantity: 600, rate: 20 }],
+      gstPercent: 5
+    }
+  });
+  assert.equal(duplicateInvoice.status, 409);
+
+  const wrongPaymentDirection = await api('/api/parties/' + party._id + '/transaction', {
+    method: 'POST',
+    body: { amount: 100, mode: 'NEFT', ref: 'WRONG-DIRECTION', direction: 'out', date: '2026-10-18' }
+  });
+  assert.equal(wrongPaymentDirection.status, 400);
+  assert.equal((await Party.findById(party._id)).balance, 12600);
+
+  const firstPayment = await api('/api/parties/' + party._id + '/transaction', {
+    method: 'POST',
+    body: { amount: 5000, mode: 'NEFT', ref: 'UTR-PHASE5-001', direction: 'in', date: '2026-10-18' }
+  });
+  assert.equal(firstPayment.status, 200);
+  let updatedInvoice = await Invoice.findById(invoice._id);
+  assert.equal(updatedInvoice.balanceDue, 7600);
+  assert.equal(updatedInvoice.status, 'Pending');
+  assert.equal(updatedInvoice.payments.length, 1);
+  assert.equal(new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(updatedInvoice.payments[0].date), '2026-10-18');
+  assert.equal(firstPayment.data.balance, 7600);
+
+  const finalPayment = await api('/api/parties/' + party._id + '/transaction', {
+    method: 'POST',
+    body: { amount: 7600, mode: 'RTGS', ref: 'UTR-PHASE5-002', direction: 'in', date: '2026-10-19' }
+  });
+  assert.equal(finalPayment.status, 200);
+  updatedInvoice = await Invoice.findById(invoice._id);
+  assert.equal(updatedInvoice.balanceDue, 0);
+  assert.equal(updatedInvoice.status, 'Paid');
+  assert.equal(updatedInvoice.payments.length, 2);
+  assert.equal(finalPayment.data.balance, 0);
+
   const sheetIssue = await StockMovement.findOne({
     referenceId: outputSheets[0]._id,
     movementType: 'production_issue'
