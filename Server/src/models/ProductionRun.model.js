@@ -19,6 +19,16 @@ const productionRunSchema = new mongoose.Schema({
   runDate: { type: Date, required: true, default: Date.now },
   shift: { type: String, enum: ['Day', 'Night'], default: 'Day' },
   operatorName: { type: String, trim: true },
+  machineName: { type: String, trim: true, maxlength: 100 },
+  wasteBreakdown: [{
+    category: {
+      type: String,
+      enum: ['edge_trim', 'setup_waste', 'quality_rejection', 'moisture_damage', 'handling_damage', 'other'],
+      required: true
+    },
+    weightKg: { type: mongoose.Schema.Types.Decimal128, required: true, min: 0.001 },
+    notes: { type: String, trim: true, maxlength: 250 }
+  }],
   inputReels: [consumedReelSchema],
   totalInputWeightKg: { type: mongoose.Schema.Types.Decimal128, required: true },
   totalOutputWeightKg: { type: mongoose.Schema.Types.Decimal128, required: true },
