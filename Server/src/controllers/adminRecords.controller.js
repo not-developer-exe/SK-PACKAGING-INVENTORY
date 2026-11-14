@@ -63,36 +63,43 @@ exports.updateAdminRecord = async (req, res) => {
     return res.status(400).json({ message: 'Enter an audit reason of at least 10 characters.' });
   }
 
+  const session = await mongoose.startSession();
   try {
-    const record = await Model.findById(req.params.id);
-    if (!record) return res.status(404).json({ message: 'Record not found.' });
-    const before = serialize(record);
-    const editable = { ...document };
-    for (const field of immutableFields) delete editable[field];
-    delete editable.recordedBy;
-    delete editable.createdBy;
-    delete editable.updatedBy;
+    let result;
+    await session.withTransaction(async () => {
+      const record = await Model.findById(req.params.id).session(session);
+      if (!record) throw Object.assign(new Error('Record not found.'), { statusCode: 404 });
+      const before = serialize(record);
+      const editable = { ...document };
+      for (const field of immutableFields) delete editable[field];
+      delete editable.recordedBy;
+      delete editable.createdBy;
+      delete editable.updatedBy;
 
-    record.set(editable);
-    await record.validate();
-    const changedFields = record.modifiedPaths().filter((path) => !immutableFields.has(path.split('.')[0]));
-    await record.save();
+      record.set(editable);
+      await record.validate();
+      const changedFields = record.modifiedPaths().filter((path) => !immutableFields.has(path.split('.')[0]));
+      await record.save({ session });
 
-    const after = serialize(record);
-    await writeAuditLog(req, {
-      action: 'admin.record_overridden',
-      entityType: Model.modelName,
-      entityId: record._id,
-      entityLabel: String(record._id),
-      summary: 'Administrator edited ' + Model.modelName + ' record: ' + reason.trim(),
-      metadata: { reason: reason.trim(), changedFields, before, after }
+      const after = serialize(record);
+      await writeAuditLog(req, {
+        action: 'admin.record_overridden',
+        entityType: Model.modelName,
+        entityId: record._id,
+        entityLabel: String(record._id),
+        summary: 'Administrator edited ' + Model.modelName + ' record: ' + reason.trim(),
+        metadata: { reason: reason.trim(), changedFields, before, after }
+      }, session);
+      result = { record: after, changedFields };
     });
-    return res.json({ record: after, changedFields });
+    return res.json(result);
   } catch (error) {
     console.error('[ADMIN RECORDS] Update failed:', error.message);
     if (error.name === 'ValidationError' || error.name === 'CastError') {
       return res.status(400).json({ message: error.message });
     }
-    return res.status(500).json({ message: 'Unable to update this record.' });
+    return res.status(error.statusCode || 500).json({ message: error.message || 'Unable to update this record.' });
+  } finally {
+    await session.endSession();
   }
 };
