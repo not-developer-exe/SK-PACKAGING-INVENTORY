@@ -18,6 +18,7 @@ exports.getWasteStats = async (req, res) => {
       ...buildDateRangeFilter(req.query.from, req.query.to, 'runDate')
     };
     const salesFilter = buildDateRangeFilter(req.query.from, req.query.to, 'saleDate');
+    if (req.query.buyerName) salesFilter.buyerName = String(req.query.buyerName).trim();
     const [productionWaste, scrapSales, legacyRows, allTimeGeneratedRows, allTimeSoldRows] = await Promise.all([
       ProductionRun.find(productionFilter)
         .sort({ runDate: -1, createdAt: -1 })
