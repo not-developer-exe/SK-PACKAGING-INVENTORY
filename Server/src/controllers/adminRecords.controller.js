@@ -168,7 +168,7 @@ exports.updateAdminRecord = async (req, res) => {
       }
 
       if (req.params.entity === 'expenses' && editable.expenseDate !== undefined &&
-          typeof editable.expenseDate === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(editable.expenseDate)) {
+          typeof editable.expenseDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(editable.expenseDate)) {
         editable.expenseDate = new Date(editable.expenseDate + 'T00:00:00+05:30');
       }
 
