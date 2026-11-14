@@ -7,9 +7,10 @@ async function seedAdmin() {
     ? process.env.ADMIN_EMAIL.trim().toLowerCase()
     : '';
   const password = process.env.ADMIN_PASSWORD;
-  const name = typeof process.env.ADMIN_NAME === 'string' && process.env.ADMIN_NAME.trim()
+  const configuredName = typeof process.env.ADMIN_NAME === 'string' && process.env.ADMIN_NAME.trim()
     ? process.env.ADMIN_NAME.trim()
-    : 'System Administrator';
+    : '';
+  const name = configuredName || 'System Administrator';
 
   if (!process.env.MONGODB_URI) throw new Error('MONGODB_URI is required.');
   if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) throw new Error('Set a valid ADMIN_EMAIL.');
@@ -22,7 +23,7 @@ async function seedAdmin() {
   if (admin) {
     admin.role = 'admin';
     admin.isActive = true;
-    if (name && admin.name !== name) admin.name = name;
+    if (configuredName && admin.name !== configuredName) admin.name = configuredName;
     await admin.save();
     console.log('Existing owner account promoted to active administrator:', admin.email);
   } else {
