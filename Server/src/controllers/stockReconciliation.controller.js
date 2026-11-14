@@ -5,7 +5,7 @@ const StockMovement = require('../models/StockMovement.model');
 const Sequence = require('../models/Sequence.model');
 const AuditLog = require('../models/AuditLog.model');
 const { calculateReelReconciliation } = require('../utils/reelReconciliation');
-const { buildDateRangeFilter } = require('../utils/dateFilters');
+const { buildDateRangeFilter, isValidDateOnly } = require('../utils/dateFilters');
 
 const asNumber = (value) => {
   if (value === '' || value === null || value === undefined) return NaN;
@@ -49,7 +49,9 @@ exports.getStockReconciliations = async (req, res) => {
 
 exports.postStockReconciliation = async (req, res) => {
   const { reason, countedAt, lines } = req.body || {};
-  const parsedDate = countedAt ? new Date(countedAt) : new Date();
+  const parsedDate = countedAt === undefined || countedAt === null || countedAt === ''
+    ? new Date()
+    : (isValidDateOnly(countedAt) ? new Date(countedAt + 'T00:00:00+05:30') : new Date(NaN));
   if (typeof reason !== 'string' || reason.trim().length < 5 ||
       Number.isNaN(parsedDate.getTime()) || !Array.isArray(lines) || !lines.length) {
     return res.status(400).json({ message: 'Provide a valid count date, reason and at least one reel count.' });
@@ -58,7 +60,10 @@ exports.postStockReconciliation = async (req, res) => {
   const seen = new Set();
   const normalized = [];
   for (const line of lines) {
-    if (!line || typeof line.reelId !== 'string' || seen.has(line.reelId)) {
+    if (!line || typeof line.reelId !== 'string' || !mongoose.isValidObjectId(line.reelId)) {
+      return res.status(400).json({ message: 'Every reconciliation line must contain a valid reel ID.' });
+    }
+    if (seen.has(line.reelId)) {
       return res.status(400).json({ message: 'Each reel must appear exactly once in a reconciliation.' });
     }
     seen.add(line.reelId);
