@@ -112,7 +112,7 @@ export default function AdminRecordsPage() {
             {Object.entries(selected).filter(([key]) => key !== '__v').map(([key, originalValue]) => {
               const protectedField = ['_id', 'createdAt', 'updatedAt', 'recordedBy', 'createdBy', 'updatedBy'].includes(key);
               const complex = originalValue === null || typeof originalValue === 'object';
-              const isDate = typeof originalValue === 'string' && /Date$/.test(key) && /^\\d{4}-\\d{2}-\\d{2}T/.test(originalValue);
+              const isDate = typeof originalValue === 'string' && /Date$/.test(key) && /^\d{4}-\d{2}-\d{2}T/.test(originalValue);
               return <label key={key} className="block rounded-lg border border-slate-100 p-3 text-sm">
                 <span className="mb-1 block font-semibold text-slate-700">{key}{protectedField && <span className="ml-2 text-xs font-normal text-slate-400">Protected</span>}</span>
                 {complex
