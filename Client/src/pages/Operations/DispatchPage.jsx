@@ -25,6 +25,7 @@ export default function DispatchPage() {
   const [dispatchBoxes, setDispatchBoxes] = useState([{ boxId: '', dispatchQuantity: '' }]);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+  const [customerFilter, setCustomerFilter] = useState('');
 
   const fetchData = async (dateParams = {}) => {
     try {
@@ -74,7 +75,7 @@ export default function DispatchPage() {
       setDispatchBoxes([{ boxId: '', dispatchQuantity: '' }]);
       
       const [historyData, boxesData] = await Promise.all([
-        dispatchService.getDispatches({ from, to }),
+        dispatchService.getDispatches({ from, to, customerId: customerFilter }),
         dispatchService.getAvailableBoxes()
       ]);
       setDispatches(historyData);
@@ -206,7 +207,7 @@ export default function DispatchPage() {
         </form>
       ) : (
         <div className="space-y-4">
-          <DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => fetchData({ from, to })} onReset={() => { setFrom(''); setTo(''); fetchData({}); }} loading={loading} label="Dispatch date range" />
+          <div className="flex flex-wrap items-end gap-3"><div className="min-w-56"><label className="mb-1 block text-xs font-medium text-slate-600">Customer</label><select value={customerFilter} onChange={e => setCustomerFilter(e.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"><option value="">All customers</option>{customers.map(customer => <option key={customer._id} value={customer._id}>{customer.name}</option>)}</select></div><div className="flex-1"><DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => fetchData({ from, to, customerId: customerFilter })} onReset={() => { setFrom(''); setTo(''); setCustomerFilter(''); fetchData({}); }} loading={loading} label="Dispatch date range" /></div></div>
           <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
