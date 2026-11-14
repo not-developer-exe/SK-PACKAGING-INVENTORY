@@ -112,7 +112,7 @@ exports.postStockReconciliation = async (req, res) => {
       const sequence = await Sequence.findOneAndUpdate(
         { _id: 'stock-reconciliation' },
         [{ $set: { value: { $add: [{ $ifNull: ['$value', 0] }, 1] } } }],
-        { new: true, upsert: true, session }
+        { new: true, upsert: true, session, updatePipeline: true }
       );
       const reconciliationNumber = 'RC-' + String(sequence.value).padStart(5, '0');
       const [reconciliation] = await StockReconciliation.create([{
