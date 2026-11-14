@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axiosClient from '../../api/axiosClient';
+import DateRangeFilter from '../../components/DateRangeFilter';
 
 const blankLine = () => ({
   reelWidthInches: '', bf: '', gsm: '', quality: 'Natural',
@@ -19,13 +20,15 @@ export default function OpeningStockPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
 
-  const load = async () => {
+  const load = async (dateParams = {}) => {
     setLoading(true);
     try {
       const [adjustments, auditLogs] = await Promise.all([
-        axiosClient.get('/controls/opening-stock'),
-        axiosClient.get('/controls/audit')
+        axiosClient.get('/controls/opening-stock', { params: dateParams }),
+        axiosClient.get('/controls/audit', { params: dateParams })
       ]);
       setHistory(adjustments.data.adjustments || []);
       setAudit(auditLogs.data.logs || []);
@@ -67,7 +70,7 @@ export default function OpeningStockPage() {
       });
       setSuccess(result.data.message + ' Reference: ' + result.data.adjustment.adjustmentNumber);
       setLines([blankLine()]);
-      await load();
+      await load({ from, to });
     } catch (err) {
       setError(err.response?.data?.message || 'Opening stock could not be posted.');
     } finally {
@@ -137,6 +140,7 @@ export default function OpeningStockPage() {
         <p className="text-xs text-slate-500">Admin-only. Posting is permanent and creates reel records, stock ledger movements and an audit entry in one database transaction. It does not create supplier payable or purchase invoice.</p>
       </form>
 
+      <DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => load({ from, to })} onReset={() => { setFrom(''); setTo(''); load({}); }} loading={loading} label="Opening stock / audit date range" />
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <div className="border-b p-5"><h2 className="font-semibold text-slate-900">Opening stock history</h2></div>
         {loading ? <p className="p-5 text-sm text-slate-500">Loading...</p> : (
