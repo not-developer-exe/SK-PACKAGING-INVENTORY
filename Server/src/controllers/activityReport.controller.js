@@ -88,7 +88,13 @@ exports.getActivityReport = async (req, res) => {
     const invoiceFilter = buildDateRangeFilter(req.query.from, req.query.to, 'invoiceDate');
     const expenseFilter = buildDateRangeFilter(req.query.from, req.query.to, 'expenseDate');
     const scrapFilter = buildDateRangeFilter(req.query.from, req.query.to, 'saleDate');
-    const movementFilter = buildDateRangeFilter(req.query.from, req.query.to, 'createdAt');
+    const movementDateRange = buildDateRangeFilter(req.query.from, req.query.to, 'movementDate').movementDate;
+    const movementFilter = movementDateRange ? {
+      $or: [
+        { movementDate: movementDateRange },
+        { movementDate: { $exists: false }, createdAt: movementDateRange }
+      ]
+    } : {};
     receiptFilter.status = 'posted';
     productionFilter.status = 'completed';
     invoiceFilter.status = { $ne: 'Cancelled' };
@@ -194,7 +200,7 @@ exports.getActivityReport = async (req, res) => {
     }
 
     for (const movement of movements) {
-      add(movement.createdAt, (row) => {
+      add(movement.movementDate || movement.createdAt, (row) => {
         row.stockMovements += 1;
         const quantityChange = Number(movement.quantityChange || 0);
         const weightChangeKg = numeric(movement.weightChangeKg);
