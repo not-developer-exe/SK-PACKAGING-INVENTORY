@@ -9,7 +9,8 @@ export default function WasteRegisterPage() {
   const [submitting, setSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState('inventory');
   const [from, setFrom] = useState('');
-  const [to, setTo] = useState(''); // 'inventory' or 'sales'
+  const [to, setTo] = useState('');
+  const [buyerFilter, setBuyerFilter] = useState('');
 
   // Sale form state
   const [buyerName, setBuyerName] = useState('');
@@ -47,7 +48,7 @@ export default function WasteRegisterPage() {
       setBuyerName('');
       setWeightSoldKg('');
       setRatePerKg('');
-      fetchData({ from, to });
+      fetchData({ from, to, buyerName: buyerFilter });
     } catch (error) {
       alert(error.response?.data?.message || 'Error recording sale');
     } finally {
@@ -64,7 +65,7 @@ export default function WasteRegisterPage() {
         <p className="mt-1 text-sm text-slate-500">Track corrugation machine waste and log scrap sales.</p>
       </div>
 
-      <DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => fetchData({ from, to })} onReset={() => { setFrom(''); setTo(''); fetchData({}); }} loading={loading} label="Waste / scrap date range" />
+      <div className="flex flex-wrap items-end gap-3"><div className="min-w-56"><label className="mb-1 block text-xs font-medium text-slate-600">Scrap buyer</label><input value={buyerFilter} onChange={e => setBuyerFilter(e.target.value)} placeholder="All buyers" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" /></div><div className="flex-1"><DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => fetchData({ from, to, buyerName: buyerFilter })} onReset={() => { setFrom(''); setTo(''); setBuyerFilter(''); fetchData({}); }} loading={loading} label="Waste / scrap date range" /></div></div>
 
       {/* Top Metrics */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
