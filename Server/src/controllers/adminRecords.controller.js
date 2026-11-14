@@ -28,9 +28,6 @@ const editableFieldsByEntity = {
   expenses: ['expenseDate', 'category', 'amount', 'vendor', 'paymentMode', 'reference', 'description', 'costTreatment']
 };
 
-// These records are connected to stock balances, financial ledgers, invoices,
-// or audit evidence. Editing them as isolated documents can silently break
-// reconciliation. Correct them through their domain workflow instead.
 const workflowManagedEntities = new Set([
   'reels',
   'sheets',
@@ -74,7 +71,7 @@ exports.listAdminRecords = async (req, res) => {
     const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 100) : '';
     const filter = {};
     if (search) {
-      const escaped = search.replace(/[.*+?^$()|[\\]\\\\]/g, '\\\\$&').replaceAll('{', '\\\\{').replaceAll('}', '\\\\}');
+      const escaped = search.replace(/[.*+?^$()|[\\]\\\\]/g, '\\$&').replaceAll('{', '\\{').replaceAll('}', '\\}');
       const expression = new RegExp(escaped, 'i');
       const searchableStrings = Object.entries(Model.schema.paths)
         .filter(([path, schema]) => schema.instance === 'String' && !path.toLowerCase().includes('password'))
@@ -114,12 +111,8 @@ exports.updateAdminRecord = async (req, res) => {
   if (!Model) return res.status(404).json({ message: 'Unsupported record type.' });
   if (req.params.entity === 'auditLogs') return res.status(403).json({ message: 'Audit history is read-only.' });
   const allowedFields = editableFieldsByEntity[req.params.entity];
-  if (!allowedFields) return res.status(403).json({ message: 'This record type is read-only in the generic data console. Use its dedicated workflow for corrections.' });
-  if (workflowManagedEntities.has(req.params.entity)) {
-    return res.status(403).json({
-      message: 'This record is connected to inventory or accounting ledgers and is read-only in the generic data console. Use its dedicated module workflow or a controlled reversal/reconciliation.',
-      entity: req.params.entity
-    });
+  if (!allowedFields || workflowManagedEntities.has(req.params.entity)) {
+    return res.status(403).json({ message: 'This record type is read-only in the generic data console. Use its dedicated workflow for corrections.' });
   }
   if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid record ID.' });
   const { document, reason } = req.body || {};
@@ -165,51 +158,6 @@ exports.updateAdminRecord = async (req, res) => {
             name: editable.name
           }).collation({ locale: 'en', strength: 2 }).session(session);
           if (duplicate) throw Object.assign(new Error('Another active party already uses this name.'), { statusCode: 409 });
-        }
-        if (editable.type !== undefined && editable.type !== record.type &&
-            (record.ledger || []).some((entry) => entry.type !== 'Opening Balance')) {
-          throw Object.assign(new Error('Party type cannot be changed after financial transactions have been recorded.'), { statusCode: 409 });
-        }
-        if (editable.phone !== undefined) editable.phone = String(editable.phone).trim();
-        if (editable.city !== undefined) editable.city = String(editable.city).trim();
-      }
-
-      if (req.params.entity === 'expenses' && editable.expenseDate !== undefined &&
-          typeof editable.expenseDate === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(editable.expenseDate)) {
-        editable.expenseDate = new Date(editable.expenseDate + 'T00:00:00+05:30');
-      }
-
-      record.set(editable);
-      await record.validate();') + '
-      const changedFields = record.modifiedPaths().filter((path) => !immutableFields.has(path.split('.')[0]));
-      await record.save({ session });
-
-      const after = serialize(record);
-      await writeAuditLog(req, {
-        action: 'admin.record_overridden',
-        entityType: Model.modelName,
-        entityId: record._id,
-        entityLabel: String(record._id),
-        summary: 'Administrator edited ' + Model.modelName + ' record: ' + reason.trim(),
-        metadata: { reason: reason.trim(), changedFields, before, after }
-      }, session);
-      result = { record: after, changedFields };
-    });
-    return res.json(result);
-  } catch (error) {
-    console.error('[ADMIN RECORDS] Update failed:', error.message);
-    if (error.name === 'ValidationError' || error.name === 'CastError') {
-      return res.status(400).json({ message: error.message });
-    }
-    return res.status(error.statusCode || 500).json({ message: error.message || 'Unable to update this record.' });
-  } finally {
-    await session.endSession();
-  }
-};
-, 'i')
-          }).session(session);
-          if (duplicate) throw Object.assign(new Error('Another active party already uses this name.'), { statusCode: 409 });
-          editable.name = String(editable.name).trim();
         }
         if (editable.type !== undefined && editable.type !== record.type &&
             (record.ledger || []).some((entry) => entry.type !== 'Opening Balance')) {
