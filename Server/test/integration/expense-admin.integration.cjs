@@ -145,6 +145,12 @@ test('admin console and expense register enforce roles and keep an audit trail',
   const deleted = await api('/api/expenses/' + expenseId, { method: 'DELETE' });
   assert.equal(deleted.status, 200);
 
+  const auditRecords = await api('/api/admin-records/auditLogs');
+  assert.equal(auditRecords.status, 200);
+  assert.ok(auditRecords.data.records.some(item => item.action === 'admin.record_overridden'));
+  const auditEdit = await api('/api/admin-records/auditLogs/' + auditRecords.data.records[0]._id, { method: 'PATCH', body: { document: auditRecords.data.records[0], reason: 'Should not be editable in audit history.' } });
+  assert.equal(auditEdit.status, 403);
+
   const actions = await AuditLog.find({ action: { $in: ['admin.record_overridden', 'expense.created', 'expense.updated', 'expense.deleted'] } }).lean();
   assert.ok(actions.some(item => item.action === 'admin.record_overridden'));
   assert.ok(actions.some(item => item.action === 'expense.created'));
