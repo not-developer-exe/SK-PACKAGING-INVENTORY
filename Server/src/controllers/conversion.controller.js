@@ -6,6 +6,7 @@ const Party = require('../models/Party.model');
 const Sequence = require('../models/Sequence.model');
 const writeAuditLog = require('../utils/writeAuditLog');
 const { calculateSheetConsumption } = require('../utils/sheetConversion');
+const { calculateMaterialCost } = require('../utils/materialCosting');
 
 exports.recordConversion = async (req, res) => {
   const {
@@ -88,6 +89,13 @@ exports.recordConversion = async (req, res) => {
         throw error;
       }
 
+      const unitCostPerKg = Number(sheet.unitCostPerKg?.toString() || 0);
+      const costingStatus = sheet.costingStatus === 'available' ? 'available' : 'unavailable';
+      const materialCost = costingStatus === 'available'
+        ? calculateMaterialCost(consumption.consumedWeightKg, unitCostPerKg)
+        : 0;
+      const costPerBox = boxesProduced > 0 ? Number((materialCost / boxesProduced).toFixed(2)) : 0;
+
       const [box] = await FinishedBox.create([{
         batchNumber,
         customerId: customer._id,
@@ -101,6 +109,9 @@ exports.recordConversion = async (req, res) => {
         sourceSheetId: sheet._id,
         quantityProduced: boxesProduced,
         quantityAvailable: boxesProduced,
+        materialCost,
+        costPerBox,
+        costingStatus,
         recordedBy: req.user._id
       }], { session });
 
@@ -140,7 +151,10 @@ exports.recordConversion = async (req, res) => {
           customerId: String(customer._id),
           sheetsConsumed,
           consumedWeightKg: consumption.consumedWeightKg,
-          boxesProduced
+          boxesProduced,
+          materialCost,
+          costPerBox,
+          costingStatus
         }
       }, session);
 
