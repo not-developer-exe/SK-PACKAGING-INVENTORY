@@ -597,6 +597,37 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
   assert.equal(updatedInvoice.payments.length, 2);
   assert.equal(finalPayment.data.balance, 0);
 
+  for (const expense of [
+    { expenseDate: '2026-10-18', category: 'electricity', amount: 200, paymentMode: 'bank_transfer', costTreatment: 'operating_expense' },
+    { expenseDate: '2026-10-18', category: 'interest', amount: 100, paymentMode: 'bank_transfer', costTreatment: 'finance_cost' },
+    { expenseDate: '2026-10-18', category: 'freight', amount: 50, paymentMode: 'bank_transfer', costTreatment: 'stock_landed_cost' }
+  ]) {
+    const createdExpense = await api('/api/expenses', { method: 'POST', body: expense });
+    assert.equal(createdExpense.status, 201);
+  }
+
+  const profitLoss = await api('/api/reports/profit-loss?from=2026-10-15&to=2026-10-20');
+  assert.equal(profitLoss.status, 200);
+  assert.equal(profitLoss.data.summary.invoiceCount, 1);
+  assert.equal(profitLoss.data.summary.revenue, 12000);
+  assert.equal(profitLoss.data.summary.costOfGoods, 882);
+  assert.equal(profitLoss.data.summary.grossProfit, 11118);
+  assert.equal(profitLoss.data.summary.balanceDue, 0);
+  assert.equal(profitLoss.data.summary.operatingExpenses, 200);
+  assert.equal(profitLoss.data.summary.financeCosts, 100);
+  assert.equal(profitLoss.data.summary.stockLandedCosts, 50);
+  assert.equal(profitLoss.data.summary.operatingProfit, 10918);
+  assert.equal(profitLoss.data.summary.netProfitBeforeTax, 10818);
+  assert.equal(profitLoss.data.summary.expenseCount, 3);
+  assert.equal(profitLoss.data.summary.operatingExpenseCount, 1);
+  assert.equal(profitLoss.data.summary.financeCostCount, 1);
+  assert.equal(profitLoss.data.summary.stockLandedCostCount, 1);
+  assert.equal(profitLoss.data.summary.recoverableScrapGeneratedKg, 5.1);
+  assert.equal(profitLoss.data.expenseByCategory.length, 3);
+  assert.ok(Math.abs(profitLoss.data.summary.processLossKg - 5.9) < 0.002);
+  const misleadingPartyFilter = await api('/api/reports/profit-loss?from=2026-10-15&to=2026-10-20&partyId=' + party._id);
+  assert.equal(misleadingPartyFilter.status, 400);
+
   const sheetIssue = await StockMovement.findOne({
     referenceId: outputSheets[0]._id,
     movementType: 'production_issue'
