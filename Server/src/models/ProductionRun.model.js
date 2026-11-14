@@ -34,4 +34,6 @@ const productionRunSchema = new mongoose.Schema({
   recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
 
+productionRunSchema.index({ runDate: -1 });
+
 module.exports = mongoose.model('ProductionRun', productionRunSchema);
