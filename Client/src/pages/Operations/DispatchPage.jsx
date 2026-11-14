@@ -9,6 +9,8 @@ import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 
 export default function DispatchPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [activeTab, setActiveTab] = useState('new');
   const [customers, setCustomers] = useState([]);
   const [availableBoxes, setAvailableBoxes] = useState([]);
@@ -236,7 +238,8 @@ export default function DispatchPage() {
                 <th className="px-5 py-3 font-semibold">Date</th>
                 <th className="px-5 py-3 font-semibold">Customer</th>
                 <th className="px-5 py-3 font-semibold">Items Dispatched</th>
-                <th className="px-5 py-3 font-semibold">Vehicle & Driver</th>\n                {isAdmin && <th className="px-5 py-3 font-semibold">Actions</th>}
+                <th className="px-5 py-3 font-semibold">Vehicle & Driver</th>
+                {isAdmin && <th className="px-5 py-3 font-semibold">Actions</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
