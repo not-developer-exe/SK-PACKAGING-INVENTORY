@@ -87,6 +87,7 @@ exports.getActivityReport = async (req, res) => {
     const scrapFilter = buildDateRangeFilter(req.query.from, req.query.to, 'saleDate');
     const movementFilter = buildDateRangeFilter(req.query.from, req.query.to, 'createdAt');
     receiptFilter.status = 'posted';
+    productionFilter.status = 'completed';
     invoiceFilter.status = { $ne: 'Cancelled' };
 
     const [receipts, runs, finishedGoods, dispatches, invoices, expenses, scrapSales, movements] = await Promise.all([
