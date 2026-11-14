@@ -2,8 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { Receipt, RefreshCw, Trash2, Pencil, Save, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import axiosClient from '../../api/axiosClient';
+import DateRangeFilter from '../../components/DateRangeFilter';
+import { toLocalDateInput } from '../../lib/date';
 
-const blank = { expenseDate: new Date().toISOString().slice(0, 10), category: 'electricity', amount: '', vendor: '', paymentMode: 'bank_transfer', reference: '', description: '', costTreatment: 'operating_expense' };
+const blank = { expenseDate: toLocalDateInput(), category: 'electricity', amount: '', vendor: '', paymentMode: 'bank_transfer', reference: '', description: '', costTreatment: 'operating_expense' };
 const categories = ['electricity', 'labour', 'rent', 'freight', 'repairs', 'admin', 'bank_charges', 'interest', 'miscellaneous'];
 const money = value => '₹' + Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
 const title = value => value.replaceAll('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
@@ -17,10 +19,12 @@ export default function ExpensesPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
 
-  const load = async () => {
+  const load = async (dateParams = {}) => {
     setLoading(true);
-    try { const { data } = await axiosClient.get('/expenses'); setExpenses(data.expenses || []); setError(''); }
+    try { const { data } = await axiosClient.get('/expenses', { params: dateParams }); setExpenses(data.expenses || []); setError(''); }
     catch (e) { setError(e.response?.data?.message || 'Unable to load expenses.'); }
     finally { setLoading(false); }
   };
@@ -46,7 +50,7 @@ export default function ExpensesPage() {
 
   const startEdit = item => {
     setEditing(item._id);
-    setForm({ expenseDate: new Date(item.expenseDate).toISOString().slice(0, 10), category: item.category, amount: String(item.amount), vendor: item.vendor || '', paymentMode: item.paymentMode, reference: item.reference || '', description: item.description || '', costTreatment: item.costTreatment || 'operating_expense' });
+    setForm({ expenseDate: toLocalDateInput(new Date(item.expenseDate)), category: item.category, amount: String(item.amount), vendor: item.vendor || '', paymentMode: item.paymentMode, reference: item.reference || '', description: item.description || '', costTreatment: item.costTreatment || 'operating_expense' });
   };
   const remove = async item => {
     if (!window.confirm('Delete this expense? The action will be written to the audit log.')) return;
@@ -70,8 +74,9 @@ export default function ExpensesPage() {
       <label className="text-sm sm:col-span-2 lg:col-span-2">Description<input maxLength="1000" value={form.description} onChange={e => setForm({...form, description:e.target.value})} className="mt-1 block w-full rounded-lg border px-3 py-2" /></label>
       <div className="flex items-end gap-2"><button disabled={saving} className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{saving ? 'Saving…' : editing ? 'Save changes' : 'Record expense'}</button>{editing && <button type="button" onClick={() => {setEditing(null);setForm(blank);}} className="rounded-lg border px-4 py-2.5 text-sm">Cancel</button>}</div>
     </form>
+    <DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => load({ from, to })} onReset={() => { setFrom(''); setTo(''); load({}); }} loading={loading} label="Expense date range" />
     <section className="overflow-hidden rounded-2xl border bg-white">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b p-5"><div><h2 className="font-semibold text-slate-900">Expense register</h2><p className="text-xs text-slate-500">{expenses.length} records · latest 1,000</p></div><div className="flex items-center gap-3"><strong>{money(total)}</strong><button onClick={load} className="rounded-lg border p-2" title="Refresh"><RefreshCw size={16}/></button></div></div>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b p-5"><div><h2 className="font-semibold text-slate-900">Expense register</h2><p className="text-xs text-slate-500">{expenses.length} records · latest 1,000</p></div><div className="flex items-center gap-3"><strong>{money(total)}</strong><button onClick={() => load({ from, to })} className="rounded-lg border p-2" title="Refresh"><RefreshCw size={16}/></button></div></div>
       {loading ? <p className="p-6 text-sm text-slate-500">Loading expenses…</p> : <div className="overflow-x-auto"><table className="w-full min-w-[900px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-3">Date</th><th className="p-3">Category</th><th className="p-3">Vendor / details</th><th className="p-3">Treatment</th><th className="p-3 text-right">Amount</th><th className="p-3">Mode</th><th className="p-3">Recorded by</th><th className="p-3">Actions</th></tr></thead><tbody className="divide-y">{expenses.map(item => <tr key={item._id}><td className="p-3">{new Date(item.expenseDate).toLocaleDateString('en-IN')}</td><td className="p-3 font-medium">{title(item.category)}</td><td className="p-3">{item.vendor || '—'}<div className="text-xs text-slate-500">{item.description || item.reference}</div></td><td className="p-3 text-xs">{title(item.costTreatment || 'operating_expense')}</td><td className="p-3 text-right font-semibold">{money(item.amount)}</td><td className="p-3">{title(item.paymentMode)}</td><td className="p-3">{item.recordedBy?.name || '—'}</td><td className="p-3"><div className="flex gap-2">{user?.role === 'admin' && <><button onClick={() => startEdit(item)} title="Edit" className="rounded border p-2"><Pencil size={14}/></button><button onClick={() => remove(item)} title="Delete" className="rounded border p-2 text-red-600"><Trash2 size={14}/></button></>}</div></td></tr>)}{!expenses.length && <tr><td colSpan="8" className="p-8 text-center text-slate-500">No expenses recorded.</td></tr>}</tbody></table></div>}
     </section>
     <p className="text-xs text-slate-500">Inbound freight already included in a reel's landed rate must be marked as stock landed cost here, not operating expense, to avoid double counting. Changes and deletions are audited.</p>

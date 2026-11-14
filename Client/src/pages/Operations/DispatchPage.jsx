@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { dispatchService } from '../../services/dispatchService';
+import DateRangeFilter from '../../components/DateRangeFilter';
+import { toLocalDateInput } from '../../lib/date';
 import { partiesService } from '../../services/partiesService';
 import { Truck, Plus, Trash2, Loader2, FileText, Printer, Download, X } from 'lucide-react';
 import html2canvas from 'html2canvas';
@@ -17,19 +19,22 @@ export default function DispatchPage() {
   const [selectedChallan, setSelectedChallan] = useState(null);
 
   // Added dispatchDate and uppercase handlers
-  const [dispatchDate, setDispatchDate] = useState(new Date().toISOString().split('T')[0]);
+  const [dispatchDate, setDispatchDate] = useState(toLocalDateInput());
   const [customerId, setCustomerId] = useState('');
   const [vehicleNumber, setVehicleNumber] = useState('');
   const [driverName, setDriverName] = useState('');
   const [dispatchBoxes, setDispatchBoxes] = useState([{ boxId: '', dispatchQuantity: '' }]);
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [customerFilter, setCustomerFilter] = useState('');
 
-  const fetchData = async () => {
+  const fetchData = async (dateParams = {}) => {
     try {
       setLoading(true);
       const [customersData, boxesData, historyData] = await Promise.all([
         partiesService.getCustomers(),
         dispatchService.getAvailableBoxes(),
-        dispatchService.getDispatches() 
+        dispatchService.getDispatches(dateParams) 
       ]);
       setCustomers(customersData);
       setAvailableBoxes(boxesData);
@@ -67,11 +72,11 @@ export default function DispatchPage() {
       setCustomerId('');
       setVehicleNumber('');
       setDriverName('');
-      setDispatchDate(new Date().toISOString().split('T')[0]);
+      setDispatchDate(toLocalDateInput());
       setDispatchBoxes([{ boxId: '', dispatchQuantity: '' }]);
       
       const [historyData, boxesData] = await Promise.all([
-        dispatchService.getDispatches(),
+        dispatchService.getDispatches({ from, to, customerId: customerFilter }),
         dispatchService.getAvailableBoxes()
       ]);
       setDispatches(historyData);
@@ -202,7 +207,9 @@ export default function DispatchPage() {
           </div>
         </form>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-end gap-3"><div className="min-w-56"><label className="mb-1 block text-xs font-medium text-slate-600">Customer</label><select value={customerFilter} onChange={e => setCustomerFilter(e.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"><option value="">All customers</option>{customers.map(customer => <option key={customer._id} value={customer._id}>{customer.name}</option>)}</select></div><div className="flex-1"><DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => fetchData({ from, to, customerId: customerFilter })} onReset={() => { setFrom(''); setTo(''); setCustomerFilter(''); fetchData({}); }} loading={loading} label="Dispatch date range" /></div></div>
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <tr>
@@ -235,6 +242,7 @@ export default function DispatchPage() {
               {dispatches.length === 0 && (<tr><td colSpan={5} className="p-8 text-center text-slate-500">No dispatches recorded yet.</td></tr>)}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

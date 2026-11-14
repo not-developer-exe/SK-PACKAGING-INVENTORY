@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, ArrowDownRight, ArrowUpRight, MapPin, Phone, Receipt, Search, Trash2, UserPlus, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import axiosClient from '../../api/axiosClient';
+import DateRangeFilter from '../../components/DateRangeFilter';
 
 const emptyForm = { name: '', type: 'Customer', phone: '', city: '', openingBalance: '0' };
 const money = (value) => '₹' + Math.abs(Number(value || 0)).toLocaleString('en-IN', { maximumFractionDigits: 2 });
@@ -13,7 +14,8 @@ export default function PartyMasterPage() {
   const [selectedParty, setSelectedParty] = useState(null);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('All');
-  const [monthFilter, setMonthFilter] = useState('');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -142,9 +144,13 @@ export default function PartyMasterPage() {
   const ledgerRows = useMemo(() => {
     if (!selectedParty) return [];
     return [...(selectedParty.ledger || [])]
-      .filter((txn) => !monthFilter || String(txn.date || '').slice(0, 7) === monthFilter)
+       .filter((txn) => {
+        if (!txn.date) return !from && !to;
+        const dateKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(txn.date));
+        return (!from || dateKey >= from) && (!to || dateKey <= to);
+      })
       .sort((a, b) => new Date(a.date) - new Date(b.date));
-  }, [selectedParty, monthFilter]);
+  }, [selectedParty, from, to]);
 
   const balanceLabel = (balance) => Number(balance) > 0 ? 'To receive' : Number(balance) < 0 ? 'To pay' : 'Settled';
 
@@ -165,7 +171,7 @@ export default function PartyMasterPage() {
         <div className="space-y-5">
           <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border bg-white p-5">
             <div className="flex items-center gap-3">
-              <button onClick={() => { setSelectedParty(null); setMonthFilter(''); }} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><ArrowLeft size={20} /></button>
+              <button onClick={() => { setSelectedParty(null); setFrom(''); setTo(''); }} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><ArrowLeft size={20} /></button>
               <div>
                 <h2 className="text-xl font-bold text-slate-900">{selectedParty.name}</h2>
                 <p className="mt-1 text-sm text-slate-500"><Phone size={13} className="mr-1 inline" />{selectedParty.phone || 'No phone'} <MapPin size={13} className="ml-3 mr-1 inline" />{selectedParty.city || 'No city'} · {selectedParty.type}</p>
@@ -182,11 +188,11 @@ export default function PartyMasterPage() {
             <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-slate-50 p-4">
               <h3 className="font-semibold text-slate-900"><Receipt size={17} className="mr-2 inline" />Account Statement</h3>
               <div className="flex flex-wrap gap-2">
-                <input type="month" value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)} className="rounded-lg border bg-white px-3 py-2 text-sm" />
                 <button onClick={() => { setPaymentDirection('in'); setShowPaymentModal(true); }} className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700"><ArrowDownRight size={15} className="mr-1 inline" />Payment In</button>
                 <button onClick={() => { setPaymentDirection('out'); setShowPaymentModal(true); }} className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700"><ArrowUpRight size={15} className="mr-1 inline" />Payment Out</button>
               </div>
             </div>
+            <div className="border-b border-slate-100 p-4"><DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => {}} onReset={() => { setFrom(''); setTo(''); }} label="Account statement date range" /></div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[700px] text-left text-sm">
                 <thead className="border-b text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Date</th><th className="px-4 py-3">Particulars</th><th className="px-4 py-3">Reference</th><th className="px-4 py-3 text-right">Debit</th><th className="px-4 py-3 text-right">Credit</th><th className="px-4 py-3 text-right">Balance</th><th className="px-4 py-3"> </th></tr></thead>

@@ -5,18 +5,27 @@ const Dispatch = require('../models/Dispatch.model');
 const Party = require('../models/Party.model');
 const FinishedBox = require('../models/FinishedBox.model');
 const writeAuditLog = require('../utils/writeAuditLog');
+const { buildDateRangeFilter } = require('../utils/dateFilters');
 
 exports.getInvoices = async (req, res) => {
   try {
-    const invoices = await Invoice.find()
+    const filter = buildDateRangeFilter(req.query.from, req.query.to, 'invoiceDate');
+    if (req.query.customerId) {
+      if (!mongoose.isValidObjectId(req.query.customerId)) return res.status(400).json({ message: 'Invalid customer ID.' });
+      filter.customerId = req.query.customerId;
+    }
+    if (req.query.status && !['Paid', 'Pending', 'Overdue', 'Cancelled'].includes(req.query.status)) return res.status(400).json({ message: 'Invalid invoice status.' });
+    if (req.query.status) filter.status = req.query.status;
+    const invoices = await Invoice.find(filter)
       .populate('customerId', 'name')
       .populate('dispatchId', 'challanNumber dispatchDate')
       .sort({ invoiceDate: -1, createdAt: -1 })
+      .limit(1000)
       .lean();
     return res.json({ invoices });
   } catch (error) {
     console.error('[INVOICE] List failed:', error.message);
-    return res.status(500).json({ message: 'Unable to fetch invoices.' });
+    return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Unable to fetch invoices.' });
   }
 };
 

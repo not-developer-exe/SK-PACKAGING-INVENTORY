@@ -26,4 +26,6 @@ const finishedBoxSchema = new mongoose.Schema({
   recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
 
+finishedBoxSchema.index({ manufacturedAt: -1, customerId: 1 });
+
 module.exports = mongoose.model('FinishedBox', finishedBoxSchema);

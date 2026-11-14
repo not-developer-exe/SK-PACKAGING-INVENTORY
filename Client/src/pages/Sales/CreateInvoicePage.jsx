@@ -12,7 +12,7 @@ export default function CreateInvoicePage() {
   const [customers, setCustomers] = useState([]);
   const [uninvoicedChallans, setUninvoicedChallans] = useState([]);
   
-  const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
+  const [invoiceDate, setInvoiceDate] = useState(toLocalDateInput());
   const [customerId, setCustomerId] = useState('');
   const [dispatchId, setDispatchId] = useState('');
   const [gstPercent, setGstPercent] = useState(5);

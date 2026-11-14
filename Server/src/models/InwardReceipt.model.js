@@ -30,4 +30,6 @@ const inwardReceiptSchema = new mongoose.Schema({
 // Prevent duplicate invoice numbers from the same supplier
 inwardReceiptSchema.index({ supplierId: 1, invoiceReference: 1 }, { unique: true, sparse: true });
 
+inwardReceiptSchema.index({ receiptDate: -1, supplierId: 1 });
+
 module.exports = mongoose.model('InwardReceipt', inwardReceiptSchema);

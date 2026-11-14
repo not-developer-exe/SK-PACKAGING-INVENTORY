@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { inwardService } from '../../services/inwardService';
 import { partiesService } from '../../services/partiesService';
+import DateRangeFilter from '../../components/DateRangeFilter';
+import { toLocalDateInput } from '../../lib/date';
 import { ArrowDownToLine, Plus, ShieldCheck, CheckCircle2, FileText, Loader2, X } from 'lucide-react';
 
 export default function StockInwardPage() {
@@ -10,11 +12,14 @@ export default function StockInwardPage() {
   const [showModal, setShowModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [supplierFilter, setSupplierFilter] = useState('');
 
   // Form state
   const [supplierId, setSupplierId] = useState('');
   const [invoiceReference, setInvoiceReference] = useState('');
-  const [receiptDate, setReceiptDate] = useState(new Date().toISOString().split('T')[0]);
+  const [receiptDate, setReceiptDate] = useState(toLocalDateInput());
   const [notes, setNotes] = useState('');
   
   // Line items state
@@ -22,11 +27,11 @@ export default function StockInwardPage() {
     { reelWidthInches: '', bf: '', gsm: '', quality: 'Natural', reelCount: '', totalWeightKg: '', ratePerKg: '', freightCharges: 0, otherCharges: 0, supplierBatchRef: '' }
   ]);
 
-  const fetchData = async () => {
+  const fetchData = async (dateParams = {}) => {
     try {
       setLoading(true);
       const [recData, supData] = await Promise.all([
-        inwardService.getReceipts(),
+        inwardService.getReceipts(dateParams),
         partiesService.getSuppliers()
       ]);
       setReceipts(recData);
@@ -131,6 +136,8 @@ export default function StockInwardPage() {
           New inward receipt
         </button>
       </div>
+
+      <div className="flex flex-wrap items-end gap-3"><div className="min-w-56"><label className="mb-1 block text-xs font-medium text-slate-600">Supplier</label><select value={supplierFilter} onChange={e => setSupplierFilter(e.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"><option value="">All suppliers</option>{suppliers.map(supplier => <option key={supplier._id} value={supplier._id}>{supplier.name}</option>)}</select></div><div className="flex-1"><DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => fetchData({ from, to, supplierId: supplierFilter })} onReset={() => { setFrom(''); setTo(''); setSupplierFilter(''); fetchData({}); }} loading={loading} label="Inward receipt date range" /></div></div>
 
       {/* Receipts Table */}
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">

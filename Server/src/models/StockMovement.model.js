@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
 const stockMovementSchema = new mongoose.Schema({
+  movementDate: { type: Date, default: Date.now },
   movementType: {
     type: String,
     required: true,
@@ -26,5 +27,7 @@ const stockMovementSchema = new mongoose.Schema({
   notes: { type: String },
   performedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
+
+stockMovementSchema.index({ movementDate: -1, createdAt: -1 });
 
 module.exports = mongoose.model('StockMovement', stockMovementSchema);

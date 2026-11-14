@@ -1,16 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { ledgerService } from '../../services/ledgerService';
 import { BookOpen, ArrowUpRight, ArrowDownRight, Loader2 } from 'lucide-react';
+import DateRangeFilter from '../../components/DateRangeFilter';
 
 export default function StockLedgerPage() {
   const [movements, setMovements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
 
   useEffect(() => {
-    const fetchLedger = async () => {
+    const fetchLedger = async (dateParams = {}) => {
       try {
-        const data = await ledgerService.getLedger();
+        const data = await ledgerService.getLedger(dateParams);
         setMovements(data);
       } catch (error) {
         console.error('Failed to load ledger:', error);
@@ -20,6 +23,13 @@ export default function StockLedgerPage() {
     };
     fetchLedger();
   }, []);
+
+  const fetchFilteredLedger = async (dateParams) => {
+    setLoading(true);
+    try { setMovements(await ledgerService.getLedger(dateParams)); }
+    catch (error) { console.error('Failed to load ledger:', error); }
+    finally { setLoading(false); }
+  };
 
   const filteredMovements = movements.filter(m => {
     if (filter === 'all') return true;
@@ -47,6 +57,8 @@ export default function StockLedgerPage() {
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">Stock Ledger</h1>
         <p className="mt-1 text-sm text-slate-500">Immutable audit trail of all inventory movements across the factory.</p>
       </div>
+
+      <DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => fetchFilteredLedger({ from, to })} onReset={() => { setFrom(''); setTo(''); fetchFilteredLedger({}); }} loading={loading} label="Stock movement date range" />
 
       <div className="flex gap-2 border-b border-slate-200 pb-4">
         {['all', 'inward', 'production', 'conversion'].map(f => (
@@ -80,7 +92,7 @@ export default function StockLedgerPage() {
               {filteredMovements.map((m) => (
                 <tr key={m._id} className="transition hover:bg-slate-50">
                   <td className="whitespace-nowrap px-5 py-4 text-slate-600">
-                    {new Date(m.createdAt).toLocaleString('en-IN', { 
+                    {new Date(m.movementDate || m.createdAt).toLocaleString('en-IN', { 
                       day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' 
                     })}
                   </td>

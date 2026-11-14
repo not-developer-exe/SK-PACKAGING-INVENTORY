@@ -19,4 +19,6 @@ const stockReconciliationSchema = new mongoose.Schema({
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
 }, { timestamps: true });
 
+stockReconciliationSchema.index({ countedAt: -1 });
+
 module.exports = mongoose.model('StockReconciliation', stockReconciliationSchema);

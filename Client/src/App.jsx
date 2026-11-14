@@ -23,6 +23,7 @@ import UserManagementPage from './pages/Reports/UserManagementPage';
 import StockReconciliationPage from './pages/Reports/StockReconciliationPage';
 import ProfitLossPage from './pages/Reports/ProfitLossPage';
 import ExpensesPage from './pages/Reports/ExpensesPage';
+import PeriodActivityPage from './pages/Reports/PeriodActivityPage';
 import AdminRecordsPage from './pages/Reports/AdminRecordsPage';
 
 function RequireAuth() {
@@ -43,6 +44,7 @@ function Sidebar() {
       { name: 'Party Master', path: '/parties', icon: Users },
       { name: 'Sales Invoices', path: '/sales', icon: FileText },
       { name: 'Profit & Loss', path: '/reports/profit-loss', icon: ChartNoAxesCombined },
+      { name: 'Factory Activity', path: '/reports/activity', icon: ChartNoAxesCombined },
       { name: 'Expenses', path: '/expenses', icon: Receipt },
       { name: 'New GST Invoice', path: '/sales/new', icon: FilePlus2 }
     ] },
@@ -108,6 +110,7 @@ export default function App() {
           <Route path="sales" element={<SalesInvoicesPage />} />
           <Route path="sales/new" element={<CreateInvoicePage />} />
           <Route path="reports/profit-loss" element={<ProfitLossPage />} />
+          <Route path="reports/activity" element={<PeriodActivityPage />} />
           <Route path="expenses" element={<ExpensesPage />} />
           <Route path="inventory/reels" element={<ReelStockPage />} />
           <Route path="inventory/inward" element={<StockInwardPage />} />

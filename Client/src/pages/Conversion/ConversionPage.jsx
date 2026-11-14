@@ -1,10 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { conversionService } from '../../services/conversionService';
 import { partiesService } from '../../services/partiesService';
+import DateRangeFilter from '../../components/DateRangeFilter';
 import { Package, Scissors, Loader2 } from 'lucide-react';
 
 export default function ConversionPage() {
   const [sheets, setSheets] = useState([]);
+  const [finishedGoods, setFinishedGoods] = useState([]);
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [customerFilter, setCustomerFilter] = useState('');
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -13,21 +18,24 @@ export default function ConversionPage() {
 
   // Form State
   const [sheetId, setSheetId] = useState('');
+  const [conversionDate, setConversionDate] = useState(() => { const date = new Date(); return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10); });
   const [sheetsConsumed, setSheetsConsumed] = useState('');
   const [customerId, setCustomerId] = useState('');
   const [itemName, setItemName] = useState('');
   const [dimensions, setDimensions] = useState({ length: '', width: '', height: '' });
   const [boxesProduced, setBoxesProduced] = useState('');
 
-  const fetchData = async () => {
+  const fetchData = async (dateParams = {}) => {
     try {
       setLoading(true);
-      const [sheetData, customerData] = await Promise.all([
+      const [sheetData, customerData, finishedGoodsData] = await Promise.all([
         conversionService.getAvailableSheets(),
-        partiesService.getCustomers()
+        partiesService.getCustomers(),
+        conversionService.getFinishedGoods(dateParams)
       ]);
       setSheets(sheetData);
       setCustomers(customerData);
+      setFinishedGoods(finishedGoodsData);
     } catch (err) {
       console.error('Error fetching conversion data:', err);
     } finally {
@@ -53,6 +61,7 @@ export default function ConversionPage() {
 
       const res = await conversionService.recordConversion({
         sheetId,
+        conversionDate,
         sheetsConsumed: Number(sheetsConsumed),
         customerId,
         itemName,
@@ -74,7 +83,7 @@ export default function ConversionPage() {
       setDimensions({ length: '', width: '', height: '' });
       setBoxesProduced('');
       
-      fetchData(); // Refresh available sheets
+      fetchData({ from, to, customerId: customerFilter }); // Refresh available sheets and filtered history
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Error recording conversion');
     } finally {
@@ -122,7 +131,7 @@ export default function ConversionPage() {
             <Package size={20} /> Finished Product
           </h2>
           
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Customer *</label>
               <select required value={customerId} onChange={e => setCustomerId(e.target.value)} className="w-full rounded-xl border border-emerald-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-emerald-400">
@@ -171,6 +180,45 @@ export default function ConversionPage() {
           </button>
         </div>
       </form>
+
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-900">Finished Goods History</h2>
+          <p className="text-sm text-slate-500">Track manufactured box batches by conversion date and customer.</p>
+        </div>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="min-w-56">
+            <label className="mb-1 block text-xs font-medium text-slate-600">Customer</label>
+            <select value={customerFilter} onChange={e => setCustomerFilter(e.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+              <option value="">All customers</option>
+              {customers.map(customer => <option key={customer._id} value={customer._id}>{customer.name}</option>)}
+            </select>
+          </div>
+          <div className="flex-1">
+            <DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => fetchData({ from, to, customerId: customerFilter })} onReset={() => { setFrom(''); setTo(''); setCustomerFilter(''); fetchData({}); }} loading={loading} label="Manufacturing date range" />
+          </div>
+        </div>
+        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+          <table className="w-full min-w-[950px] text-left text-sm">
+            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+              <tr><th className="px-4 py-3">Date</th><th className="px-4 py-3">Batch</th><th className="px-4 py-3">Customer</th><th className="px-4 py-3">Item</th><th className="px-4 py-3">Dimensions</th><th className="px-4 py-3 text-right">Produced</th><th className="px-4 py-3 text-right">Available</th><th className="px-4 py-3 text-right">Cost / box</th></tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {finishedGoods.map(box => <tr key={box._id}>
+                <td className="px-4 py-3 whitespace-nowrap">{new Date(box.manufacturedAt || box.createdAt).toLocaleDateString('en-IN')}</td>
+                <td className="px-4 py-3 font-semibold text-blue-700">{box.batchNumber}</td>
+                <td className="px-4 py-3">{box.customerId?.name || '—'}</td>
+                <td className="px-4 py-3 font-medium">{box.itemName}</td>
+                <td className="px-4 py-3">{box.dimensions?.length} × {box.dimensions?.width} × {box.dimensions?.height}</td>
+                <td className="px-4 py-3 text-right">{Number(box.quantityProduced || 0).toLocaleString('en-IN')}</td>
+                <td className="px-4 py-3 text-right font-semibold">{Number(box.quantityAvailable || 0).toLocaleString('en-IN')}</td>
+                <td className="px-4 py-3 text-right">{box.costingStatus === 'available' ? '₹' + Number(box.costPerBox || 0).toFixed(2) : 'Pending'}</td>
+              </tr>)}
+              {!finishedGoods.length && <tr><td colSpan={8} className="p-8 text-center text-slate-500">No finished goods batches found for this period.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   );
 }

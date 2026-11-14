@@ -1,25 +1,29 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ClipboardCheck, RefreshCw } from 'lucide-react';
 import axiosClient from '../../api/axiosClient';
+import DateRangeFilter from '../../components/DateRangeFilter';
+import { toLocalDateInput } from '../../lib/date';
 
 export default function StockReconciliationPage() {
   const [reels, setReels] = useState([]);
   const [counts, setCounts] = useState({});
   const [history, setHistory] = useState([]);
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(toLocalDateInput());
   const [reason, setReason] = useState('Physical stock verification');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
 
-  const load = async () => {
+  const load = async (dateParams = {}) => {
     setLoading(true);
     setError('');
     try {
       const [candidateResponse, historyResponse] = await Promise.all([
         axiosClient.get('/controls/stock-reconciliation/candidates'),
-        axiosClient.get('/controls/stock-reconciliation')
+        axiosClient.get('/controls/stock-reconciliation', { params: dateParams })
       ]);
       setReels(candidateResponse.data.reels || []);
       setHistory(historyResponse.data.reconciliations || []);
@@ -55,7 +59,7 @@ export default function StockReconciliationPage() {
         lines: entered.map(([reelId, countedWeightKg]) => ({ reelId, countedWeightKg: Number(countedWeightKg) }))
       });
       setSuccess(data.message + ' Reference: ' + data.reconciliation.reconciliationNumber);
-      await load();
+      await load({ from, to });
     } catch (err) {
       setError(err.response?.data?.message || 'Stock reconciliation could not be posted.');
     } finally {
@@ -106,8 +110,9 @@ export default function StockReconciliationPage() {
         </div>
       </form>
 
+      <DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => load({ from, to })} onReset={() => { setFrom(''); setTo(''); load({}); }} loading={loading} label="Reconciliation date range" />
       <section className="overflow-hidden rounded-2xl border bg-white">
-        <div className="border-b p-5"><h2 className="font-semibold">Recent reconciliation history</h2></div>
+        <div className="border-b p-5"><h2 className="font-semibold">Reconciliation history</h2></div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[700px] text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Reference</th><th className="px-4 py-3">Date</th><th className="px-4 py-3">Reason</th><th className="px-4 py-3 text-right">Reels</th><th className="px-4 py-3 text-right">Net variance</th><th className="px-4 py-3">By</th></tr></thead>

@@ -1,22 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { wasteService } from '../../services/wasteService';
+import DateRangeFilter from '../../components/DateRangeFilter';
 import { Trash2, IndianRupee, Loader2 } from 'lucide-react';
 
 export default function WasteRegisterPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState('inventory'); // 'inventory' or 'sales'
+  const [activeTab, setActiveTab] = useState('inventory');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [buyerFilter, setBuyerFilter] = useState('');
 
   // Sale form state
   const [buyerName, setBuyerName] = useState('');
   const [weightSoldKg, setWeightSoldKg] = useState('');
   const [ratePerKg, setRatePerKg] = useState('');
+  const [saleDate, setSaleDate] = useState(() => { const date = new Date(); return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10); });
 
-  const fetchData = async () => {
+  const fetchData = async (dateParams = {}) => {
     try {
       setLoading(true);
-      const res = await wasteService.getWasteData();
+      const res = await wasteService.getWasteData(dateParams);
       setData(res);
     } catch (error) {
       console.error('Error fetching waste data', error);
@@ -39,11 +44,11 @@ export default function WasteRegisterPage() {
         return;
       }
 
-      await wasteService.recordSale({ buyerName, weightSoldKg, ratePerKg });
+      await wasteService.recordSale({ buyerName, weightSoldKg, ratePerKg, saleDate });
       setBuyerName('');
       setWeightSoldKg('');
       setRatePerKg('');
-      fetchData();
+      fetchData({ from, to, buyerName: buyerFilter });
     } catch (error) {
       alert(error.response?.data?.message || 'Error recording sale');
     } finally {
@@ -59,6 +64,8 @@ export default function WasteRegisterPage() {
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">Waste Register</h1>
         <p className="mt-1 text-sm text-slate-500">Track corrugation machine waste and log scrap sales.</p>
       </div>
+
+      <div className="flex flex-wrap items-end gap-3"><div className="min-w-56"><label className="mb-1 block text-xs font-medium text-slate-600">Scrap buyer</label><input value={buyerFilter} onChange={e => setBuyerFilter(e.target.value)} placeholder="All buyers" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" /></div><div className="flex-1"><DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => fetchData({ from, to, buyerName: buyerFilter })} onReset={() => { setFrom(''); setTo(''); setBuyerFilter(''); fetchData({}); }} loading={loading} label="Waste / scrap date range" /></div></div>
 
       {/* Top Metrics */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -96,7 +103,10 @@ export default function WasteRegisterPage() {
         <h2 className="mb-4 text-sm font-semibold text-slate-900 flex items-center gap-2">
           <IndianRupee size={18} className="text-emerald-600" /> Record Scrap Sale
         </h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-5">
+          <div>
+            <input type="date" required aria-label="Scrap sale date" value={saleDate} onChange={e => setSaleDate(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400" />
+          </div>
           <div>
             <input type="text" required placeholder="Buyer / Vendor Name" value={buyerName} onChange={e => setBuyerName(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400" />
           </div>
@@ -135,7 +145,7 @@ export default function WasteRegisterPage() {
             <tbody className="divide-y divide-slate-100">
               {data.productionWaste.map((run) => (
                 <tr key={run._id} className="hover:bg-slate-50">
-                  <td className="px-5 py-4 text-slate-600">{new Date(run.createdAt).toLocaleString('en-IN')}</td>
+                  <td className="px-5 py-4 text-slate-600">{new Date(run.runDate || run.createdAt).toLocaleString('en-IN')}</td>
                   <td className="px-5 py-4 font-medium text-slate-900">Run {run.runNumber}</td>
                   <td className="px-5 py-4 text-right font-medium text-amber-600">+{Number(run.recoverableWasteKg || 0).toFixed(2)}</td>
                   <td className="px-5 py-4 text-slate-700">{run.operatorName}</td>
@@ -158,7 +168,7 @@ export default function WasteRegisterPage() {
             <tbody className="divide-y divide-slate-100">
               {data.scrapSales.map((sale) => (
                 <tr key={sale._id} className="hover:bg-slate-50">
-                  <td className="px-5 py-4 text-slate-600">{new Date(sale.createdAt).toLocaleDateString('en-IN')}</td>
+                  <td className="px-5 py-4 text-slate-600">{new Date(sale.saleDate || sale.createdAt).toLocaleDateString('en-IN')}</td>
                   <td className="px-5 py-4 font-medium text-slate-900">{sale.buyerName}</td>
                   <td className="px-5 py-4 text-right text-slate-700">{sale.weightSoldKg.toFixed(1)} kg</td>
                   <td className="px-5 py-4 text-right text-slate-700">₹{sale.ratePerKg.toFixed(2)}</td>

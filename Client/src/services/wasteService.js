@@ -1,8 +1,8 @@
 import axiosClient from '../api/axiosClient';
 
 export const wasteService = {
-  async getWasteData() {
-    const { data } = await axiosClient.get('/waste');
+  async getWasteData(params = {}) {
+    const { data } = await axiosClient.get('/waste', { params });
     return data;
   },
   async recordSale(saleData) {

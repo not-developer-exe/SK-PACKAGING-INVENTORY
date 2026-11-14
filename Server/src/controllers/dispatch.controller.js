@@ -5,6 +5,7 @@ const StockMovement = require('../models/StockMovement.model');
 const Party = require('../models/Party.model');
 const Sequence = require('../models/Sequence.model');
 const writeAuditLog = require('../utils/writeAuditLog');
+const { buildDateRangeFilter } = require('../utils/dateFilters');
 
 exports.recordDispatch = async (req, res) => {
   const { customerId, vehicleNumber, driverName, boxes, dispatchDate } = req.body || {};
@@ -67,6 +68,7 @@ exports.recordDispatch = async (req, res) => {
         await box.save({ session });
 
         await StockMovement.create([{
+          movementDate: parsedDispatchDate,
           movementType: 'dispatch',
           referenceId: box._id,
           referenceModel: 'FinishedBox',
@@ -120,15 +122,20 @@ exports.getAvailableBoxes = async (req, res) => {
 
 exports.getDispatches = async (req, res) => {
   try {
-    const dispatches = await Dispatch.find()
+    const filter = buildDateRangeFilter(req.query.from, req.query.to, 'dispatchDate');
+    if (req.query.customerId) {
+      if (!mongoose.isValidObjectId(req.query.customerId)) return res.status(400).json({ message: 'Invalid customer ID.' });
+      filter.customerId = req.query.customerId;
+    }
+    const dispatches = await Dispatch.find(filter)
       .populate('customerId', 'name')
       .populate('boxes.boxId', 'batchNumber itemName dimensions')
       .sort({ dispatchDate: -1, createdAt: -1 })
-      .sort({ createdAt: -1 })
-      .lean();
+      .lean()
+      .limit(1000);
     return res.json({ dispatches });
   } catch (error) {
     console.error('[DISPATCH] Dispatch history query failed:', error.message);
-    return res.status(500).json({ message: 'Unable to fetch dispatch history' });
+    return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Unable to fetch dispatch history' });
   }
 };

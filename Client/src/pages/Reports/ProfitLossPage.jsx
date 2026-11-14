@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { RefreshCw, TrendingUp, Receipt, Package, Wallet, Landmark } from 'lucide-react';
 import axiosClient from '../../api/axiosClient';
+import { toLocalDateInput, localMonthStartInput } from '../../lib/date';
 
 const money = (value) => '₹' + Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
 const today = new Date();
-const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
-const todayValue = today.toISOString().slice(0, 10);
+const monthStart = localMonthStartInput(today);
+const todayValue = toLocalDateInput(today);
 
 export default function ProfitLossPage() {
   const [from, setFrom] = useState(monthStart);

@@ -4,6 +4,7 @@ const ScrapSale = require('../models/ScrapSale.model');
 const WasteInventory = require('../models/WasteInventory.model');
 const { calculateScrapAvailability } = require('../utils/productionAccounting');
 const writeAuditLog = require('../utils/writeAuditLog');
+const { buildDateRangeFilter, isValidDateOnly } = require('../utils/dateFilters');
 
 const asNumber = (value) => {
   if (value === null || value === undefined) return 0;
@@ -12,23 +13,37 @@ const asNumber = (value) => {
 
 exports.getWasteStats = async (req, res) => {
   try {
-    const [productionWaste, scrapSales, legacyRows] = await Promise.all([
-      ProductionRun.find({ recoverableWasteKg: { $gt: 0 } })
-        .sort({ createdAt: -1 })
-        .select('runNumber createdAt recoverableWasteKg processLossKg operatorName')
+    const productionFilter = {
+      recoverableWasteKg: { $gt: 0 },
+      ...buildDateRangeFilter(req.query.from, req.query.to, 'runDate')
+    };
+    const salesFilter = buildDateRangeFilter(req.query.from, req.query.to, 'saleDate');
+    if (req.query.buyerName) salesFilter.buyerName = String(req.query.buyerName).trim();
+    const [productionWaste, scrapSales, legacyRows, allTimeGeneratedRows, allTimeSoldRows] = await Promise.all([
+      ProductionRun.find(productionFilter)
+        .sort({ runDate: -1, createdAt: -1 })
+        .limit(1000)
+        .select('runNumber runDate createdAt recoverableWasteKg processLossKg operatorName')
         .lean(),
-      ScrapSale.find().sort({ createdAt: -1 }).lean(),
+      ScrapSale.find(salesFilter).sort({ saleDate: -1, createdAt: -1 }).limit(1000).lean(),
       ProductionRun.aggregate([
         { $match: { recoverableWasteKg: { $exists: false }, wasteGeneratedKg: { $gt: 0 } } },
         { $group: { _id: null, total: { $sum: '$wasteGeneratedKg' } } }
+      ]),
+      ProductionRun.aggregate([
+        { $group: { _id: null, total: { $sum: { $ifNull: ['$recoverableWasteKg', 0] } } } }
+      ]),
+      ScrapSale.aggregate([
+        { $group: { _id: null, total: { $sum: '$weightSoldKg' } } }
       ])
     ]);
 
     const totalWasteGenerated = productionWaste.reduce((sum, run) => sum + asNumber(run.recoverableWasteKg), 0);
     const totalWasteSold = scrapSales.reduce((sum, sale) => sum + asNumber(sale.weightSoldKg), 0);
+    const allTimeGenerated = asNumber(allTimeGeneratedRows[0] && allTimeGeneratedRows[0].total);
+    const allTimeSold = asNumber(allTimeSoldRows[0] && allTimeSoldRows[0].total);
     const legacyUnverifiedWasteKg = asNumber(legacyRows[0] && legacyRows[0].total);
-    // Keep negative balances visible: historical sales may exceed newly verified scrap.
-    const currentWasteInventory = calculateScrapAvailability(totalWasteGenerated, totalWasteSold);
+    const currentWasteInventory = calculateScrapAvailability(allTimeGenerated, allTimeSold);
 
     const verifiedRuns = productionWaste.map((run) => ({
       ...run,
@@ -40,18 +55,26 @@ exports.getWasteStats = async (req, res) => {
       currentWasteInventory,
       totalWasteGenerated,
       totalWasteSold,
+      allTimeWasteGenerated: allTimeGenerated,
+      allTimeWasteSold: allTimeSold,
       legacyUnverifiedWasteKg,
       productionWaste: verifiedRuns,
-      scrapSales
+      scrapSales,
+      period: { from: req.query.from || null, to: req.query.to || null }
     });
   } catch (error) {
     console.error('[WASTE] Stats query failed:', error.message);
-    return res.status(500).json({ message: 'Error fetching waste statistics' });
+    return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Error fetching waste statistics' });
   }
 };
 
 exports.recordScrapSale = async (req, res) => {
   const buyerName = typeof req.body?.buyerName === 'string' ? req.body.buyerName.trim() : '';
+  const rawSaleDate = req.body?.saleDate;
+  if (rawSaleDate !== undefined && !isValidDateOnly(rawSaleDate)) {
+    return res.status(400).json({ message: 'Scrap sale date must be a real calendar date in YYYY-MM-DD format.' });
+  }
+  const saleDate = rawSaleDate ? new Date(rawSaleDate + 'T00:00:00+05:30') : new Date();
   const weightSoldKg = Number(req.body?.weightSoldKg);
   const ratePerKg = Number(req.body?.ratePerKg);
 
@@ -90,6 +113,7 @@ exports.recordScrapSale = async (req, res) => {
 
       const totalAmount = Math.round(weightSoldKg * ratePerKg * 100) / 100;
       const [sale] = await ScrapSale.create([{
+        saleDate,
         buyerName,
         weightSoldKg,
         ratePerKg,

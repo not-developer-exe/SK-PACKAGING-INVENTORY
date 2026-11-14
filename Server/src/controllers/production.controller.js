@@ -8,12 +8,14 @@ const { calculateProductionBalance } = require('../utils/productionAccounting');
 const writeAuditLog = require('../utils/writeAuditLog');
 const { calculateWidthSubstitution } = require('../utils/widthSubstitution');
 const { resolveLandedRatePerKg, calculateMaterialCost, calculateUnitMaterialCost } = require('../utils/materialCosting');
+const { buildDateRangeFilter, isValidDateOnly } = require('../utils/dateFilters');
 
 exports.getProductionRuns = async (req, res) => {
   try {
-    const runs = await ProductionRun.find()
+    const filter = buildDateRangeFilter(req.query.from, req.query.to, 'runDate');
+    const runs = await ProductionRun.find(filter)
       .sort({ runDate: -1, createdAt: -1 })
-      .limit(100)
+      .limit(1000)
       .populate('recordedBy', 'name')
       .lean();
     const runIds = runs.map((run) => run._id);
@@ -35,7 +37,7 @@ exports.getProductionRuns = async (req, res) => {
     });
   } catch (error) {
     console.error('[PRODUCTION] History query failed:', error.message);
-    return res.status(500).json({ message: 'Unable to fetch production history.' });
+    return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Unable to fetch production history.' });
   }
 };
 
@@ -43,10 +45,16 @@ exports.recordProduction = async (req, res) => {
   const {
     shift,
     operatorName,
+    runDate: rawRunDate,
     inputReels,
     outputSheets,
     recoverableWasteKg: rawRecoverableWasteKg
   } = req.body || {};
+
+  if (rawRunDate !== undefined && !isValidDateOnly(rawRunDate)) {
+    return res.status(400).json({ message: 'Production date must be a real calendar date in YYYY-MM-DD format.' });
+  }
+  const runDate = rawRunDate ? new Date(rawRunDate + 'T00:00:00+05:30') : new Date();
 
   if (!Array.isArray(inputReels) || inputReels.length === 0 ||
       !Array.isArray(outputSheets) || outputSheets.length === 0) {
@@ -169,6 +177,7 @@ exports.recordProduction = async (req, res) => {
       });
 
       await StockMovement.create([{
+        movementDate: runDate,
         movementType: 'production_issue',
         referenceId: reel._id,
         referenceModel: 'ReelUnit',
@@ -187,6 +196,7 @@ exports.recordProduction = async (req, res) => {
 
     const [run] = await ProductionRun.create([{
       runNumber,
+      runDate,
       shift,
       operatorName,
       inputReels: tracedInputs,
@@ -215,6 +225,7 @@ exports.recordProduction = async (req, res) => {
       }], { session, ordered: true });
 
       await StockMovement.create([{
+        movementDate: runDate,
         movementType: 'sheet_cutting',
         referenceId: sheet._id,
         referenceModel: 'CorrugatedSheet',

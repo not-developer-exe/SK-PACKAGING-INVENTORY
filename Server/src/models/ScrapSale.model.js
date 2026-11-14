@@ -10,4 +10,6 @@ const scrapSaleSchema = new mongoose.Schema({
   recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
 
+scrapSaleSchema.index({ saleDate: -1, buyerName: 1 });
+
 module.exports = mongoose.model('ScrapSale', scrapSaleSchema);
