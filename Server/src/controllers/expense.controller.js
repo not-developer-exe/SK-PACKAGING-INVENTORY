@@ -44,7 +44,7 @@ exports.createExpense = async (req, res) => {
     let created;
     await session.withTransaction(async () => {
       [created] = await Expense.create([{
-        expenseDate: req.body.expenseDate,
+        expenseDate: new Date(req.body.expenseDate + 'T00:00:00+05:30'),
         category: req.body.category,
         amount: Number(Number(req.body.amount).toFixed(2)),
         vendor: req.body.vendor || '',
@@ -77,7 +77,11 @@ exports.updateExpense = async (req, res) => {
       if (!expense) throw Object.assign(new Error('Expense not found.'), { statusCode: 404 });
       const before = expense.toObject();
       for (const key of ['expenseDate', 'category', 'amount', 'vendor', 'paymentMode', 'reference', 'description', 'costTreatment']) {
-        if (req.body[key] !== undefined) expense[key] = key === 'amount' ? Number(Number(req.body[key]).toFixed(2)) : req.body[key];
+        if (req.body[key] !== undefined) {
+          if (key === 'amount') expense[key] = Number(Number(req.body[key]).toFixed(2));
+          else if (key === 'expenseDate') expense[key] = new Date(req.body[key] + 'T00:00:00+05:30');
+          else expense[key] = req.body[key];
+        }
       }
       await expense.save({ session });
       await writeAuditLog(req, {
