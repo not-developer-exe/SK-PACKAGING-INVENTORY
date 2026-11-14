@@ -86,6 +86,8 @@ exports.getActivityReport = async (req, res) => {
     const expenseFilter = buildDateRangeFilter(req.query.from, req.query.to, 'expenseDate');
     const scrapFilter = buildDateRangeFilter(req.query.from, req.query.to, 'saleDate');
     const movementFilter = buildDateRangeFilter(req.query.from, req.query.to, 'createdAt');
+    receiptFilter.status = 'posted';
+    invoiceFilter.status = { $ne: 'Cancelled' };
 
     const [receipts, runs, finishedGoods, dispatches, invoices, expenses, scrapSales, movements] = await Promise.all([
       InwardReceipt.find(receiptFilter).populate('supplierId', 'name').lean(),
