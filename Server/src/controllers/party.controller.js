@@ -1,28 +1,20 @@
 const mongoose = require('mongoose');
 const Party = require('../models/Party.model');
 const writeAuditLog = require('../utils/writeAuditLog');
-const AuditLog = require('../models/AuditLog.model');
 const Invoice = require('../models/Invoice.model');
 const { allocateInvoicePayment } = require('../utils/invoicePaymentAllocation');
 const { recalculatePartyLedger } = require('../utils/partyLedger');
 const { isValidDateOnly } = require('../utils/dateFilters');
 
 async function auditPartyChange(req, action, party, summary, metadata = {}) {
-  try {
-    await AuditLog.create({
-      action,
-      entityType: 'Party',
-      entityId: party._id,
-      entityLabel: party.name,
-      actorId: req.user._id,
-      actorName: req.user.name,
-      actorRole: req.user.role,
-      summary,
-      metadata
-    });
-  } catch (error) {
-    console.error('[AUDIT] Party event could not be recorded:', error.message);
-  }
+  await writeAuditLog(req, {
+    action,
+    entityType: 'Party',
+    entityId: party._id,
+    entityLabel: party.name,
+    summary,
+    metadata
+  });
 }
 
 exports.getParties = async (req, res) => {
