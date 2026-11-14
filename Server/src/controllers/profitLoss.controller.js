@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const Invoice = require('../models/Invoice.model');
 const ScrapSale = require('../models/ScrapSale.model');
+const ProductionRun = require('../models/ProductionRun.model');
 
 const { buildProfitLossGroups, isValidDateOnly } = require('../utils/profitLossAggregation');
 
@@ -29,13 +30,20 @@ exports.getProfitLoss = async (req, res) => {
     };
     if (req.query.partyId) invoiceFilter.customerId = req.query.partyId;
 
-    const [invoices, scrapSales] = await Promise.all([
+    const [invoices, scrapSales, productionRuns, allTimeWasteTotals] = await Promise.all([
       Invoice.find(invoiceFilter)
         .populate('customerId', 'name')
         .select('invoiceNumber invoiceDate customerId subTotal costOfGoods grossProfit costingStatus balanceDue status')
         .sort({ invoiceDate: 1 })
         .lean(),
-      ScrapSale.find({ saleDate: { $gte: fromDate, $lt: toDate } }).sort({ saleDate: 1 }).lean()
+      ScrapSale.find({ saleDate: { $gte: fromDate, $lt: toDate } }).sort({ saleDate: 1 }).lean(),
+      ProductionRun.find({ runDate: { $gte: fromDate, $lt: toDate } })
+        .select('runDate totalInputWeightKg totalMaterialCost processLossKg recoverableWasteKg')
+        .lean(),
+      Promise.all([
+        ProductionRun.aggregate([{ $group: { _id: null, generated: { $sum: { $ifNull: ['$recoverableWasteKg', 0] } } } }]),
+        ScrapSale.aggregate([{ $group: { _id: null, sold: { $sum: '$weightSoldKg' } } }])
+      ])
     ]);
 
     const costedInvoices = invoices.filter((invoice) =>
@@ -48,8 +56,17 @@ exports.getProfitLoss = async (req, res) => {
     const balanceDue = Number(invoices.reduce((sum, invoice) => sum + Number(invoice.balanceDue || 0), 0).toFixed(2));
     const scrapRevenue = Number(scrapSales.reduce((sum, sale) => sum + Number(sale.totalAmount || 0), 0).toFixed(2));
     const scrapWeightKg = Number(scrapSales.reduce((sum, sale) => sum + Number(sale.weightSoldKg || 0), 0).toFixed(3));
+    const processLossKg = Number(productionRuns.reduce((sum, run) => sum + Number(run.processLossKg || 0), 0).toFixed(3));
+    const processLossCostEstimate = Number(productionRuns.reduce((sum, run) => {
+      const inputWeight = Number(run.totalInputWeightKg || 0);
+      return sum + (inputWeight > 0 ? Number(run.processLossKg || 0) * Number(run.totalMaterialCost || 0) / inputWeight : 0);
+    }, 0).toFixed(2));
+    const recoverableScrapGeneratedKg = Number(productionRuns.reduce((sum, run) => sum + Number(run.recoverableWasteKg || 0), 0).toFixed(3));
+    const allTimeGenerated = Number(allTimeWasteTotals[0][0]?.generated || 0);
+    const allTimeSold = Number(allTimeWasteTotals[1][0]?.sold || 0);
+    const currentVerifiedScrapInventoryKg = Number((allTimeGenerated - allTimeSold).toFixed(3));
 
-    const { daily, monthly, partyWise } = buildProfitLossGroups(invoices);
+    const { daily, monthly, partyWise } = buildProfitLossGroups(invoices, productionRuns, scrapSales);
 
     return res.json({
       period: { from, to },
@@ -61,6 +78,10 @@ exports.getProfitLoss = async (req, res) => {
         balanceDue,
         scrapRevenue,
         scrapWeightKg,
+        processLossKg,
+        processLossCostEstimate,
+        recoverableScrapGeneratedKg,
+        currentVerifiedScrapInventoryKg,
         costedInvoiceCount: costedInvoices.length,
         uncostedInvoiceCount: uncostedInvoices,
         grossProfitCoveragePercent: invoices.length ? Number((costedInvoices.length / invoices.length * 100).toFixed(1)) : 100
@@ -73,6 +94,7 @@ exports.getProfitLoss = async (req, res) => {
         'Cost of goods sold uses reel landed cost allocated to produced sheets by output weight, then to finished boxes by consumed sheet weight.',
         'Invoices without a recorded manufacturing cost are excluded from gross-profit totals and counted as uncosted.',
         'Scrap sale proceeds are shown separately and are not included in gross profit.',
+        'Process-loss cost is an estimate using average raw material cost per input kilogram; it is not a separately posted accounting expense.',
         'Labour, electricity, rent, finance charges and other operating expenses are not yet included; this is not net profit.'
       ]
     });
