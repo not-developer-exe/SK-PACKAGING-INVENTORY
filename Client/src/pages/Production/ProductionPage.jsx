@@ -307,7 +307,7 @@ export default function ProductionPage() {
               <details key={run._id} className="rounded-xl border border-slate-200 p-4">
                 <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-3 text-sm">
                   <span className="font-semibold text-slate-900">{run.runNumber} · {new Date(run.runDate).toLocaleDateString()}</span>
-                  <span className="text-slate-600">{Number(run.totalInputWeightKg?.$numberDecimal || run.totalInputWeightKg || 0).toFixed(2)} kg input → {Number(run.totalOutputWeightKg?.$numberDecimal || run.totalOutputWeightKg || 0).toFixed(2)} kg sheets</span>
+                  <span className="text-slate-600">{Number(run.totalInputWeightKg?.$numberDecimal || run.totalInputWeightKg || 0).toFixed(2)} kg input → {Number(run.totalOutputWeightKg?.$numberDecimal || run.totalOutputWeightKg || 0).toFixed(2)} kg sheets · ₹{Number(run.totalMaterialCost?.$numberDecimal || run.totalMaterialCost || 0).toFixed(2)} material cost</span>
                   <span className={run.widthSubstitutions?.length ? "rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800" : "rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800"}>{run.widthSubstitutions?.length || 0} width substitutions</span>
                 </summary>
                 <div className="mt-4 grid gap-4 lg:grid-cols-2">
@@ -318,6 +318,7 @@ export default function ProductionPage() {
                         <div key={input._id || input.reelId || index} className="rounded-lg bg-slate-50 p-3 text-sm">
                           <div className="font-medium text-slate-800">{input.reelCode || 'Reel'} · {Number(input.weightConsumedKg?.$numberDecimal || input.weightConsumedKg || 0).toFixed(2)} kg</div>
                           <div className="text-xs text-slate-500">Required {input.requestedWidthInches || '—'}" · Actual {input.actualWidthInches || '—'}" · Difference {Number(input.widthVarianceInches || 0) > 0 ? '+' : ''}{Number(input.widthVarianceInches || 0).toFixed(2)}"</div>
+                          <div className="text-xs text-slate-500">Landed rate ₹{Number(input.landedRatePerKg?.$numberDecimal || input.landedRatePerKg || 0).toFixed(2)}/kg · Material ₹{Number(input.materialCost?.$numberDecimal || input.materialCost || 0).toFixed(2)}</div>
                         </div>
                       ))}
                     </div>
@@ -327,7 +328,7 @@ export default function ProductionPage() {
                     <div className="space-y-2">
                       {(run.outputSheets || []).map((sheet, index) => (
                         <div key={sheet._id || index} className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
-                          {sheet.ply} Ply · {sheet.lengthInches}" × {sheet.widthInches}" · {sheet.sheetCount} sheets · {Number(sheet.totalWeightKg?.$numberDecimal || sheet.totalWeightKg || 0).toFixed(2)} kg
+                          {sheet.ply} Ply · {sheet.lengthInches}" × {sheet.widthInches}" · {sheet.sheetCount} sheets · {Number(sheet.totalWeightKg?.$numberDecimal || sheet.totalWeightKg || 0).toFixed(2)} kg · ₹{Number(sheet.unitCostPerKg?.$numberDecimal || sheet.unitCostPerKg || 0).toFixed(2)}/kg
                         </div>
                       ))}
                     </div>
