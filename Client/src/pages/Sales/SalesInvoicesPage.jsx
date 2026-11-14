@@ -41,6 +41,8 @@ export default function SalesInvoicesPage() {
   const totalSales = activeInvoices.reduce((sum, invoice) => sum + Number(invoice.grandTotal || 0), 0);
   const totalBalance = activeInvoices.reduce((sum, invoice) => sum + Number(invoice.balanceDue || 0), 0);
   const totalReceived = totalSales - totalBalance;
+  const costedInvoices = activeInvoices.filter((invoice) => invoice.costingStatus === 'available');
+  const totalGrossProfit = costedInvoices.reduce((sum, invoice) => sum + Number(invoice.grossProfit || 0), 0);
 
   const statusStyle = {
     Paid: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -68,6 +70,7 @@ export default function SalesInvoicesPage() {
         <div className="rounded-2xl border border-slate-200 bg-white p-5"><p className="text-sm text-slate-500">Total Sales Amount</p><p className="mt-2 text-2xl font-bold text-slate-900">{money(totalSales)}</p></div>
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-5"><p className="text-sm text-emerald-700">Payment Received / Adjusted</p><p className="mt-2 text-2xl font-bold text-emerald-900">{money(totalReceived)}</p></div>
         <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-5"><p className="text-sm text-amber-700">Balance Due</p><p className="mt-2 text-2xl font-bold text-amber-900">{money(totalBalance)}</p></div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5"><p className="text-sm text-slate-500">Gross Profit (costed invoices)</p><p className="mt-2 text-2xl font-bold text-slate-900">{money(totalGrossProfit)}</p><p className="mt-1 text-xs text-slate-500">{costedInvoices.length} of {activeInvoices.length} invoices have cost data</p></div>
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
@@ -78,7 +81,7 @@ export default function SalesInvoicesPage() {
         {loading ? <p className="p-10 text-center text-sm text-slate-500">Loading invoices...</p> : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-left text-sm">
-              <thead className="border-b bg-white text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-4">Date</th><th className="px-5 py-4">Invoice No.</th><th className="px-5 py-4">Customer</th><th className="px-5 py-4">Challan</th><th className="px-5 py-4 text-right">Invoice Total</th><th className="px-5 py-4 text-right">Balance Due</th><th className="px-5 py-4 text-center">Status</th></tr></thead>
+              <thead className="border-b bg-white text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-4">Date</th><th className="px-5 py-4">Invoice No.</th><th className="px-5 py-4">Customer</th><th className="px-5 py-4">Challan</th><th className="px-5 py-4 text-right">Invoice Total</th><th className="px-5 py-4 text-right">Balance Due</th><th className="px-5 py-4 text-right">Gross Profit</th><th className="px-5 py-4 text-center">Status</th></tr></thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredInvoices.map((invoice) => <tr key={invoice._id} className="hover:bg-slate-50">
                   <td className="px-5 py-4 text-slate-600">{new Date(invoice.invoiceDate).toLocaleDateString('en-IN')}</td>
@@ -87,9 +90,10 @@ export default function SalesInvoicesPage() {
                   <td className="px-5 py-4 text-slate-600">{invoice.dispatchId?.challanNumber || '—'}</td>
                   <td className="px-5 py-4 text-right font-medium">{money(invoice.grandTotal)}</td>
                   <td className="px-5 py-4 text-right font-semibold text-amber-700">{money(invoice.balanceDue)}</td>
+                  <td className="px-5 py-4 text-right font-semibold">{invoice.costingStatus === 'available' ? money(invoice.grossProfit) : 'Cost pending'}</td>
                   <td className="px-5 py-4 text-center"><span className={'inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ' + (statusStyle[invoice.status] || statusStyle.Pending)}>{invoice.status}</span></td>
                 </tr>)}
-                {!filteredInvoices.length && <tr><td colSpan="7" className="p-10 text-center text-slate-500">No invoices found for this filter.</td></tr>}
+                {!filteredInvoices.length && <tr><td colSpan="8" className="p-10 text-center text-slate-500">No invoices found for this filter.</td></tr>}
               </tbody>
             </table>
           </div>
