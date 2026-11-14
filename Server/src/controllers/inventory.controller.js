@@ -45,6 +45,8 @@ exports.getLiveReelStock = async (req, res) => {
               { $toString: "$_id.bf" },
               "bf-",
               { $toString: "$_id.gsm" },
+              "-",
+              "$_id.quality",
             ],
           },
           width: "$_id.width",
