@@ -1,8 +1,8 @@
 import axiosClient from '../api/axiosClient';
 
 export const inwardService = {
-  async getReceipts() {
-    const { data } = await axiosClient.get('/inward');
+  async getReceipts(params = {}) {
+    const { data } = await axiosClient.get('/inward', { params });
     return data.receipts;
   },
 
