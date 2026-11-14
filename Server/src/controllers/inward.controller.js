@@ -198,6 +198,7 @@ exports.postReceipt = async (req, res) => {
         }
 
         await StockMovement.create([{
+          movementDate: receipt.receiptDate,
           movementType: 'inward_receipt',
           referenceId: receipt._id,
           referenceModel: 'InwardReceipt',
