@@ -28,4 +28,6 @@ const stockMovementSchema = new mongoose.Schema({
   performedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
 
+stockMovementSchema.index({ movementDate: -1, createdAt: -1 });
+
 module.exports = mongoose.model('StockMovement', stockMovementSchema);
