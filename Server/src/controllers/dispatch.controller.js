@@ -5,12 +5,14 @@ const StockMovement = require('../models/StockMovement.model');
 const Party = require('../models/Party.model');
 const Sequence = require('../models/Sequence.model');
 const writeAuditLog = require('../utils/writeAuditLog');
-const { buildDateRangeFilter } = require('../utils/dateFilters');
+const { buildDateRangeFilter, isValidDateOnly } = require('../utils/dateFilters');
 
 exports.recordDispatch = async (req, res) => {
   const { customerId, vehicleNumber, driverName, boxes, dispatchDate } = req.body || {};
-  const parsedDispatchDate = dispatchDate ? new Date(dispatchDate) : new Date();
-  if (Number.isNaN(parsedDispatchDate.getTime())) return res.status(400).json({ message: 'Dispatch date is invalid.' });
+  if (dispatchDate !== undefined && !isValidDateOnly(dispatchDate)) {
+    return res.status(400).json({ message: 'Dispatch date must be a real calendar date in YYYY-MM-DD format.' });
+  }
+  const parsedDispatchDate = dispatchDate ? new Date(dispatchDate + 'T00:00:00+05:30') : new Date();
   if (!mongoose.isValidObjectId(customerId) || !Array.isArray(boxes) || boxes.length === 0) {
     return res.status(400).json({ message: 'A valid customer and at least one box batch are required' });
   }
