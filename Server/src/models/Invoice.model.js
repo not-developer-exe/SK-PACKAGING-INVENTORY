@@ -18,7 +18,11 @@ const invoiceSchema = new mongoose.Schema({
     boxId: { type: mongoose.Schema.Types.ObjectId, ref: 'FinishedBox' },
     quantity: { type: Number, required: true },
     rate: { type: Number, required: true },
-    taxableAmount: { type: Number, required: true }
+    taxableAmount: { type: Number, required: true },
+    costPerBox: { type: Number, default: null },
+    costOfGoods: { type: Number, default: null },
+    grossProfit: { type: Number, default: null },
+    costingStatus: { type: String, enum: ['available', 'unavailable'], default: 'unavailable' }
   }],
 
   subTotal: { type: Number, required: true },
@@ -27,6 +31,9 @@ const invoiceSchema = new mongoose.Schema({
   sgstAmount: { type: Number, required: true },
   grandTotal: { type: Number, required: true },
   balanceDue: { type: Number, required: true },
+  costOfGoods: { type: Number, default: null },
+  grossProfit: { type: Number, default: null },
+  costingStatus: { type: String, enum: ['available', 'unavailable'], default: 'unavailable' },
   payments: { type: [invoicePaymentSchema], default: [] },
   
   status: { type: String, enum: ['Paid', 'Pending', 'Overdue', 'Cancelled'], default: 'Pending' }
