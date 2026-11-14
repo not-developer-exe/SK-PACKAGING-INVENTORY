@@ -13,11 +13,12 @@ const asNumber = (value) => {
 
 exports.getWasteStats = async (req, res) => {
   try {
-    const productionFilter = { recoverableWasteKg: { $gt: 0 }, ...buildDateRangeFilter(req.query.from, req.query.to, 'runDate') };
+    const productionFilter = {
+      recoverableWasteKg: { $gt: 0 },
+      ...buildDateRangeFilter(req.query.from, req.query.to, 'runDate')
+    };
     const salesFilter = buildDateRangeFilter(req.query.from, req.query.to, 'saleDate');
-    if (req.query.buyer) salesFilter.buyerName = { $regex: req.query.buyer.trim().replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\    const [productionWaste, scrapSales, legacyRows] = await Promise.all([
-      ProductionRun.find({ recoverableWasteKg: { $gt: 0 } })'), $options: 'i' };
-    const [productionWaste, scrapSales, legacyRows] = await Promise.all([
+    const [productionWaste, scrapSales, legacyRows, allTimeGeneratedRows, allTimeSoldRows] = await Promise.all([
       ProductionRun.find(productionFilter)
         .sort({ runDate: -1, createdAt: -1 })
         .limit(1000)
@@ -27,14 +28,21 @@ exports.getWasteStats = async (req, res) => {
       ProductionRun.aggregate([
         { $match: { recoverableWasteKg: { $exists: false }, wasteGeneratedKg: { $gt: 0 } } },
         { $group: { _id: null, total: { $sum: '$wasteGeneratedKg' } } }
+      ]),
+      ProductionRun.aggregate([
+        { $group: { _id: null, total: { $sum: { $ifNull: ['$recoverableWasteKg', 0] } } } }
+      ]),
+      ScrapSale.aggregate([
+        { $group: { _id: null, total: { $sum: '$weightSoldKg' } } }
       ])
     ]);
 
     const totalWasteGenerated = productionWaste.reduce((sum, run) => sum + asNumber(run.recoverableWasteKg), 0);
     const totalWasteSold = scrapSales.reduce((sum, sale) => sum + asNumber(sale.weightSoldKg), 0);
+    const allTimeGenerated = asNumber(allTimeGeneratedRows[0] && allTimeGeneratedRows[0].total);
+    const allTimeSold = asNumber(allTimeSoldRows[0] && allTimeSoldRows[0].total);
     const legacyUnverifiedWasteKg = asNumber(legacyRows[0] && legacyRows[0].total);
-    // Keep negative balances visible: historical sales may exceed newly verified scrap.
-    const currentWasteInventory = calculateScrapAvailability(totalWasteGenerated, totalWasteSold);
+    const currentWasteInventory = calculateScrapAvailability(allTimeGenerated, allTimeSold);
 
     const verifiedRuns = productionWaste.map((run) => ({
       ...run,
@@ -46,13 +54,16 @@ exports.getWasteStats = async (req, res) => {
       currentWasteInventory,
       totalWasteGenerated,
       totalWasteSold,
+      allTimeWasteGenerated: allTimeGenerated,
+      allTimeWasteSold: allTimeSold,
       legacyUnverifiedWasteKg,
       productionWaste: verifiedRuns,
-      scrapSales
+      scrapSales,
+      period: { from: req.query.from || null, to: req.query.to || null }
     });
   } catch (error) {
     console.error('[WASTE] Stats query failed:', error.message);
-    return res.status(500).json({ message: 'Error fetching waste statistics' });
+    return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Error fetching waste statistics' });
   }
 };
 
