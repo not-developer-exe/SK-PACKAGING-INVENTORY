@@ -7,7 +7,7 @@ const treatments = ['operating_expense', 'finance_cost', 'stock_landed_cost'];
 const modes = ['cash', 'upi', 'bank_transfer', 'cheque', 'card', 'other'];
 
 function validDateOnly(value) {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  if (typeof value !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return false;
   const [year, month, day] = value.split('-').map(Number);
   const date = new Date(Date.UTC(year, month - 1, day));
   return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
@@ -55,58 +55,83 @@ exports.listExpenses = async (req, res) => {
 };
 
 exports.createExpense = async (req, res) => {
-  const error = validateExpense(req.body);
-  if (error) return res.status(400).json({ message: error });
+  const validationError = validateExpense(req.body);
+  if (validationError) return res.status(400).json({ message: validationError });
+  const session = await mongoose.startSession();
   try {
-    const expense = await Expense.create({
-      expenseDate: req.body.expenseDate,
-      category: req.body.category,
-      amount: Number(Number(req.body.amount).toFixed(2)),
-      vendor: req.body.vendor || '',
-      paymentMode: req.body.paymentMode,
-      reference: req.body.reference || '',
-      description: req.body.description || '',
-      costTreatment: req.body.costTreatment || 'operating_expense',
-      recordedBy: req.user._id
+    let created;
+    await session.withTransaction(async () => {
+      [created] = await Expense.create([{
+        expenseDate: req.body.expenseDate,
+        category: req.body.category,
+        amount: Number(Number(req.body.amount).toFixed(2)),
+        vendor: req.body.vendor || '',
+        paymentMode: req.body.paymentMode,
+        reference: req.body.reference || '',
+        description: req.body.description || '',
+        costTreatment: req.body.costTreatment || 'operating_expense',
+        recordedBy: req.user._id
+      }], { session });
+      await writeAuditLog(req, { action: 'expense.created', entityType: 'Expense', entityId: created._id, entityLabel: created.category, summary: 'Expense recorded: ₹' + created.amount, metadata: { amount: created.amount, category: created.category, costTreatment: created.costTreatment } }, session);
     });
-    await writeAuditLog(req, { action: 'expense.created', entityType: 'Expense', entityId: expense._id, entityLabel: expense.category, summary: 'Expense recorded: ₹' + expense.amount, metadata: { amount: expense.amount, category: expense.category, costTreatment: expense.costTreatment } });
-    return res.status(201).json({ expense });
+    return res.status(201).json({ expense: created });
   } catch (error) {
     console.error('[EXPENSES] Create failed:', error.message);
     return res.status(400).json({ message: 'Unable to record expense.' });
+  } finally {
+    await session.endSession();
   }
 };
 
 exports.updateExpense = async (req, res) => {
-  const error = validateExpense(req.body, true);
-  if (error) return res.status(400).json({ message: error });
+  const validationError = validateExpense(req.body, true);
+  if (validationError) return res.status(400).json({ message: validationError });
   if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid expense ID.' });
+  const session = await mongoose.startSession();
   try {
-    const expense = await Expense.findById(req.params.id);
-    if (!expense) return res.status(404).json({ message: 'Expense not found.' });
-    const before = expense.toObject();
-    for (const key of ['expenseDate', 'category', 'amount', 'vendor', 'paymentMode', 'reference', 'description', 'costTreatment']) {
-      if (req.body[key] !== undefined) expense[key] = key === 'amount' ? Number(Number(req.body[key]).toFixed(2)) : req.body[key];
-    }
-    await expense.save();
-    await writeAuditLog(req, { action: 'expense.updated', entityType: 'Expense', entityId: expense._id, entityLabel: expense.category, summary: 'Expense updated: ' + expense._id, metadata: { before: { expenseDate: before.expenseDate, category: before.category, amount: before.amount, vendor: before.vendor, paymentMode: before.paymentMode, costTreatment: before.costTreatment }, after: { expenseDate: expense.expenseDate, category: expense.category, amount: expense.amount, vendor: expense.vendor, paymentMode: expense.paymentMode, costTreatment: expense.costTreatment } } });
-    return res.json({ expense });
+    let updated;
+    await session.withTransaction(async () => {
+      const expense = await Expense.findById(req.params.id).session(session);
+      if (!expense) throw Object.assign(new Error('Expense not found.'), { statusCode: 404 });
+      const before = expense.toObject();
+      for (const key of ['expenseDate', 'category', 'amount', 'vendor', 'paymentMode', 'reference', 'description', 'costTreatment']) {
+        if (req.body[key] !== undefined) expense[key] = key === 'amount' ? Number(Number(req.body[key]).toFixed(2)) : req.body[key];
+      }
+      await expense.save({ session });
+      await writeAuditLog(req, {
+        action: 'expense.updated', entityType: 'Expense', entityId: expense._id,
+        entityLabel: expense.category, summary: 'Expense updated: ' + expense._id,
+        metadata: {
+          before: { expenseDate: before.expenseDate, category: before.category, amount: before.amount, vendor: before.vendor, paymentMode: before.paymentMode, costTreatment: before.costTreatment },
+          after: { expenseDate: expense.expenseDate, category: expense.category, amount: expense.amount, vendor: expense.vendor, paymentMode: expense.paymentMode, costTreatment: expense.costTreatment }
+        }
+      }, session);
+      updated = expense;
+    });
+    return res.json({ expense: updated });
   } catch (error) {
     console.error('[EXPENSES] Update failed:', error.message);
-    return res.status(400).json({ message: 'Unable to update expense.' });
+    return res.status(error.statusCode || 400).json({ message: error.message || 'Unable to update expense.' });
+  } finally {
+    await session.endSession();
   }
 };
 
 exports.deleteExpense = async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid expense ID.' });
+  const session = await mongoose.startSession();
   try {
-    const expense = await Expense.findById(req.params.id);
-    if (!expense) return res.status(404).json({ message: 'Expense not found.' });
-    await writeAuditLog(req, { action: 'expense.deleted', entityType: 'Expense', entityId: expense._id, entityLabel: expense.category, summary: 'Expense deleted: ₹' + expense.amount, metadata: { expense: expense.toObject() } });
-    await expense.deleteOne();
+    await session.withTransaction(async () => {
+      const expense = await Expense.findById(req.params.id).session(session);
+      if (!expense) throw Object.assign(new Error('Expense not found.'), { statusCode: 404 });
+      await writeAuditLog(req, { action: 'expense.deleted', entityType: 'Expense', entityId: expense._id, entityLabel: expense.category, summary: 'Expense deleted: ₹' + expense.amount, metadata: { expense: expense.toObject() } }, session);
+      await expense.deleteOne({ session });
+    });
     return res.json({ message: 'Expense deleted.' });
   } catch (error) {
     console.error('[EXPENSES] Delete failed:', error.message);
-    return res.status(500).json({ message: 'Unable to delete expense.' });
+    return res.status(error.statusCode || 500).json({ message: error.message || 'Unable to delete expense.' });
+  } finally {
+    await session.endSession();
   }
 };
