@@ -16,7 +16,7 @@ export default function ProductionPage() {
   const [recoverableWasteKg, setRecoverableWasteKg] = useState('');
   
   const [inputReels, setInputReels] = useState([
-    { reelId: '', weightConsumedKg: '' }
+    { reelId: '', requestedWidthInches: '', weightConsumedKg: '' }
   ]);
   
   const [outputSheets, setOutputSheets] = useState([
@@ -70,7 +70,7 @@ export default function ProductionPage() {
         shift,
         operatorName,
         recoverableWasteKg: measuredScrap,
-        inputReels: inputReels.map(r => ({ ...r, weightConsumedKg: Number(r.weightConsumedKg) })),
+        inputReels: inputReels.map(r => ({ ...r, requestedWidthInches: r.requestedWidthInches === '' ? undefined : Number(r.requestedWidthInches), weightConsumedKg: Number(r.weightConsumedKg) })),
         outputSheets: outputSheets.map(s => ({
           ...s,
           ply: Number(s.ply),
@@ -86,7 +86,7 @@ export default function ProductionPage() {
       // Reset form
       setOperatorName('');
       setRecoverableWasteKg('');
-      setInputReels([{ reelId: '', weightConsumedKg: '' }]);
+      setInputReels([{ reelId: '', requestedWidthInches: '', weightConsumedKg: '' }]);
       setOutputSheets([{ ply: 3, lengthInches: '', widthInches: '', sheetCount: '', totalWeightKg: '' }]);
       fetchReels(); // Refresh physical reels drop-down
 
@@ -127,7 +127,7 @@ export default function ProductionPage() {
           <div className="rounded-2xl border border-amber-200 bg-amber-50/30 p-5">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-amber-900">Input Materials</h2>
-              <button type="button" onClick={() => setInputReels([...inputReels, { reelId: '', weightConsumedKg: '' }])} className="flex items-center gap-1 text-sm font-medium text-amber-700 hover:text-amber-900">
+              <button type="button" onClick={() => setInputReels([...inputReels, { reelId: '', requestedWidthInches: '', weightConsumedKg: '' }])} className="flex items-center gap-1 text-sm font-medium text-amber-700 hover:text-amber-900">
                 <Plus size={16} /> Add Reel
               </button>
             </div>
@@ -139,6 +139,8 @@ export default function ProductionPage() {
                     <select required value={input.reelId} onChange={e => {
                         const newReels = [...inputReels];
                         newReels[idx].reelId = e.target.value;
+                        const selectedReel = availableReels.find(reel => reel._id === e.target.value);
+                        if (selectedReel && !newReels[idx].requestedWidthInches) newReels[idx].requestedWidthInches = String(selectedReel.reelWidthInches);
                         setInputReels(newReels);
                       }}
                       className="w-full rounded-lg border border-amber-200 px-3 py-2 text-sm outline-none focus:border-amber-400 bg-white"
@@ -151,8 +153,17 @@ export default function ProductionPage() {
                       ))}
                     </select>
                   </div>
-                  <div className="w-32">
-                    <input type="number" step="any" required placeholder="Kg Used" value={input.weightConsumedKg} onChange={e => {
+                  <div className="w-24">
+                    <label className="mb-1 block text-xs text-amber-800">Required width</label>
+                    <input type="number" min="0.1" step="0.1" required placeholder="Inches" value={input.requestedWidthInches} onChange={e => {
+                        const newReels = [...inputReels];
+                        newReels[idx].requestedWidthInches = e.target.value;
+                        setInputReels(newReels);
+                      }} className="w-full rounded-lg border border-amber-200 px-2 py-2 text-sm outline-none focus:border-amber-400 bg-white" />
+                  </div>
+                  <div className="w-28">
+                    <label className="mb-1 block text-xs text-amber-800">Consumed kg</label>
+                    <input type="number" min="0.001" step="any" required placeholder="Kg Used" value={input.weightConsumedKg} onChange={e => {
                         const newReels = [...inputReels];
                         newReels[idx].weightConsumedKg = e.target.value;
                         setInputReels(newReels);
@@ -167,6 +178,9 @@ export default function ProductionPage() {
                   )}
                 </div>
               ))}
+              <div className="rounded-lg bg-amber-100/70 p-3 text-xs text-amber-900">
+                Enter the width you intended to use. The selected reel's actual width is captured separately; any difference is recorded as a width substitution.
+              </div>
               <div className="pt-2 text-right text-sm font-semibold text-amber-800">
                 Total Input: {totalInputWeight.toFixed(2)} kg
               </div>
