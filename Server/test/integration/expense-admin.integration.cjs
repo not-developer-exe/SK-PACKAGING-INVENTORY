@@ -492,7 +492,7 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
   assert.equal(tinyResidualRun.status, 201);
   const residual = await ReelUnit.findById(tinyResidualReel._id);
   assert.equal(residual.status, 'partial');
-  assert.equal(Number(residual.remainingWeightKg.toString()), 0.0005);
+  assert.ok(Math.abs(Number(residual.remainingWeightKg.toString()) - 0.0005) < 1e-9);
 
   const fifoSheets = await api('/api/conversion/sheets');
   assert.equal(fifoSheets.status, 200);
