@@ -39,6 +39,24 @@ exports.recordConversion = async (req, res) => {
     return res.status(400).json({ message: 'Enter an item name and positive box length, width and height.' });
   }
 
+  // Reject obviously impossible requests before opening a transaction. The same checks
+  // are repeated inside the transaction to protect against concurrent stock changes.
+  const preflightSheet = await CorrugatedSheet.findById(sheetId)
+    .select('status sheetCount totalWeightKg')
+    .lean();
+  if (!preflightSheet || preflightSheet.status !== 'available') {
+    return res.status(409).json({ message: 'Source sheet batch is unavailable or has already been consumed.' });
+  }
+  try {
+    calculateSheetConsumption({
+      availableSheets: preflightSheet.sheetCount,
+      availableWeightKg: Number(preflightSheet.totalWeightKg?.toString?.() ?? preflightSheet.totalWeightKg),
+      sheetsConsumed
+    });
+  } catch (error) {
+    return res.status(409).json({ message: error.message });
+  }
+
   const session = await mongoose.startSession();
   let response;
   try {
