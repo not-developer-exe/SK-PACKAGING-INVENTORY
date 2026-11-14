@@ -40,5 +40,6 @@ const invoiceSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 invoiceSchema.index({ invoiceDate: -1, customerId: 1 });
+invoiceSchema.index({ dispatchId: 1 }, { unique: true });
 
 module.exports = mongoose.model('Invoice', invoiceSchema);
