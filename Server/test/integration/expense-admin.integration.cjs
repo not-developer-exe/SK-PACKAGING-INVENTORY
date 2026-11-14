@@ -77,6 +77,8 @@ test('admin console and expense register enforce roles and keep an audit trail',
   const records = await api('/api/admin-records/parties');
   assert.equal(records.status, 200);
   assert.equal(records.data.records.length, 1);
+  assert.deepEqual(records.data.editableFields, ['name', 'type', 'phone', 'city']);
+  assert.equal(records.data.readOnly, false);
   const document = records.data.records[0];
   document.name = 'Corrected Party Name';
   document.city = 'Indore';
@@ -89,6 +91,23 @@ test('admin console and expense register enforce roles and keep an audit trail',
   assert.ok(changed.data.changedFields.includes('city'));
   assert.ok(changed.data.changedFields.includes('name'));
   assert.equal((await Party.findById(party._id)).name, 'Corrected Party Name');
+
+  const unsafePartyEdit = await api('/api/admin-records/parties/' + party._id, {
+    method: 'PATCH',
+    body: {
+      document: { ...changed.data.record, balance: 9999, ledger: [{ type: 'Payment Received', debit: 0, credit: 9999, balance: -9999 }] },
+      reason: 'Attempting to alter protected party accounting fields.'
+    }
+  });
+  assert.equal(unsafePartyEdit.status, 403);
+  const unchangedParty = await Party.findById(party._id);
+  assert.equal(unchangedParty.balance, 0);
+  assert.equal(unchangedParty.ledger.length, 0);
+
+  const protectedInvoiceList = await api('/api/admin-records/invoices');
+  assert.equal(protectedInvoiceList.status, 200);
+  assert.equal(protectedInvoiceList.data.readOnly, true);
+  assert.deepEqual(protectedInvoiceList.data.editableFields, []);
 
   const protectedInvoice = await Invoice.create({
     invoiceNumber: 'INV-ADMIN-PROTECTED',
