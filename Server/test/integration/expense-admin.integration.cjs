@@ -12,6 +12,7 @@ const Party = require('../../src/models/Party.model');
 const Expense = require('../../src/models/Expense.model');
 const AuditLog = require('../../src/models/AuditLog.model');
 const Invoice = require('../../src/models/Invoice.model');
+const Dispatch = require('../../src/models/Dispatch.model');
 const ReelUnit = require('../../src/models/ReelUnit.model');
 const ProductionRun = require('../../src/models/ProductionRun.model');
 const CorrugatedSheet = require('../../src/models/CorrugatedSheet.model');
@@ -469,6 +470,58 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
   const remainingSheet = await CorrugatedSheet.findById(outputSheets[0]._id);
   assert.equal(remainingSheet.sheetCount, 50);
   assert.equal(Number(remainingSheet.totalWeightKg.toString()), 30);
+  const wrongCustomer = await Party.create({ name: 'Dispatch Wrong Customer', type: 'Customer' });
+  const wrongDispatch = await api('/api/dispatch', {
+    method: 'POST',
+    body: {
+      customerId: String(wrongCustomer._id),
+      dispatchDate: '2026-10-17',
+      boxes: [{ boxId: String(finishedBox._id), dispatchQuantity: 1 }]
+    }
+  });
+  assert.equal(wrongDispatch.status, 400);
+  assert.equal((await FinishedBox.findById(finishedBox._id)).quantityAvailable, 1000);
+
+  const overshipped = await api('/api/dispatch', {
+    method: 'POST',
+    body: {
+      customerId: String(party._id),
+      dispatchDate: '2026-10-17',
+      boxes: [{ boxId: String(finishedBox._id), dispatchQuantity: 1001 }]
+    }
+  });
+  assert.equal(overshipped.status, 409);
+  assert.equal((await FinishedBox.findById(finishedBox._id)).quantityAvailable, 1000);
+
+  const dispatchResponse = await api('/api/dispatch', {
+    method: 'POST',
+    body: {
+      customerId: String(party._id),
+      dispatchDate: '2026-10-17',
+      vehicleNumber: 'MP07AB1234',
+      driverName: 'Integration Driver',
+      boxes: [
+        { boxId: String(finishedBox._id), dispatchQuantity: 250 },
+        { boxId: String(finishedBox._id), dispatchQuantity: 350 }
+      ]
+    }
+  });
+  assert.equal(dispatchResponse.status, 201);
+  const dispatch = await Dispatch.findOne({ challanNumber: dispatchResponse.data.challanNumber });
+  assert.equal(dispatch.boxes.length, 1);
+  assert.equal(dispatch.boxes[0].dispatchQuantity, 600);
+  const partiallyDispatchedBox = await FinishedBox.findById(finishedBox._id);
+  assert.equal(partiallyDispatchedBox.quantityAvailable, 400);
+  assert.equal(partiallyDispatchedBox.status, 'available');
+  const dispatchMovement = await StockMovement.findOne({
+    referenceId: finishedBox._id,
+    movementType: 'dispatch'
+  });
+  assert.equal(dispatchMovement.quantityChange, -600);
+  const dispatchHistory = await api('/api/dispatch?from=2026-10-17&to=2026-10-17');
+  assert.equal(dispatchHistory.status, 200);
+  assert.ok(dispatchHistory.data.dispatches.some(item => item.challanNumber === dispatch.challanNumber));
+
   const sheetIssue = await StockMovement.findOne({
     referenceId: outputSheets[0]._id,
     movementType: 'production_issue'
