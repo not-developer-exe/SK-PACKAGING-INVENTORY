@@ -25,7 +25,7 @@ exports.getInvoices = async (req, res) => {
     return res.json({ invoices });
   } catch (error) {
     console.error('[INVOICE] List failed:', error.message);
-    return res.status(500).json({ message: 'Unable to fetch invoices.' });
+    return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Unable to fetch invoices.' });
   }
 };
 
