@@ -188,8 +188,16 @@ exports.recordConversion = async (req, res) => {
 exports.getAvailableSheets = async (req, res) => {
   try {
     const sheets = await CorrugatedSheet.find({ status: 'available', sheetCount: { $gt: 0 } })
+      .populate('productionRunId', 'runDate runNumber')
       .sort({ createdAt: 1 })
       .lean();
+
+    // FIFO is based on the production date so backdated runs do not jump to the end of the queue.
+    sheets.sort((a, b) =>
+      new Date(a.productionRunId?.runDate || a.createdAt).getTime() -
+      new Date(b.productionRunId?.runDate || b.createdAt).getTime() ||
+      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
     return res.json({ sheets });
   } catch (error) {
     console.error('[CONVERSION] Sheet query failed:', error.message);
