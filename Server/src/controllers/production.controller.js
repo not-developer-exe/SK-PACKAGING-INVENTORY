@@ -110,7 +110,7 @@ exports.recordProduction = async (req, res) => {
     const sequence = await Sequence.findOneAndUpdate(
       { _id: 'production-run' },
       [{ $set: { value: { $add: [{ $max: [{ $ifNull: ['$value', existingCount] }, existingCount] }, 1] } } }],
-      { new: true, upsert: true, session }
+      { new: true, upsert: true, session, updatePipeline: true }
     );
     const runNumber = 'PR-' + String(sequence.value).padStart(5, '0');
 
