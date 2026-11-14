@@ -158,15 +158,26 @@ exports.updateAdminRecord = async (req, res) => {
 
       if (req.params.entity === 'parties') {
         if (editable.name !== undefined) {
+          editable.name = String(editable.name).trim();
           const duplicate = await Model.findOne({
             _id: { $ne: record._id },
             isActive: { $ne: false },
-            name: new RegExp('^' + String(editable.name).trim().replace(/[.*+?^$()|[\\]\\\\]/g, '\\\\      const before = serialize(record);
-      const editable = { ...document };
-      for (const field of immutableFields) delete editable[field];
-      delete editable.recordedBy;
-      delete editable.createdBy;
-      delete editable.updatedBy;
+            name: editable.name
+          }).collation({ locale: 'en', strength: 2 }).session(session);
+          if (duplicate) throw Object.assign(new Error('Another active party already uses this name.'), { statusCode: 409 });
+        }
+        if (editable.type !== undefined && editable.type !== record.type &&
+            (record.ledger || []).some((entry) => entry.type !== 'Opening Balance')) {
+          throw Object.assign(new Error('Party type cannot be changed after financial transactions have been recorded.'), { statusCode: 409 });
+        }
+        if (editable.phone !== undefined) editable.phone = String(editable.phone).trim();
+        if (editable.city !== undefined) editable.city = String(editable.city).trim();
+      }
+
+      if (req.params.entity === 'expenses' && editable.expenseDate !== undefined &&
+          typeof editable.expenseDate === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(editable.expenseDate)) {
+        editable.expenseDate = new Date(editable.expenseDate + 'T00:00:00+05:30');
+      }
 
       record.set(editable);
       await record.validate();') + '
