@@ -139,8 +139,10 @@ exports.recordProduction = async (req, res) => {
         throw error;
       }
 
-      const newWeight = Math.max(0, currentWeight - consumedWeight);
-      const newStatus = newWeight <= 0.001 ? 'consumed' : 'partial';
+      const remainingAfterIssue = Math.max(0, currentWeight - consumedWeight);
+      // Keep measurable residual stock visible; only treat floating-point dust as fully consumed.
+      const newWeight = remainingAfterIssue <= 1e-9 ? 0 : remainingAfterIssue;
+      const newStatus = newWeight === 0 ? 'consumed' : 'partial';
       const updatedReel = await ReelUnit.findOneAndUpdate(
         { _id: reel._id, remainingWeightKg: reel.remainingWeightKg, status: reel.status },
         {
