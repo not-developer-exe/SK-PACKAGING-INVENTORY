@@ -5,7 +5,7 @@ const Dispatch = require('../models/Dispatch.model');
 const Party = require('../models/Party.model');
 const FinishedBox = require('../models/FinishedBox.model');
 const writeAuditLog = require('../utils/writeAuditLog');
-const { buildDateRangeFilter } = require('../utils/dateFilters');
+const { buildDateRangeFilter, isValidDateOnly } = require('../utils/dateFilters');
 
 exports.getInvoices = async (req, res) => {
   try {
@@ -68,9 +68,12 @@ exports.createInvoice = async (req, res) => {
       return res.status(400).json({ message: 'At least one invoice line is required' });
     }
 
-    const date = new Date(invoiceDate);
+    if (!isValidDateOnly(invoiceDate)) {
+      return res.status(400).json({ message: 'Invoice date must be a real calendar date in YYYY-MM-DD format.' });
+    }
+    const date = new Date(invoiceDate + 'T00:00:00+05:30');
     const gst = Number(gstPercent);
-    if (Number.isNaN(date.getTime()) || !Number.isFinite(gst) || gst < 0 || gst > 40) {
+    if (!Number.isFinite(gst) || gst < 0 || gst > 40) {
       return res.status(400).json({ message: 'Invoice date or GST rate is invalid' });
     }
 
@@ -159,7 +162,7 @@ exports.createInvoice = async (req, res) => {
       const cgstAmount = Number((subTotal * gst / 200).toFixed(2));
       const sgstAmount = Number((subTotal * gst / 200).toFixed(2));
       const grandTotal = Number((subTotal + cgstAmount + sgstAmount).toFixed(2));
-      const dateKey = date.toISOString().slice(2, 10).replace(/-/g, '');
+      const dateKey = invoiceDate.slice(2).replace(/-/g, '');
       const invoiceNumber = `INV-${dateKey}-${Date.now()}-${crypto.randomInt(1000, 10000)}`;
 
       const [created] = await Invoice.create([{
