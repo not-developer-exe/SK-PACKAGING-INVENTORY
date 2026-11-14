@@ -20,8 +20,21 @@ const models = {
 
 const immutableFields = new Set(['_id', '__v', 'createdAt', 'updatedAt', 'password']);
 
+function normalize(value) {
+  if (value === null || value === undefined) return value;
+  if (value instanceof Date) return value.toISOString();
+  if (Array.isArray(value)) return value.map(normalize);
+  if (value && typeof value === 'object') {
+    if (value._bsontype === 'ObjectId') return String(value);
+    if (value._bsontype === 'Decimal128') return value.toString();
+    if (typeof value.toHexString === 'function') return value.toHexString();
+    return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, normalize(child)]));
+  }
+  return value;
+}
+
 function serialize(doc) {
-  const value = doc.toObject ? doc.toObject({ depopulate: true }) : doc;
+  const value = normalize(doc.toObject ? doc.toObject({ depopulate: true }) : doc);
   delete value.password;
   return value;
 }
@@ -62,10 +75,10 @@ exports.updateAdminRecord = async (req, res) => {
 
     record.set(editable);
     await record.validate();
+    const changedFields = record.modifiedPaths().filter((path) => !immutableFields.has(path.split('.')[0]));
     await record.save();
 
     const after = serialize(record);
-    const changedFields = record.modifiedPaths().filter((path) => !immutableFields.has(path.split('.')[0]));
     await writeAuditLog(req, {
       action: 'admin.record_overridden',
       entityType: Model.modelName,
