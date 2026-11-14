@@ -111,6 +111,7 @@ exports.createOpeningStockAdjustment = async (req, res) => {
         const createdReels = await ReelUnit.create(reelDocs, { session, ordered: true });
         adjustment.lines[index].reelIds = createdReels.map(reel => reel._id);
         await StockMovement.create([{
+          movementDate: parsedDate,
           movementType: 'adjustment',
           referenceId: adjustment._id,
           referenceModel: 'OpeningStockAdjustment',
