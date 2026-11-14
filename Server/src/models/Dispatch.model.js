@@ -17,4 +17,6 @@ const dispatchSchema = new mongoose.Schema({
   recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
 
+dispatchSchema.index({ dispatchDate: -1, customerId: 1 });
+
 module.exports = mongoose.model('Dispatch', dispatchSchema);
