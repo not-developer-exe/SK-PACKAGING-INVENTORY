@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowDownRight, ArrowUpRight, MapPin, Phone, Receipt, Search
 import { useAuth } from '../../context/AuthContext';
 import axiosClient from '../../api/axiosClient';
 import DateRangeFilter from '../../components/DateRangeFilter';
+import { toLocalDateInput } from '../../lib/date';
 
 const emptyForm = { name: '', type: 'Customer', phone: '', city: '', openingBalance: '0' };
 const money = (value) => '₹' + Math.abs(Number(value || 0)).toLocaleString('en-IN', { maximumFractionDigits: 2 });
@@ -25,7 +26,7 @@ export default function PartyMasterPage() {
   const [partyForm, setPartyForm] = useState(emptyForm);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentDirection, setPaymentDirection] = useState('in');
-  const [payment, setPayment] = useState({ amount: '', mode: 'NEFT', ref: '' });
+  const [payment, setPayment] = useState({ amount: '', mode: 'NEFT', ref: '', date: toLocalDateInput() });
 
   const loadParties = async () => {
     setLoading(true);
@@ -113,11 +114,11 @@ export default function PartyMasterPage() {
     setError('');
     try {
       const { data } = await axiosClient.post('/parties/' + selectedParty._id + '/transaction', {
-        amount: Number(payment.amount), mode: payment.mode, ref: payment.ref, direction: paymentDirection
+        amount: Number(payment.amount), mode: payment.mode, ref: payment.ref, direction: paymentDirection, date: payment.date
       });
       setParties((current) => current.map((item) => item._id === data._id ? data : item));
       setSelectedParty(data);
-      setPayment({ amount: '', mode: 'NEFT', ref: '' });
+      setPayment({ amount: '', mode: 'NEFT', ref: '', date: toLocalDateInput() });
       setShowPaymentModal(false);
       setSuccess('Payment entry recorded.');
     } catch (err) {
@@ -262,6 +263,7 @@ export default function PartyMasterPage() {
       {showPaymentModal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => setShowPaymentModal(false)}>
         <form onSubmit={recordPayment} onClick={(e) => e.stopPropagation()} className="w-full max-w-md space-y-4 rounded-2xl bg-white p-6 shadow-xl">
           <div className="flex items-center justify-between"><h2 className="text-lg font-bold">{paymentDirection === 'in' ? 'Record payment received' : 'Record payment sent'}</h2><button type="button" onClick={() => setShowPaymentModal(false)}><X size={19} /></button></div>
+          <label className="block text-sm">Payment date<input type="date" required value={payment.date} onChange={(e) => setPayment({ ...payment, date: e.target.value })} className="mt-1 w-full rounded-lg border px-3 py-2" /></label>
           <label className="block text-sm">Amount (₹)<input type="number" min="0.01" step="0.01" required value={payment.amount} onChange={(e) => setPayment({ ...payment, amount: e.target.value })} className="mt-1 w-full rounded-lg border px-3 py-2" /></label>
           <div className="grid grid-cols-2 gap-3"><label className="block text-sm">Mode<select value={payment.mode} onChange={(e) => setPayment({ ...payment, mode: e.target.value })} className="mt-1 w-full rounded-lg border bg-white px-3 py-2"><option>NEFT</option><option>RTGS</option><option>UPI</option><option>Cash</option><option>Cheque</option></select></label><label className="block text-sm">UTR / Reference<input value={payment.ref} onChange={(e) => setPayment({ ...payment, ref: e.target.value })} className="mt-1 w-full rounded-lg border px-3 py-2" /></label></div>
           <div className="flex justify-end gap-2"><button type="button" onClick={() => setShowPaymentModal(false)} className="rounded-lg border px-4 py-2 text-sm">Cancel</button><button disabled={saving} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{saving ? 'Saving...' : 'Post payment'}</button></div>
