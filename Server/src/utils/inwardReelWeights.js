@@ -22,14 +22,14 @@ function normalizeInwardReelWeights({ reelCount, totalWeightKg, reelWeightsKg })
     if (Math.abs(sum - total) > 0.01) {
       throw new TypeError('The sum of individual reel weights must match total inward weight within 0.01 kg.');
     }
-    return { reelWeightsKg: weights, isAggregateWeightOnly: false };
+    return { reelWeightsKg: weights, totalWeightKg: Number(sum.toFixed(6)), isAggregateWeightOnly: false };
   }
 
   const average = total / count;
   const weights = Array.from({ length: count }, (_, index) =>
     index === count - 1 ? total - average * (count - 1) : average
   );
-  return { reelWeightsKg: weights, isAggregateWeightOnly: true };
+  return { reelWeightsKg: weights, totalWeightKg: total, isAggregateWeightOnly: true };
 }
 
 module.exports = { normalizeInwardReelWeights };
