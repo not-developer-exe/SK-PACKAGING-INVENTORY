@@ -118,7 +118,33 @@ exports.restoreParty = async (req, res) => {
       const duplicate = await Party.findOne({
         _id: { $ne: party._id },
         isActive: { $ne: false },
-        name: new RegExp('^' + party.name.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\exports.deleteParty = async (req, res) => {') + '
+        name: party.name
+      }).collation({ locale: 'en', strength: 2 }).session(session);
+      if (duplicate) {
+        throw Object.assign(new Error('Another active party already uses this name. Rename that party before restoring.'), { statusCode: 409 });
+      }
+      party.isActive = true;
+      await party.save({ session });
+      await writeAuditLog(req, {
+        action: 'party.restored',
+        entityType: 'Party',
+        entityId: party._id,
+        entityLabel: party.name,
+        summary: 'Party restored: ' + party.name,
+        metadata: { type: party.type, balance: party.balance, retainedLedgerEntries: party.ledger.length }
+      }, session);
+      restoredParty = party;
+    });
+    return res.json({ message: 'Party restored successfully.', party: restoredParty });
+  } catch (error) {
+    console.error('[PARTIES] Restore failed:', error.message);
+    return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Unable to restore party.' });
+  } finally {
+    await session.endSession();
+  }
+};
+
+exports.deleteParty = async (req, res) => {
   const session = await mongoose.startSession();
   try {
     let archivedParty;
@@ -139,8 +165,6 @@ exports.restoreParty = async (req, res) => {
         throw Object.assign(new Error('Cannot archive this party while invoice ' + unpaidInvoice.invoiceNumber + ' has an outstanding balance.'), { statusCode: 409 });
       }
 
-      // Keep the historical ledger and linked documents intact. Archiving only
-      // removes the party from active operational selectors.
       party.isActive = false;
       await party.save({ session });
       await writeAuditLog(req, {
