@@ -21,6 +21,6 @@ exports.getLedger = async (req, res) => {
     res.json({ movements });
   } catch (error) {
     console.error('[LEDGER ERROR]', error);
-    res.status(500).json({ message: 'Error fetching ledger data', error: error.message });
+    res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Error fetching ledger data', error: error.statusCode ? undefined : error.message });
   }
 };
