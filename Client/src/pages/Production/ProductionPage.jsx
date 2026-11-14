@@ -18,7 +18,9 @@ export default function ProductionPage() {
   const [shift, setShift] = useState('Day');
   const [runDate, setRunDate] = useState(() => { const date = new Date(); return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10); });
   const [operatorName, setOperatorName] = useState('');
+  const [machineName, setMachineName] = useState('');
   const [recoverableWasteKg, setRecoverableWasteKg] = useState('');
+  const [wasteBreakdown, setWasteBreakdown] = useState([{ category: 'edge_trim', weightKg: '', notes: '' }]);
   
   const [inputReels, setInputReels] = useState([
     { reelId: '', requestedWidthInches: '', weightConsumedKg: '' }
@@ -51,6 +53,15 @@ export default function ProductionPage() {
   const massDifference = totalInputWeight - totalOutputWeight;
   const measuredScrap = Number(recoverableWasteKg || 0);
   const calculatedProcessLoss = massDifference - measuredScrap;
+  const classifiedWasteTotal = wasteBreakdown.reduce((sum, row) => sum + Number(row.weightKg || 0), 0);
+  const wasteCategoryLabels = {
+    edge_trim: 'Edge trim',
+    setup_waste: 'Machine setup',
+    quality_rejection: 'Quality rejection',
+    moisture_damage: 'Moisture damage',
+    handling_damage: 'Handling damage',
+    other: 'Other'
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -69,6 +80,10 @@ export default function ProductionPage() {
       setError('Measured recoverable scrap must be non-negative and cannot exceed the input-output weight difference.');
       return;
     }
+    if (Math.abs(Number(classifiedWasteTotal.toFixed(3)) - Number(measuredScrap.toFixed(3))) > 0.005) {
+      setError('Classified waste weights must add up to the measured recoverable scrap total.');
+      return;
+    }
 
     try {
       setSubmitting(true);
@@ -76,7 +91,9 @@ export default function ProductionPage() {
         shift,
         runDate,
         operatorName,
+        machineName,
         recoverableWasteKg: measuredScrap,
+        wasteBreakdown: wasteBreakdown.filter(row => Number(row.weightKg) > 0).map(row => ({ ...row, weightKg: Number(row.weightKg) })),
         inputReels: inputReels.map(r => ({ ...r, requestedWidthInches: r.requestedWidthInches === '' ? undefined : Number(r.requestedWidthInches), weightConsumedKg: Number(r.weightConsumedKg) })),
         outputSheets: outputSheets.map(s => ({
           ...s,
@@ -92,7 +109,9 @@ export default function ProductionPage() {
       
       // Reset form
       setOperatorName('');
+      setMachineName('');
       setRecoverableWasteKg('');
+      setWasteBreakdown([{ category: 'edge_trim', weightKg: '', notes: '' }]);
       setInputReels([{ reelId: '', requestedWidthInches: '', weightConsumedKg: '' }]);
       setOutputSheets([{ ply: 3, lengthInches: '', widthInches: '', sheetCount: '', totalWeightKg: '' }]);
       fetchReels(); // Refresh physical reels drop-down
@@ -115,7 +134,7 @@ export default function ProductionPage() {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Header Info */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 rounded-2xl border border-slate-200 bg-white p-5">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 rounded-2xl border border-slate-200 bg-white p-5">
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Production Date *</label>
             <input type="date" required value={runDate} onChange={e => setRunDate(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400" />
@@ -130,6 +149,10 @@ export default function ProductionPage() {
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Operator Name *</label>
             <input type="text" required value={operatorName} onChange={e => setOperatorName(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400" placeholder="e.g. Ramesh Kumar" />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Machine / Line</label>
+            <input type="text" maxLength="100" value={machineName} onChange={e => setMachineName(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400" placeholder="e.g. Corrugation Line 1" />
           </div>
         </div>
 
@@ -250,25 +273,34 @@ export default function ProductionPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-5">
-          <label className="mb-2 block text-sm font-semibold text-amber-900">Measured Recoverable Scrap (kg)</label>
-          <input
-            type="number"
-            required
-            min="0"
-            max={Math.max(0, massDifference)}
-            step="0.001"
-            value={recoverableWasteKg}
-            onChange={e => setRecoverableWasteKg(e.target.value)}
-            placeholder="Enter only scrap physically weighed and recoverable"
-            className="w-full max-w-sm rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm outline-none focus:border-amber-400"
-          />
-          <p className="mt-2 text-xs text-amber-800">
-            Do not enter the full input-output difference here. Moisture loss, dust, and other unaccounted process loss are tracked separately and are not available for scrap sale.
-          </p>
-          <p className="mt-1 text-sm font-medium text-slate-700">
-            Remaining process loss / variance: {Number.isFinite(calculatedProcessLoss) ? calculatedProcessLoss.toFixed(2) : '—'} kg
-          </p>
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-5 space-y-4">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-amber-900">Measured Recoverable Scrap (kg)</label>
+              <input type="number" required min="0" max={Math.max(0, massDifference)} step="0.001" value={recoverableWasteKg} onChange={e => setRecoverableWasteKg(e.target.value)} placeholder="Only physically weighed scrap" className="w-full rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm outline-none focus:border-amber-400" />
+              <p className="mt-2 text-xs text-amber-800">Moisture loss, dust and unaccounted process variance are not saleable scrap.</p>
+              <p className="mt-1 text-sm font-medium text-slate-700">Remaining process loss / variance: {Number.isFinite(calculatedProcessLoss) ? calculatedProcessLoss.toFixed(2) : '—'} kg</p>
+            </div>
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <label className="text-sm font-semibold text-amber-900">Classify recoverable scrap</label>
+                <button type="button" onClick={() => setWasteBreakdown([...wasteBreakdown, { category: 'other', weightKg: '', notes: '' }])} className="text-xs font-semibold text-amber-800 hover:text-amber-950">+ Add category</button>
+              </div>
+              <div className="space-y-2">
+                {wasteBreakdown.map((row, index) => (
+                  <div key={index} className="grid grid-cols-12 gap-2">
+                    <select value={row.category} onChange={e => { const next = [...wasteBreakdown]; next[index].category = e.target.value; setWasteBreakdown(next); }} className="col-span-5 rounded-lg border border-amber-200 bg-white px-2 py-2 text-xs">
+                      {Object.entries(wasteCategoryLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                    </select>
+                    <input type="number" min="0" step="0.001" placeholder="kg" value={row.weightKg} onChange={e => { const next = [...wasteBreakdown]; next[index].weightKg = e.target.value; setWasteBreakdown(next); }} className="col-span-3 min-w-0 rounded-lg border border-amber-200 bg-white px-2 py-2 text-xs" />
+                    <input type="text" maxLength="250" placeholder="Notes (optional)" value={row.notes} onChange={e => { const next = [...wasteBreakdown]; next[index].notes = e.target.value; setWasteBreakdown(next); }} className="col-span-3 min-w-0 rounded-lg border border-amber-200 bg-white px-2 py-2 text-xs" />
+                    <button type="button" disabled={wasteBreakdown.length === 1} onClick={() => setWasteBreakdown(wasteBreakdown.filter((_, i) => i !== index))} className="col-span-1 text-red-600 disabled:opacity-30"><Trash2 size={15}/></button>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-slate-600">Classified: {classifiedWasteTotal.toFixed(3)} kg / Measured: {measuredScrap.toFixed(3)} kg</p>
+            </div>
+          </div>
         </div>
 
         {/* Footer Summary & Submit */}
@@ -316,10 +348,12 @@ export default function ProductionPage() {
             {productionRuns.map(run => (
               <details key={run._id} className="rounded-xl border border-slate-200 p-4">
                 <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-3 text-sm">
-                  <span className="font-semibold text-slate-900">{run.runNumber} · {new Date(run.runDate).toLocaleDateString()}</span>
+                  <span className="font-semibold text-slate-900">{run.runNumber} · {new Date(run.runDate).toLocaleDateString()} · {run.shift || '—'} Shift</span>
                   <span className="text-slate-600">{Number(run.totalInputWeightKg?.$numberDecimal || run.totalInputWeightKg || 0).toFixed(2)} kg input → {Number(run.totalOutputWeightKg?.$numberDecimal || run.totalOutputWeightKg || 0).toFixed(2)} kg sheets · ₹{Number(run.totalMaterialCost?.$numberDecimal || run.totalMaterialCost || 0).toFixed(2)} material cost</span>
                   <span className={run.widthSubstitutions?.length ? "rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800" : "rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800"}>{run.widthSubstitutions?.length || 0} width substitutions</span>
                 </summary>
+                <div className="mt-2 text-xs text-slate-500">Operator: {run.operatorName || '—'} · Machine: {run.machineName || 'Not recorded'}</div>
+                {(run.wasteBreakdown || []).length > 0 && <div className="mt-3 rounded-lg bg-amber-50 p-3 text-sm"><p className="mb-2 font-semibold text-amber-900">Recoverable waste classification</p>{run.wasteBreakdown.map((waste, index) => <p key={waste._id || index} className="text-xs text-amber-900">{wasteCategoryLabels[waste.category] || waste.category}: {Number(waste.weightKg?.$numberDecimal || waste.weightKg || 0).toFixed(3)} kg {waste.notes ? '· ' + waste.notes : ''}</p>)}</div>}
                 <div className="mt-4 grid gap-4 lg:grid-cols-2">
                   <div>
                     <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Reels consumed</h3>
