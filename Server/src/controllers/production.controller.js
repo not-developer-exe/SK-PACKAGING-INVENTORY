@@ -6,6 +6,37 @@ const StockMovement = require('../models/StockMovement.model');
 const Sequence = require('../models/Sequence.model');
 const { calculateProductionBalance } = require('../utils/productionAccounting');
 const writeAuditLog = require('../utils/writeAuditLog');
+const { calculateWidthSubstitution } = require('../utils/widthSubstitution');
+
+exports.getProductionRuns = async (req, res) => {
+  try {
+    const runs = await ProductionRun.find()
+      .sort({ runDate: -1, createdAt: -1 })
+      .limit(100)
+      .populate('recordedBy', 'name')
+      .lean();
+    const runIds = runs.map((run) => run._id);
+    const sheets = await CorrugatedSheet.find({ productionRunId: { $in: runIds } })
+      .select('productionRunId ply lengthInches widthInches sheetCount totalWeightKg status')
+      .lean();
+    const sheetsByRun = new Map();
+    for (const sheet of sheets) {
+      const key = String(sheet.productionRunId);
+      if (!sheetsByRun.has(key)) sheetsByRun.set(key, []);
+      sheetsByRun.get(key).push(sheet);
+    }
+    return res.json({
+      runs: runs.map((run) => ({
+        ...run,
+        outputSheets: sheetsByRun.get(String(run._id)) || [],
+        widthSubstitutions: (run.inputReels || []).filter((input) => Number(input.widthVarianceInches || 0) !== 0)
+      }))
+    });
+  } catch (error) {
+    console.error('[PRODUCTION] History query failed:', error.message);
+    return res.status(500).json({ message: 'Unable to fetch production history.' });
+  }
+};
 
 exports.recordProduction = async (req, res) => {
   const {
@@ -119,12 +150,13 @@ exports.recordProduction = async (req, res) => {
 
       const actualWidthInches = Number(reel.reelWidthInches);
       const requestedWidthInches = input.requestedWidthInches || actualWidthInches;
+      const widthTrace = calculateWidthSubstitution(requestedWidthInches, actualWidthInches);
       tracedInputs.push({
         reelId: reel._id,
         reelCode: reel.reelCode,
         requestedWidthInches,
         actualWidthInches,
-        widthVarianceInches: actualWidthInches - requestedWidthInches,
+        widthVarianceInches: widthTrace.varianceInches,
         bf: reel.bf,
         gsm: reel.gsm,
         quality: reel.quality,
@@ -140,7 +172,7 @@ exports.recordProduction = async (req, res) => {
         quantityChange: newStatus === 'consumed' ? -1 : 0,
         weightChangeKg: mongoose.Types.Decimal128.fromString(String(-consumedWeight)),
         notes: 'Issued to Production Run ' + runNumber +
-          (actualWidthInches !== requestedWidthInches ? '; width substitution ' + requestedWidthInches + '" required, ' + actualWidthInches + '" used' : ''),
+          (widthTrace.isSubstitution ? '; width substitution ' + requestedWidthInches + '" required, ' + actualWidthInches + '" used (' + widthTrace.substitutionDirection + ')' : ''),
         performedBy: req.user._id
       }], { session, ordered: true });
     }
