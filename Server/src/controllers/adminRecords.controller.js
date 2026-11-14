@@ -21,6 +21,12 @@ const models = {
 };
 
 const immutableFields = new Set(['_id', '__v', 'createdAt', 'updatedAt', 'password']);
+const editableFieldsByEntity = {
+  // Party identity/contact details are safe to correct here. Balances and
+  // ledger entries must only change through payment/invoice workflows.
+  parties: ['name', 'type', 'phone', 'city'],
+  expenses: ['expenseDate', 'category', 'amount', 'vendor', 'paymentMode', 'reference', 'description', 'costTreatment']
+};
 
 // These records are connected to stock balances, financial ledgers, invoices,
 // or audit evidence. Editing them as isolated documents can silently break
@@ -86,6 +92,7 @@ exports.listAdminRecords = async (req, res) => {
       Model.find(filter).sort({ updatedAt: -1, createdAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).lean(),
       Model.countDocuments(filter)
     ]);
+    const editableFields = editableFieldsByEntity[req.params.entity] || [];
     return res.json({
       entity: req.params.entity,
       records: records.map(serialize),
@@ -93,7 +100,8 @@ exports.listAdminRecords = async (req, res) => {
       limit,
       total,
       totalPages: Math.ceil(total / limit),
-      readOnly: req.params.entity === 'auditLogs' || workflowManagedEntities.has(req.params.entity)
+      editableFields,
+      readOnly: req.params.entity === 'auditLogs' || workflowManagedEntities.has(req.params.entity) || editableFields.length === 0
     });
   } catch (error) {
     console.error('[ADMIN RECORDS] List failed:', error.message);
@@ -105,6 +113,8 @@ exports.updateAdminRecord = async (req, res) => {
   const Model = models[req.params.entity];
   if (!Model) return res.status(404).json({ message: 'Unsupported record type.' });
   if (req.params.entity === 'auditLogs') return res.status(403).json({ message: 'Audit history is read-only.' });
+  const allowedFields = editableFieldsByEntity[req.params.entity];
+  if (!allowedFields) return res.status(403).json({ message: 'This record type is read-only in the generic data console. Use its dedicated workflow for corrections.' });
   if (workflowManagedEntities.has(req.params.entity)) {
     return res.status(403).json({
       message: 'This record is connected to inventory or accounting ledgers and is read-only in the generic data console. Use its dedicated module workflow or a controlled reversal/reconciliation.',
@@ -127,11 +137,81 @@ exports.updateAdminRecord = async (req, res) => {
       const record = await Model.findById(req.params.id).session(session);
       if (!record) throw Object.assign(new Error('Record not found.'), { statusCode: 404 });
       const before = serialize(record);
+      const allowed = new Set(allowedFields);
+      const changedProtectedFields = Object.entries(document)
+        .filter(([field, value]) => !allowed.has(field) &&
+          JSON.stringify(value) !== JSON.stringify(before[field]))
+        .map(([field]) => field);
+      if (changedProtectedFields.length) {
+        throw Object.assign(
+          new Error('Protected fields cannot be changed here: ' + changedProtectedFields.join(', ') + '. Use the dedicated inventory or accounting workflow.'),
+          { statusCode: 403 }
+        );
+      }
+
+      const editable = Object.fromEntries(
+        Object.entries(document).filter(([field]) => allowed.has(field))
+      );
+      if (!Object.keys(editable).length) {
+        throw Object.assign(new Error('No supported editable fields were provided.'), { statusCode: 400 });
+      }
+
+      if (req.params.entity === 'parties') {
+        if (editable.name !== undefined) {
+          const duplicate = await Model.findOne({
+            _id: { $ne: record._id },
+            isActive: { $ne: false },
+            name: new RegExp('^' + String(editable.name).trim().replace(/[.*+?^$()|[\\]\\\\]/g, '\\\\      const before = serialize(record);
       const editable = { ...document };
       for (const field of immutableFields) delete editable[field];
       delete editable.recordedBy;
       delete editable.createdBy;
       delete editable.updatedBy;
+
+      record.set(editable);
+      await record.validate();') + '
+      const changedFields = record.modifiedPaths().filter((path) => !immutableFields.has(path.split('.')[0]));
+      await record.save({ session });
+
+      const after = serialize(record);
+      await writeAuditLog(req, {
+        action: 'admin.record_overridden',
+        entityType: Model.modelName,
+        entityId: record._id,
+        entityLabel: String(record._id),
+        summary: 'Administrator edited ' + Model.modelName + ' record: ' + reason.trim(),
+        metadata: { reason: reason.trim(), changedFields, before, after }
+      }, session);
+      result = { record: after, changedFields };
+    });
+    return res.json(result);
+  } catch (error) {
+    console.error('[ADMIN RECORDS] Update failed:', error.message);
+    if (error.name === 'ValidationError' || error.name === 'CastError') {
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(error.statusCode || 500).json({ message: error.message || 'Unable to update this record.' });
+  } finally {
+    await session.endSession();
+  }
+};
+, 'i')
+          }).session(session);
+          if (duplicate) throw Object.assign(new Error('Another active party already uses this name.'), { statusCode: 409 });
+          editable.name = String(editable.name).trim();
+        }
+        if (editable.type !== undefined && editable.type !== record.type &&
+            (record.ledger || []).some((entry) => entry.type !== 'Opening Balance')) {
+          throw Object.assign(new Error('Party type cannot be changed after financial transactions have been recorded.'), { statusCode: 409 });
+        }
+        if (editable.phone !== undefined) editable.phone = String(editable.phone).trim();
+        if (editable.city !== undefined) editable.city = String(editable.city).trim();
+      }
+
+      if (req.params.entity === 'expenses' && editable.expenseDate !== undefined &&
+          typeof editable.expenseDate === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(editable.expenseDate)) {
+        editable.expenseDate = new Date(editable.expenseDate + 'T00:00:00+05:30');
+      }
 
       record.set(editable);
       await record.validate();
