@@ -124,6 +124,7 @@ exports.recordConversion = async (req, res) => {
 
       await StockMovement.create([
         {
+          movementDate: conversionDate,
           movementType: 'production_issue',
           referenceId: sheet._id,
           referenceModel: 'CorrugatedSheet',
@@ -135,6 +136,7 @@ exports.recordConversion = async (req, res) => {
           performedBy: req.user._id
         },
         {
+          movementDate: conversionDate,
           movementType: 'adjustment',
           referenceId: box._id,
           referenceModel: 'FinishedBox',
