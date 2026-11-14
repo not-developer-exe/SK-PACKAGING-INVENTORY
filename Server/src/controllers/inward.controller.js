@@ -6,6 +6,7 @@ const Party = require('../models/Party.model');
 const Sequence = require('../models/Sequence.model');
 const writeAuditLog = require('../utils/writeAuditLog');
 const { calculateLandedRatePerKg } = require('../utils/materialCosting');
+const { normalizeInwardReelWeights } = require('../utils/inwardReelWeights');
 const { buildDateRangeFilter, isValidDateOnly } = require('../utils/dateFilters');
 
 const toFiniteNumber = (value) => {
@@ -61,6 +62,20 @@ exports.createDraftReceipt = async (req, res) => {
       });
     }
 
+    let normalizedLines;
+    try {
+      normalizedLines = lines.map((line) => ({
+        ...line,
+        ...normalizeInwardReelWeights({
+          reelCount: line.reelCount,
+          totalWeightKg: line.totalWeightKg,
+          reelWeightsKg: line.reelWeightsKg
+        })
+      }));
+    } catch (error) {
+      return res.status(400).json({ message: error.message });
+    }
+
     const supplier = await Party.findById(supplierId);
     if (!supplier || !['Supplier', 'Both'].includes(supplier.type)) {
       return res.status(400).json({ message: 'Invalid or non-supplier party selected.' });
@@ -81,11 +96,11 @@ exports.createDraftReceipt = async (req, res) => {
       supplierId,
       invoiceReference: invoiceReference.trim(),
       notes,
-      lines,
+      lines: normalizedLines,
       status: 'draft'
     });
 
-    await writeAuditLog(req, { action: 'inward.draft_created', entityType: 'InwardReceipt', entityId: receipt._id, entityLabel: receipt.receiptNumber, summary: 'Inward receipt draft created: ' + receipt.receiptNumber, metadata: { supplierId: String(supplierId), invoiceReference: invoiceReference.trim(), lineCount: lines.length } });
+    await writeAuditLog(req, { action: 'inward.draft_created', entityType: 'InwardReceipt', entityId: receipt._id, entityLabel: receipt.receiptNumber, summary: 'Inward receipt draft created: ' + receipt.receiptNumber, metadata: { supplierId: String(supplierId), invoiceReference: invoiceReference.trim(), lineCount: normalizedLines.length } });
     return res.status(201).json({ message: 'Inward receipt draft saved successfully', receipt });
   } catch (error) {
     if (error.code === 11000) {
@@ -147,6 +162,17 @@ exports.postReceipt = async (req, res) => {
         const bf = Number(line.bf);
         const gsm = Number(line.gsm);
         const rate = Number(line.ratePerKg.toString());
+        try {
+          normalizeInwardReelWeights({
+            reelCount: qty,
+            totalWeightKg: weightNum,
+            reelWeightsKg: line.reelWeightsKg
+          });
+        } catch (error) {
+          const invalidWeights = new Error(error.message);
+          invalidWeights.statusCode = 400;
+          throw invalidWeights;
+        }
         if (!Number.isInteger(qty) || qty <= 0 ||
             !Number.isFinite(weightNum) || weightNum <= 0 ||
             !Number.isFinite(width) || width <= 0 ||
@@ -171,7 +197,11 @@ exports.postReceipt = async (req, res) => {
       for (const line of receipt.lines) {
         const weightNum = Number(line.totalWeightKg.toString());
         const qty = Number(line.reelCount);
-        const weightPerReel = weightNum / qty;
+        const { reelWeightsKg } = normalizeInwardReelWeights({
+          reelCount: qty,
+          totalWeightKg: weightNum,
+          reelWeightsKg: line.reelWeightsKg
+        });
         const landedRatePerKg = calculateLandedRatePerKg({
           ratePerKg: Number(line.ratePerKg.toString()),
           freightCharges: Number(line.freightCharges?.toString() || 0),
@@ -191,8 +221,8 @@ exports.postReceipt = async (req, res) => {
             supplierId: receipt.supplierId,
             inwardReceiptId: receipt._id,
             batchReference: line.supplierBatchRef || receipt.invoiceReference,
-            originalWeightKg: weightPerReel,
-            remainingWeightKg: weightPerReel,
+            originalWeightKg: reelWeightsKg[i],
+            remainingWeightKg: reelWeightsKg[i],
             ratePerKg: line.ratePerKg,
             landedRatePerKg,
             status: 'available'
