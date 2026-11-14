@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { inwardService } from '../../services/inwardService';
 import { partiesService } from '../../services/partiesService';
+import DateRangeFilter from '../../components/DateRangeFilter';
 import { ArrowDownToLine, Plus, ShieldCheck, CheckCircle2, FileText, Loader2, X } from 'lucide-react';
 
 export default function StockInwardPage() {
@@ -10,6 +11,8 @@ export default function StockInwardPage() {
   const [showModal, setShowModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
 
   // Form state
   const [supplierId, setSupplierId] = useState('');
@@ -22,11 +25,11 @@ export default function StockInwardPage() {
     { reelWidthInches: '', bf: '', gsm: '', quality: 'Natural', reelCount: '', totalWeightKg: '', ratePerKg: '', freightCharges: 0, otherCharges: 0, supplierBatchRef: '' }
   ]);
 
-  const fetchData = async () => {
+  const fetchData = async (dateParams = {}) => {
     try {
       setLoading(true);
       const [recData, supData] = await Promise.all([
-        inwardService.getReceipts(),
+        inwardService.getReceipts(dateParams),
         partiesService.getSuppliers()
       ]);
       setReceipts(recData);
@@ -131,6 +134,8 @@ export default function StockInwardPage() {
           New inward receipt
         </button>
       </div>
+
+      <DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => fetchData({ from, to })} onReset={() => { setFrom(''); setTo(''); fetchData({}); }} loading={loading} label="Inward receipt date range" />
 
       {/* Receipts Table */}
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
