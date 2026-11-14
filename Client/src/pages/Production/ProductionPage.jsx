@@ -16,6 +16,7 @@ export default function ProductionPage() {
 
   // Form State
   const [shift, setShift] = useState('Day');
+  const [runDate, setRunDate] = useState(() => { const date = new Date(); return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10); });
   const [operatorName, setOperatorName] = useState('');
   const [recoverableWasteKg, setRecoverableWasteKg] = useState('');
   
@@ -73,6 +74,7 @@ export default function ProductionPage() {
       setSubmitting(true);
       const res = await productionService.recordRun({
         shift,
+        runDate,
         operatorName,
         recoverableWasteKg: measuredScrap,
         inputReels: inputReels.map(r => ({ ...r, requestedWidthInches: r.requestedWidthInches === '' ? undefined : Number(r.requestedWidthInches), weightConsumedKg: Number(r.weightConsumedKg) })),
@@ -113,7 +115,11 @@ export default function ProductionPage() {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Header Info */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 rounded-2xl border border-slate-200 bg-white p-5">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 rounded-2xl border border-slate-200 bg-white p-5">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Production Date *</label>
+            <input type="date" required value={runDate} onChange={e => setRunDate(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400" />
+          </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Shift</label>
             <select value={shift} onChange={e => setShift(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400">
@@ -299,7 +305,7 @@ export default function ProductionPage() {
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold text-slate-900">Recent Production Runs</h2>
-            <p className="text-sm text-slate-500">Latest 100 runs with reel-to-sheet traceability and width substitutions</p>
+            <p className="text-sm text-slate-500">Date-filtered production runs with reel-to-sheet traceability and width substitutions</p>
           </div>
           <button type="button" onClick={() => fetchReels({ from, to })} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Refresh</button>
         </div>
