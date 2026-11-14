@@ -11,7 +11,7 @@ const connectDB = async () => {
 
   // ADMIN_EMAIL identifies the owner account. Existing accounts are promoted;
   // a new account is created only when ADMIN_PASSWORD is also configured.
-  const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  const email = (process.env.ADMIN_EMAIL || 'official.additya.singh@gmail.com').trim().toLowerCase();
   const password = process.env.ADMIN_PASSWORD;
   if (email) {
     const ownerAccount = await User.findOne({ email });
