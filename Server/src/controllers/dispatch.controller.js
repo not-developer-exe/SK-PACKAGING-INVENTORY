@@ -135,6 +135,6 @@ exports.getDispatches = async (req, res) => {
     return res.json({ dispatches });
   } catch (error) {
     console.error('[DISPATCH] Dispatch history query failed:', error.message);
-    return res.status(500).json({ message: 'Unable to fetch dispatch history' });
+    return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Unable to fetch dispatch history' });
   }
 };
