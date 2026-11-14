@@ -19,7 +19,8 @@ const ensureGroup = (map, key) => {
       key, invoiceCount: 0, revenue: 0, costOfGoods: 0, grossProfit: 0,
       costedInvoiceCount: 0, uncostedInvoiceCount: 0, balanceDue: 0,
       productionRunCount: 0, processLossKg: 0, processLossCostEstimate: 0,
-      recoverableScrapGeneratedKg: 0, scrapRevenue: 0, scrapSoldKg: 0
+      recoverableScrapGeneratedKg: 0, scrapRevenue: 0, scrapSoldKg: 0,
+      operatingExpenses: 0, financeCosts: 0, stockLandedCosts: 0, expenseCount: 0
     });
   }
   return map.get(key);
@@ -60,6 +61,15 @@ const addScrapSaleToGroup = (map, key, sale) => {
   group.scrapSoldKg += Number(sale.weightSoldKg || 0);
 };
 
+const addExpenseToGroup = (map, key, expense) => {
+  const group = ensureGroup(map, key);
+  const amount = Number(expense.amount || 0);
+  group.expenseCount += 1;
+  if (expense.costTreatment === 'finance_cost') group.financeCosts += amount;
+  else if (expense.costTreatment === 'stock_landed_cost') group.stockLandedCosts += amount;
+  else group.operatingExpenses += amount;
+};
+
 const normalize = (group) => ({
   ...group,
   revenue: Number(group.revenue.toFixed(2)),
@@ -70,10 +80,15 @@ const normalize = (group) => ({
   processLossCostEstimate: Number(group.processLossCostEstimate.toFixed(2)),
   recoverableScrapGeneratedKg: Number(group.recoverableScrapGeneratedKg.toFixed(3)),
   scrapRevenue: Number(group.scrapRevenue.toFixed(2)),
-  scrapSoldKg: Number(group.scrapSoldKg.toFixed(3))
+  scrapSoldKg: Number(group.scrapSoldKg.toFixed(3)),
+  operatingExpenses: Number(group.operatingExpenses.toFixed(2)),
+  financeCosts: Number(group.financeCosts.toFixed(2)),
+  stockLandedCosts: Number(group.stockLandedCosts.toFixed(2)),
+  operatingProfit: group.partyName ? null : Number((group.grossProfit + group.scrapRevenue - group.operatingExpenses).toFixed(2)),
+  netProfitBeforeTax: group.partyName ? null : Number((group.grossProfit + group.scrapRevenue - group.operatingExpenses - group.financeCosts).toFixed(2))
 });
 
-function buildProfitLossGroups(invoices, productionRuns = [], scrapSales = []) {
+function buildProfitLossGroups(invoices, productionRuns = [], scrapSales = [], expenses = []) {
   const dailyMap = new Map();
   const monthlyMap = new Map();
   const partyMap = new Map();
@@ -92,6 +107,10 @@ function buildProfitLossGroups(invoices, productionRuns = [], scrapSales = []) {
   for (const sale of scrapSales) {
     addScrapSaleToGroup(dailyMap, dateKey(sale.saleDate, 'daily'), sale);
     addScrapSaleToGroup(monthlyMap, dateKey(sale.saleDate, 'monthly'), sale);
+  }
+  for (const expense of expenses) {
+    addExpenseToGroup(dailyMap, dateKey(expense.expenseDate, 'daily'), expense);
+    addExpenseToGroup(monthlyMap, dateKey(expense.expenseDate, 'monthly'), expense);
   }
   return {
     daily: [...dailyMap.values()].sort((a, b) => a.key.localeCompare(b.key)).map(normalize),
