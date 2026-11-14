@@ -318,6 +318,7 @@ test('payment allocations reverse atomically and production posting rolls back p
       shift: 'Morning',
       operatorName: 'Integration Test',
       recoverableWasteKg: 1,
+      wasteBreakdown: [{ category: 'edge_trim', weightKg: 1 }],
       inputReels: [
         { reelId: String(availableReel._id), requestedWidthInches: 24, weightConsumedKg: 20 },
         { reelId: String(unavailableReel._id), requestedWidthInches: 24, weightConsumedKg: 1 }
@@ -488,13 +489,15 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
     body: {
       shift: 'Day',
       operatorName: 'Phase 2 Integration',
+      machineName: 'Corrugation Line 1',
       runDate: '2026-10-15',
       inputReels: [{ reelId: String(productionReel._id), requestedWidthInches: 36, weightConsumedKg: 100 }],
       outputSheets: [
         { ply: 3, lengthInches: 36, widthInches: 24, sheetCount: 100, totalWeightKg: 60 },
         { ply: 5, lengthInches: 48, widthInches: 36, sheetCount: 100, totalWeightKg: 30 }
       ],
-      recoverableWasteKg: 5
+      recoverableWasteKg: 5,
+      wasteBreakdown: [{ category: 'edge_trim', weightKg: 3 }, { category: 'setup_waste', weightKg: 2 }]
     }
   });
   assert.equal(production.status, 201);
@@ -505,6 +508,8 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
   assert.equal(Number(run.totalMaterialCost.toString()), 4400);
   assert.equal(Number(run.materialCostPerOutputKg.toString()), 48.888889);
   assert.equal(Number(run.recoverableWasteKg.toString()), 5);
+  assert.equal(run.machineName, 'Corrugation Line 1');
+  assert.equal(run.wasteBreakdown.length, 2);
   assert.equal(Number(run.processLossKg.toString()), 5);
 
   const outputSheets = await CorrugatedSheet.find({ productionRunId: run._id }).sort({ ply: 1 });
@@ -781,7 +786,8 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
       runDate: '2026-10-20',
       inputReels: [{ reelId: String(tinyResidualReel._id), requestedWidthInches: 24, weightConsumedKg: 99.9995 }],
       outputSheets: [{ ply: 3, lengthInches: 24, widthInches: 18, sheetCount: 10, totalWeightKg: 99 }],
-      recoverableWasteKg: 0.1
+      recoverableWasteKg: 0.1,
+      wasteBreakdown: [{ category: 'edge_trim', weightKg: 0.1 }]
     }
   });
   assert.equal(tinyResidualRun.status, 201);
