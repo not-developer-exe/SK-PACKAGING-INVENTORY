@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { CalendarDays, RefreshCw, TrendingUp, Receipt, Package, Wallet } from 'lucide-react';
+import { RefreshCw, TrendingUp, Receipt, Package, Wallet, Landmark } from 'lucide-react';
 import axiosClient from '../../api/axiosClient';
 
 const money = (value) => '₹' + Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
@@ -56,6 +56,9 @@ export default function ProfitLossPage() {
             <div className="rounded-2xl border border-slate-200 bg-white p-5"><p className="text-sm text-slate-500"><Receipt size={15} className="mr-1 inline" />Sales (ex-GST)</p><p className="mt-2 text-2xl font-bold text-slate-900">{money(report.summary.revenue)}</p><p className="mt-1 text-xs text-slate-500">{report.summary.invoiceCount} invoices</p></div>
             <div className="rounded-2xl border border-slate-200 bg-white p-5"><p className="text-sm text-slate-500"><Package size={15} className="mr-1 inline" />Cost of goods sold</p><p className="mt-2 text-2xl font-bold text-slate-900">{money(report.summary.costOfGoods)}</p><p className="mt-1 text-xs text-slate-500">{report.summary.costedInvoiceCount} costed · {report.summary.uncostedInvoiceCount} uncosted</p></div>
             <div className="rounded-2xl border border-slate-200 bg-white p-5"><p className="text-sm text-slate-500"><TrendingUp size={15} className="mr-1 inline" />Gross profit on costed invoices</p><p className="mt-2 text-2xl font-bold text-slate-900">{money(report.summary.grossProfit)}</p><p className="mt-1 text-xs text-slate-500">{report.summary.grossProfitCoveragePercent}% costing coverage</p></div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5"><p className="text-sm text-slate-500">Operating expenses</p><p className="mt-2 text-2xl font-bold text-slate-900">{money(report.summary.operatingExpenses)}</p><p className="mt-1 text-xs text-slate-500">{report.summary.expenseCount || 0} expense records in period</p></div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5"><p className="text-sm text-slate-500"><Landmark size={15} className="mr-1 inline" />Operating profit*</p><p className="mt-2 text-2xl font-bold text-slate-900">{money(report.summary.operatingProfit)}</p><p className="mt-1 text-xs text-slate-500">Gross profit + scrap proceeds − operating expenses</p></div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5"><p className="text-sm text-slate-500">Net profit before tax*</p><p className="mt-2 text-2xl font-bold text-slate-900">{money(report.summary.netProfitBeforeTax)}</p><p className="mt-1 text-xs text-slate-500">After finance costs of {money(report.summary.financeCosts)}</p></div>
             <div className="rounded-2xl border border-slate-200 bg-white p-5"><p className="text-sm text-slate-500">Process loss (unrecovered)</p><p className="mt-2 text-2xl font-bold text-slate-900">{Number(report.summary.processLossKg || 0).toFixed(2)} kg</p><p className="mt-1 text-xs text-slate-500">Estimated material value: {money(report.summary.processLossCostEstimate)}</p></div>
             <div className="rounded-2xl border border-slate-200 bg-white p-5"><p className="text-sm text-slate-500">Scrap proceeds / stock</p><p className="mt-2 text-2xl font-bold text-slate-900">{money(report.summary.scrapRevenue)}</p><p className="mt-1 text-xs text-slate-500">Current verified scrap: {Number(report.summary.currentVerifiedScrapInventoryKg || 0).toFixed(2)} kg</p></div>
             <div className="rounded-2xl border border-slate-200 bg-white p-5"><p className="text-sm text-slate-500"><Wallet size={15} className="mr-1 inline" />Receivables outstanding</p><p className="mt-2 text-2xl font-bold text-slate-900">{money(report.summary.balanceDue)}</p><p className="mt-1 text-xs text-slate-500">Period scrap sold: {Number(report.summary.scrapWeightKg || 0).toFixed(2)} kg</p></div>
@@ -72,7 +75,7 @@ export default function ProfitLossPage() {
             </div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[720px] text-left text-sm">
-                <thead className="border-b text-xs uppercase text-slate-500"><tr><th className="py-3 pr-4">{group === 'party' ? 'Customer' : 'Period'}</th><th className="px-4 py-3 text-right">Invoices</th><th className="px-4 py-3 text-right">Sales</th><th className="px-4 py-3 text-right">Cost</th><th className="px-4 py-3 text-right">Gross profit*</th><th className="px-4 py-3 text-right">Process loss kg</th><th className="px-4 py-3 text-right">Scrap sales</th><th className="px-4 py-3 text-right">Balance due</th></tr></thead>
+                <thead className="border-b text-xs uppercase text-slate-500"><tr><th className="py-3 pr-4">{group === 'party' ? 'Customer' : 'Period'}</th><th className="px-4 py-3 text-right">Invoices</th><th className="px-4 py-3 text-right">Sales</th><th className="px-4 py-3 text-right">Cost</th><th className="px-4 py-3 text-right">Gross profit*</th><th className="px-4 py-3 text-right">Operating expenses</th><th className="px-4 py-3 text-right">Operating profit*</th><th className="px-4 py-3 text-right">Process loss kg</th><th className="px-4 py-3 text-right">Scrap sales</th><th className="px-4 py-3 text-right">Balance due</th></tr></thead>
                 <tbody className="divide-y">
                   {rows.map((row) => <tr key={row.key}>
                     <td className="py-3 pr-4 font-medium text-slate-800">{row.partyName || row.key}</td>
@@ -80,17 +83,24 @@ export default function ProfitLossPage() {
                     <td className="px-4 py-3 text-right">{money(row.revenue)}</td>
                     <td className="px-4 py-3 text-right">{money(row.costOfGoods)}</td>
                     <td className="px-4 py-3 text-right font-semibold">{money(row.grossProfit)}</td>
+                    <td className="px-4 py-3 text-right">{money(row.operatingExpenses)}</td>
+                    <td className="px-4 py-3 text-right font-semibold">{row.operatingProfit === null ? "—" : money(row.operatingProfit)}</td>
                     <td className="px-4 py-3 text-right">{Number(row.processLossKg || 0).toFixed(2)}</td>
                     <td className="px-4 py-3 text-right">{money(row.scrapRevenue)}</td>
                     <td className="px-4 py-3 text-right">{money(row.balanceDue)}</td>
                   </tr>)}
-                  {!rows.length && <tr><td colSpan="8" className="p-8 text-center text-slate-500">No invoice activity in this period.</td></tr>}
+                  {!rows.length && <tr><td colSpan="10" className="p-8 text-center text-slate-500">No activity in this period.</td></tr>}
                 </tbody>
               </table>
             </div>
             <p className="mt-3 text-xs text-slate-500">*Gross profit is calculated only for invoices with manufacturing cost snapshots.</p>
           </section>
 
+          <section className="rounded-2xl border border-slate-200 bg-white p-5">
+            <h2 className="font-semibold text-slate-900">Expenses by category</h2>
+            <div className="mt-3 overflow-x-auto"><table className="w-full text-left text-sm"><thead className="border-b text-xs uppercase text-slate-500"><tr><th className="py-2">Category</th><th className="py-2 text-right">Entries</th><th className="py-2 text-right">Amount</th></tr></thead><tbody className="divide-y">{(report.expenseByCategory || []).map(item => <tr key={item.category}><td className="py-2 capitalize">{item.category.replaceAll('_', ' ')}</td><td className="py-2 text-right">{item.count}</td><td className="py-2 text-right font-medium">{money(item.amount)}</td></tr>)}{!(report.expenseByCategory || []).length && <tr><td colSpan="3" className="py-5 text-center text-slate-500">No expense entries in this period.</td></tr>}</tbody></table></div>
+            <p className="mt-3 text-xs text-slate-500">*Operating profit and net profit before tax include only invoices with recorded manufacturing costs. Review costing coverage before treating these figures as final accounts.</p>
+          </section>
           <section className="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
             <h2 className="text-sm font-semibold text-amber-900">Important costing notes</h2>
             <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-amber-900">

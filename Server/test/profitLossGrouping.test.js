@@ -36,3 +36,23 @@ test('validates real calendar dates instead of accepting rolled dates', () => {
   assert.equal(isValidDateOnly('2026-02-30'), false);
   assert.equal(isValidDateOnly('not-a-date'), false);
 });
+
+
+test('groups operating, finance and landed-stock expenses into daily and monthly profit', () => {
+  const groups = buildProfitLossGroups([
+    { invoiceDate: '2026-11-14T10:00:00.000Z', customerId: { _id: 'a', name: 'Customer A' }, subTotal: 1000, costOfGoods: 600, grossProfit: 400, costingStatus: 'available', balanceDue: 0 }
+  ], [], [
+    { saleDate: '2026-11-14T13:00:00.000Z', weightSoldKg: 1, totalAmount: 50 }
+  ], [
+    { expenseDate: '2026-11-14T06:00:00.000Z', amount: 100, costTreatment: 'operating_expense' },
+    { expenseDate: '2026-11-14T06:00:00.000Z', amount: 20, costTreatment: 'finance_cost' },
+    { expenseDate: '2026-11-14T06:00:00.000Z', amount: 30, costTreatment: 'stock_landed_cost' }
+  ]);
+  assert.equal(groups.daily[0].operatingExpenses, 100);
+  assert.equal(groups.daily[0].financeCosts, 20);
+  assert.equal(groups.daily[0].stockLandedCosts, 30);
+  assert.equal(groups.daily[0].operatingProfit, 350);
+  assert.equal(groups.daily[0].netProfitBeforeTax, 330);
+  assert.equal(groups.monthly[0].expenseCount, 3);
+  assert.equal(groups.partyWise[0].operatingProfit, null);
+});

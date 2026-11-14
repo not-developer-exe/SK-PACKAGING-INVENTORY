@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - fix/production-readiness-foundation
+      - feat/operating-expenses-and-admin-controls
   pull_request:
     branches:
       - main
@@ -34,8 +35,12 @@ jobs:
         run: npm run build
 
   server-syntax:
-    name: Server dependency install and syntax check
+    name: Server install, syntax, domain and replica-set integration tests
     runs-on: ubuntu-latest
+    env:
+      MONGODB_URI: mongodb://localhost:27017/sk-packaging-test?replicaSet=rs0
+      JWT_SECRET: ci-integration-secret-that-is-long-enough
+      NODE_ENV: test
     defaults:
       run:
         working-directory: Server
@@ -50,7 +55,27 @@ jobs:
           cache-dependency-path: Server/package-lock.json
       - name: Install dependencies
         run: npm ci
+      - name: Start MongoDB replica set
+        run: |
+          docker run -d --name sk-packaging-mongodb -p 27017:27017 mongo:7 mongod --replSet rs0 --bind_ip_all
+          for attempt in $(seq 1 30); do
+            if docker exec sk-packaging-mongodb mongosh --quiet --eval 'db.adminCommand({ ping: 1 })' >/dev/null 2>&1; then
+              break
+            fi
+            sleep 2
+          done
+          docker exec sk-packaging-mongodb mongosh --quiet --eval 'rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "localhost:27017" }] })'
+          for attempt in $(seq 1 30); do
+            if docker exec sk-packaging-mongodb mongosh --quiet --eval 'db.hello().isWritablePrimary' | grep -q true; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "MongoDB replica set did not become primary"
+          exit 1
       - name: Check JavaScript syntax
         run: find src -type f -name '*.js' -print0 | xargs -0 -n1 node --check
       - name: Run domain tests
         run: npm test
+      - name: Run MongoDB-backed integration tests
+        run: npm run test:integration

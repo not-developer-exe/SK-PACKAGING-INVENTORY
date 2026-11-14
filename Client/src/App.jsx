@@ -2,7 +2,7 @@ import React from 'react';
 import { Routes, Route, Link, useLocation, Navigate, Outlet, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, FileText, Package, ArrowDownToLine, Factory, ClipboardCheck,
-  Scissors, Truck, LogOut, FilePlus2, BookOpen, Trash2, ShieldCheck, ChartNoAxesCombined
+  Scissors, Truck, LogOut, FilePlus2, BookOpen, Trash2, ShieldCheck, ChartNoAxesCombined, Receipt, Database
 } from 'lucide-react';
 
 import { useAuth } from './context/AuthContext';
@@ -22,6 +22,8 @@ import OpeningStockPage from './pages/Reports/OpeningStockPage';
 import UserManagementPage from './pages/Reports/UserManagementPage';
 import StockReconciliationPage from './pages/Reports/StockReconciliationPage';
 import ProfitLossPage from './pages/Reports/ProfitLossPage';
+import ExpensesPage from './pages/Reports/ExpensesPage';
+import AdminRecordsPage from './pages/Reports/AdminRecordsPage';
 
 function RequireAuth() {
   const { user, loading } = useAuth();
@@ -41,6 +43,7 @@ function Sidebar() {
       { name: 'Party Master', path: '/parties', icon: Users },
       { name: 'Sales Invoices', path: '/sales', icon: FileText },
       { name: 'Profit & Loss', path: '/reports/profit-loss', icon: ChartNoAxesCombined },
+      { name: 'Expenses', path: '/expenses', icon: Receipt },
       { name: 'New GST Invoice', path: '/sales/new', icon: FilePlus2 }
     ] },
     { group: 'Inventory', items: [
@@ -51,7 +54,8 @@ function Sidebar() {
     ...(user?.role === 'admin' ? [{ group: 'Administration', items: [
       { name: 'Opening Stock & Audit', path: '/admin/opening-stock', icon: ShieldCheck },
       { name: 'User Management', path: '/admin/users', icon: Users },
-      { name: 'Stock Reconciliation', path: '/admin/stock-reconciliation', icon: ClipboardCheck }
+      { name: 'Stock Reconciliation', path: '/admin/stock-reconciliation', icon: ClipboardCheck },
+      { name: 'Data Console', path: '/admin/data', icon: Database }
     ] }] : []),
     { group: 'Factory Operations', items: [
       { name: 'Production', path: '/operations/production', icon: Factory },
@@ -104,6 +108,7 @@ export default function App() {
           <Route path="sales" element={<SalesInvoicesPage />} />
           <Route path="sales/new" element={<CreateInvoicePage />} />
           <Route path="reports/profit-loss" element={<ProfitLossPage />} />
+          <Route path="expenses" element={<ExpensesPage />} />
           <Route path="inventory/reels" element={<ReelStockPage />} />
           <Route path="inventory/inward" element={<StockInwardPage />} />
           <Route path="inventory/ledger" element={<StockLedgerPage />} />
@@ -114,6 +119,7 @@ export default function App() {
           <Route path="admin/opening-stock" element={user?.role === 'admin' ? <OpeningStockPage /> : <Navigate to="/" replace />} />
           <Route path="admin/users" element={user?.role === 'admin' ? <UserManagementPage /> : <Navigate to="/" replace />} />
           <Route path="admin/stock-reconciliation" element={user?.role === 'admin' ? <StockReconciliationPage /> : <Navigate to="/" replace />} />
+          <Route path="admin/data" element={user?.role === 'admin' ? <AdminRecordsPage /> : <Navigate to="/" replace />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to={user ? '/' : '/login'} replace />} />
