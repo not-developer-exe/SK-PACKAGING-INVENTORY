@@ -272,7 +272,7 @@ test('inward posting preserves individual reel weights, landed cost and stock le
     body: {
       supplierId: String(supplier._id),
       invoiceReference: 'SUP-INV-REELS-001',
-      receiptDate: '2026-11-14',
+      receiptDate: '2026-11-01',
       lines: [{
         reelWidthInches: 36,
         bf: 18,
@@ -316,6 +316,12 @@ test('inward posting preserves individual reel weights, landed cost and stock le
   const movement = await StockMovement.findOne({ referenceId: receiptId, movementType: 'inward_receipt' });
   assert.equal(movement.quantityChange, 3);
   assert.equal(Number(movement.weightChangeKg.toString()), 450);
+  const liveStock = await api('/api/inventory/reels');
+  assert.equal(liveStock.status, 200);
+  const receivedSpec = liveStock.data.stock.find(item =>
+    item.width === 36 && item.bf === 18 && item.gsm === 140 && item.quality === 'Natural'
+  );
+  assert.equal(new Date(receivedSpec.dateAdded).toISOString().slice(0, 10), '2026-11-01');
 
   const duplicatePost = await api('/api/inward/' + receiptId + '/post', { method: 'POST' });
   assert.equal(duplicatePost.status, 409);
