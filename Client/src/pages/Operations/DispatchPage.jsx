@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { dispatchService } from '../../services/dispatchService';
 import DateRangeFilter from '../../components/DateRangeFilter';
+import { toLocalDateInput } from '../../lib/date';
 import { partiesService } from '../../services/partiesService';
 import { Truck, Plus, Trash2, Loader2, FileText, Printer, Download, X } from 'lucide-react';
 import html2canvas from 'html2canvas';
@@ -18,7 +19,7 @@ export default function DispatchPage() {
   const [selectedChallan, setSelectedChallan] = useState(null);
 
   // Added dispatchDate and uppercase handlers
-  const [dispatchDate, setDispatchDate] = useState(new Date().toISOString().split('T')[0]);
+  const [dispatchDate, setDispatchDate] = useState(toLocalDateInput());
   const [customerId, setCustomerId] = useState('');
   const [vehicleNumber, setVehicleNumber] = useState('');
   const [driverName, setDriverName] = useState('');
@@ -71,7 +72,7 @@ export default function DispatchPage() {
       setCustomerId('');
       setVehicleNumber('');
       setDriverName('');
-      setDispatchDate(new Date().toISOString().split('T')[0]);
+      setDispatchDate(toLocalDateInput());
       setDispatchBoxes([{ boxId: '', dispatchQuantity: '' }]);
       
       const [historyData, boxesData] = await Promise.all([
