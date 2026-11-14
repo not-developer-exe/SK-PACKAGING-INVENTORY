@@ -25,3 +25,10 @@ test('rejects invalid and reversed date ranges with HTTP 400 errors', () => {
   assert.throws(() => buildDateRangeFilter('2026-02-30', undefined, 'runDate'), { statusCode: 400 });
   assert.throws(() => buildDateRangeFilter('2026-11-15', '2026-11-14', 'runDate'), { statusCode: 400 });
 });
+
+
+test('formats default report dates using local calendar components', () => {
+  const { formatDateOnlyLocal } = require('../src/utils/dateFilters');
+  const date = new Date(2026, 10, 1, 0, 15, 0);
+  assert.equal(formatDateOnlyLocal(date), '2026-11-01');
+});
