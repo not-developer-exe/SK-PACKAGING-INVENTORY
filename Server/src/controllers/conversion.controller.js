@@ -74,7 +74,7 @@ exports.recordConversion = async (req, res) => {
       const sequence = await Sequence.findOneAndUpdate(
         { _id: 'finished-box-batch' },
         [{ $set: { value: { $add: [{ $max: [{ $ifNull: ['$value', existingCount] }, existingCount] }, 1] } } }],
-        { new: true, upsert: true, session }
+        { new: true, upsert: true, session, updatePipeline: true }
       );
       const batchNumber = 'FB-' + String(sequence.value).padStart(6, '0');
 
