@@ -92,7 +92,7 @@ export default function StockLedgerPage() {
               {filteredMovements.map((m) => (
                 <tr key={m._id} className="transition hover:bg-slate-50">
                   <td className="whitespace-nowrap px-5 py-4 text-slate-600">
-                    {new Date(m.createdAt).toLocaleString('en-IN', { 
+                    {new Date(m.movementDate || m.createdAt).toLocaleString('en-IN', { 
                       day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' 
                     })}
                   </td>
