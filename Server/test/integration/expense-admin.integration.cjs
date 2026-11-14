@@ -622,9 +622,10 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
   assert.equal(profitLoss.data.summary.operatingExpenseCount, 1);
   assert.equal(profitLoss.data.summary.financeCostCount, 1);
   assert.equal(profitLoss.data.summary.stockLandedCostCount, 1);
-  assert.equal(profitLoss.data.summary.recoverableScrapGeneratedKg, 5.1);
+  assert.equal(profitLoss.data.summary.recoverableScrapGeneratedKg, 5);
   assert.equal(profitLoss.data.expenseByCategory.length, 3);
-  assert.ok(Math.abs(profitLoss.data.summary.processLossKg - 5.9) < 0.002);
+  assert.equal(profitLoss.data.summary.processLossKg, 5);
+  assert.equal(profitLoss.data.summary.processLossCostEstimate, 220);
   const misleadingPartyFilter = await api('/api/reports/profit-loss?from=2026-10-15&to=2026-10-20&partyId=' + party._id);
   assert.equal(misleadingPartyFilter.status, 400);
 
