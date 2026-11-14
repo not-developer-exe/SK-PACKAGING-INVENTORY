@@ -4,6 +4,8 @@ const writeAuditLog = require('../utils/writeAuditLog');
 const AuditLog = require('../models/AuditLog.model');
 const Invoice = require('../models/Invoice.model');
 const { allocateInvoicePayment } = require('../utils/invoicePaymentAllocation');
+const { recalculatePartyLedger } = require('../utils/partyLedger');
+const { isValidDateOnly } = require('../utils/dateFilters');
 
 async function auditPartyChange(req, action, party, summary, metadata = {}) {
   try {
@@ -55,8 +57,8 @@ exports.createParty = async (req, res) => {
       ledger: balance !== 0 ? [{
         type: 'Opening Balance',
         ref: 'OPENING',
-        debit: balance < 0 ? Math.abs(balance) : 0,
-        credit: balance > 0 ? balance : 0,
+        debit: balance > 0 ? balance : 0,
+        credit: balance < 0 ? Math.abs(balance) : 0,
         balance
       }] : []
     });
@@ -122,30 +124,41 @@ exports.deleteParty = async (req, res) => {
 };
 
 exports.addTransaction = async (req, res) => {
-  const { amount: rawAmount, mode, ref = '', direction } = req.body || {};
+  const { amount: rawAmount, mode, ref = '', direction, date: rawDate } = req.body || {};
   const amount = Number(rawAmount);
   if (!Number.isFinite(amount) || amount <= 0 || !['in', 'out'].includes(direction) ||
       typeof mode !== 'string' || !mode.trim() || (ref !== '' && typeof ref !== 'string')) {
     return res.status(400).json({ message: 'Enter a positive amount, payment mode and valid direction.' });
   }
+  if (rawDate !== undefined && !isValidDateOnly(rawDate)) {
+    return res.status(400).json({ message: 'Payment date must be a real calendar date in YYYY-MM-DD format.' });
+  }
+  const paymentDate = rawDate ? new Date(rawDate + 'T00:00:00+05:30') : new Date();
 
   const session = await mongoose.startSession();
   try {
     let updatedParty;
     await session.withTransaction(async () => {
       const party = await Party.findById(req.params.id).session(session);
-      if (!party) throw Object.assign(new Error('Party not found.'), { statusCode: 404 });
+      if (!party || party.isActive === false) throw Object.assign(new Error('Active party not found.'), { statusCode: 404 });
       const isPaymentIn = direction === 'in';
-      const newBalance = isPaymentIn ? party.balance - amount : party.balance + amount;
+      if (isPaymentIn && !['Customer', 'Both'].includes(party.type)) {
+        throw Object.assign(new Error('Payment received can only be recorded for a customer.'), { statusCode: 400 });
+      }
+      if (!isPaymentIn && !['Supplier', 'Both'].includes(party.type)) {
+        throw Object.assign(new Error('Payment sent can only be recorded for a supplier.'), { statusCode: 400 });
+      }
       const newTxn = {
+        date: paymentDate,
         type: isPaymentIn ? 'Payment Received' : 'Payment Sent',
         ref: mode.trim() + (ref.trim() ? ' / ' + ref.trim() : ''),
         debit: isPaymentIn ? 0 : amount,
         credit: isPaymentIn ? amount : 0,
-        balance: newBalance
+        balance: 0
       };
       party.ledger.push(newTxn);
       const ledgerEntryId = party.ledger[party.ledger.length - 1]._id;
+      const newBalance = recalculatePartyLedger(party.ledger);
       party.balance = newBalance;
 
       let invoiceAllocations = [];
@@ -171,7 +184,7 @@ exports.addTransaction = async (req, res) => {
             invoice.status = 'Pending';
           }
           invoice.payments.push({
-            date: new Date(),
+            date: paymentDate,
             amount: item.amount,
             mode: mode.trim(),
             reference: ref.trim(),
@@ -232,12 +245,7 @@ exports.deleteTransaction = async (req, res) => {
       }
 
       party.ledger.pull({ _id: req.params.txnId });
-      let recalculatedBalance = 0;
-      for (const entry of party.ledger) {
-        recalculatedBalance = Number((recalculatedBalance + Number(entry.debit || 0) - Number(entry.credit || 0)).toFixed(2));
-        entry.balance = recalculatedBalance;
-      }
-      party.balance = recalculatedBalance;
+      party.balance = recalculatePartyLedger(party.ledger);
       await party.save({ session });
       await writeAuditLog(req, {
         action: 'party.transaction_deleted',
