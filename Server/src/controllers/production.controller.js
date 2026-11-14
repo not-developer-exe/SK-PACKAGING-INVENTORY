@@ -9,6 +9,7 @@ const writeAuditLog = require('../utils/writeAuditLog');
 const { calculateWidthSubstitution } = require('../utils/widthSubstitution');
 const { resolveLandedRatePerKg, calculateMaterialCost, calculateUnitMaterialCost } = require('../utils/materialCosting');
 const { buildDateRangeFilter, isValidDateOnly } = require('../utils/dateFilters');
+const { normalizeWasteBreakdown } = require('../utils/productionWaste');
 
 exports.getProductionRuns = async (req, res) => {
   try {
@@ -45,6 +46,8 @@ exports.recordProduction = async (req, res) => {
   const {
     shift,
     operatorName,
+    machineName: rawMachineName,
+    wasteBreakdown: rawWasteBreakdown = [],
     runDate: rawRunDate,
     inputReels,
     outputSheets,
@@ -70,6 +73,16 @@ exports.recordProduction = async (req, res) => {
     : Number(rawRecoverableWasteKg);
   if (!Number.isFinite(recoverableWasteKg) || recoverableWasteKg < 0) {
     return res.status(400).json({ message: 'Measured recoverable scrap must be a non-negative number.' });
+  }
+  const machineName = rawMachineName === undefined || rawMachineName === null ? '' : rawMachineName;
+  if (typeof machineName !== 'string' || machineName.trim().length > 100) {
+    return res.status(400).json({ message: 'Machine name must be text of at most 100 characters.' });
+  }
+  let wasteBreakdown;
+  try {
+    wasteBreakdown = normalizeWasteBreakdown(rawWasteBreakdown, recoverableWasteKg);
+  } catch (error) {
+    return res.status(error.statusCode || 400).json({ message: error.message });
   }
 
   const inputs = inputReels.map((item) => ({
@@ -200,7 +213,9 @@ exports.recordProduction = async (req, res) => {
       runNumber,
       runDate,
       shift,
-      operatorName,
+      operatorName: typeof operatorName === 'string' ? operatorName.trim() : '',
+      machineName: machineName.trim(),
+      wasteBreakdown: wasteBreakdown.map((row) => ({ ...row, weightKg: mongoose.Types.Decimal128.fromString(String(row.weightKg)) })),
       inputReels: tracedInputs,
       totalInputWeightKg: totalInputWeight,
       totalOutputWeightKg: totalOutputWeight,
@@ -240,7 +255,7 @@ exports.recordProduction = async (req, res) => {
       }], { session, ordered: true });
     }
 
-    await writeAuditLog(req, { action: 'production.recorded', entityType: 'ProductionRun', entityId: run._id, entityLabel: runNumber, summary: 'Production run recorded: ' + runNumber, metadata: { totalInputWeightKg: totalInputWeight, totalOutputWeightKg: totalOutputWeight, totalMaterialCost, materialCostPerOutputKg, recoverableWasteKg, processLossKg, inputReelCount: tracedInputs.length, outputLineCount: outputs.length, widthSubstitutions: tracedInputs.filter((item) => item.widthVarianceInches !== 0).map((item) => ({ reelCode: item.reelCode, requestedWidthInches: item.requestedWidthInches, actualWidthInches: item.actualWidthInches, varianceInches: item.widthVarianceInches })) } }, session);
+    await writeAuditLog(req, { action: 'production.recorded', entityType: 'ProductionRun', entityId: run._id, entityLabel: runNumber, summary: 'Production run recorded: ' + runNumber, metadata: { totalInputWeightKg: totalInputWeight, totalOutputWeightKg: totalOutputWeight, totalMaterialCost, materialCostPerOutputKg, recoverableWasteKg, wasteBreakdown, machineName: machineName.trim(), shift, operatorName, processLossKg, inputReelCount: tracedInputs.length, outputLineCount: outputs.length, widthSubstitutions: tracedInputs.filter((item) => item.widthVarianceInches !== 0).map((item) => ({ reelCode: item.reelCode, requestedWidthInches: item.requestedWidthInches, actualWidthInches: item.actualWidthInches, varianceInches: item.widthVarianceInches })) } }, session);
     await session.commitTransaction();
     return res.status(201).json({
       message: 'Production run recorded successfully',
