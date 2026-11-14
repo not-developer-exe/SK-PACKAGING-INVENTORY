@@ -86,6 +86,27 @@ test('admin console and expense register enforce roles and keep an audit trail',
   assert.ok(changed.data.changedFields.includes('name'));
   assert.equal((await Party.findById(party._id)).name, 'Corrected Party Name');
 
+  const protectedInvoice = await Invoice.create({
+    invoiceNumber: 'INV-ADMIN-PROTECTED',
+    invoiceDate: new Date('2026-11-14T00:00:00.000Z'),
+    customerId: party._id,
+    dispatchId: new mongoose.Types.ObjectId(),
+    items: [],
+    subTotal: 100,
+    gstPercent: 0,
+    cgstAmount: 0,
+    sgstAmount: 0,
+    grandTotal: 100,
+    balanceDue: 100,
+    status: 'Pending'
+  });
+  const blockedInvoiceEdit = await api('/api/admin-records/invoices/' + protectedInvoice._id, {
+    method: 'PATCH',
+    body: { document: { balanceDue: 0 }, reason: 'Must use controlled accounting corrections.' }
+  });
+  assert.equal(blockedInvoiceEdit.status, 403);
+  assert.equal((await Invoice.findById(protectedInvoice._id)).balanceDue, 100);
+
   const invalidReason = await api('/api/admin-records/parties/' + party._id, {
     method: 'PATCH',
     body: { document, reason: 'fix' }
