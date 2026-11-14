@@ -5,6 +5,19 @@ exports.getLiveReelStock = async (req, res) => {
     const stockAggregation = await ReelUnit.aggregate([
       // 1. Only count reels that are not fully consumed
       { $match: { status: { $in: ["available", "partial"] } } },
+      // Use the source document's business date, not the time the reel record was created.
+      { $lookup: { from: "inwardreceipts", localField: "inwardReceiptId", foreignField: "_id", as: "inwardReceipt" } },
+      { $lookup: { from: "openingstockadjustments", localField: "openingStockAdjustmentId", foreignField: "_id", as: "openingAdjustment" } },
+      {
+        $addFields: {
+          stockReceivedAt: {
+            $ifNull: [
+              { $arrayElemAt: ["$inwardReceipt.receiptDate", 0] },
+              { $ifNull: [{ $arrayElemAt: ["$openingAdjustment.adjustmentDate", 0] }, "$createdAt"] }
+            ]
+          }
+        }
+      },
       // 2. Group by exact paper specifications
       {
         $group: {
@@ -18,7 +31,7 @@ exports.getLiveReelStock = async (req, res) => {
           // Convert Decimal128 to standard JavaScript numbers for safe JSON sending
           weight: { $sum: { $toDouble: "$remainingWeightKg" } },
           // Grab the date of the newest reel in this category
-          lastAdded: { $max: "$createdAt" },
+          lastAdded: { $max: "$stockReceivedAt" },
         },
       },
       // 3. Format the output to perfectly match the React frontend's expectations
