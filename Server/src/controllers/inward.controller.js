@@ -5,6 +5,7 @@ const StockMovement = require('../models/StockMovement.model');
 const Party = require('../models/Party.model');
 const Sequence = require('../models/Sequence.model');
 const writeAuditLog = require('../utils/writeAuditLog');
+const { calculateLandedRatePerKg } = require('../utils/materialCosting');
 
 const toFiniteNumber = (value) => {
   if (value === null || value === undefined || value === '') return NaN;
@@ -161,6 +162,12 @@ exports.postReceipt = async (req, res) => {
         const weightNum = Number(line.totalWeightKg.toString());
         const qty = Number(line.reelCount);
         const weightPerReel = weightNum / qty;
+        const landedRatePerKg = calculateLandedRatePerKg({
+          ratePerKg: Number(line.ratePerKg.toString()),
+          freightCharges: Number(line.freightCharges?.toString() || 0),
+          otherCharges: Number(line.otherCharges?.toString() || 0),
+          totalWeightKg: weightNum
+        });
 
         for (let i = 0; i < qty; i++) {
           reelCounter += 1;
@@ -177,6 +184,7 @@ exports.postReceipt = async (req, res) => {
             originalWeightKg: weightPerReel,
             remainingWeightKg: weightPerReel,
             ratePerKg: line.ratePerKg,
+            landedRatePerKg,
             status: 'available'
           }], { session });
         }
