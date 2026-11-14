@@ -3,8 +3,9 @@ import { Receipt, RefreshCw, Trash2, Pencil, Save, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import axiosClient from '../../api/axiosClient';
 import DateRangeFilter from '../../components/DateRangeFilter';
+import { toLocalDateInput } from '../../lib/date';
 
-const blank = { expenseDate: new Date().toISOString().slice(0, 10), category: 'electricity', amount: '', vendor: '', paymentMode: 'bank_transfer', reference: '', description: '', costTreatment: 'operating_expense' };
+const blank = { expenseDate: toLocalDateInput(), category: 'electricity', amount: '', vendor: '', paymentMode: 'bank_transfer', reference: '', description: '', costTreatment: 'operating_expense' };
 const categories = ['electricity', 'labour', 'rent', 'freight', 'repairs', 'admin', 'bank_charges', 'interest', 'miscellaneous'];
 const money = value => '₹' + Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
 const title = value => value.replaceAll('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
