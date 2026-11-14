@@ -14,6 +14,8 @@ const AuditLog = require('../../src/models/AuditLog.model');
 const Invoice = require('../../src/models/Invoice.model');
 const ReelUnit = require('../../src/models/ReelUnit.model');
 const ProductionRun = require('../../src/models/ProductionRun.model');
+const CorrugatedSheet = require('../../src/models/CorrugatedSheet.model');
+const FinishedBox = require('../../src/models/FinishedBox.model');
 const StockMovement = require('../../src/models/StockMovement.model');
 const StockReconciliation = require('../../src/models/StockReconciliation.model');
 const connectDB = require('../../src/config/db');
@@ -381,4 +383,119 @@ test('inward posting preserves individual reel weights, landed cost and stock le
   );
   assert.equal(sameDimensions.length, 2);
   assert.notEqual(sameDimensions[0].id, sameDimensions[1].id);
+});
+
+
+test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and FIFO traceability', async () => {
+  const productionReel = await ReelUnit.create({
+    reelCode: 'PHASE2-REEL-001',
+    reelWidthInches: 36,
+    bf: 18,
+    gsm: 140,
+    quality: 'Natural',
+    originalWeightKg: 100,
+    remainingWeightKg: 100,
+    ratePerKg: 40,
+    landedRatePerKg: 44,
+    status: 'available'
+  });
+
+  const production = await api('/api/production', {
+    method: 'POST',
+    body: {
+      shift: 'Day',
+      operatorName: 'Phase 2 Integration',
+      runDate: '2026-10-15',
+      inputReels: [{ reelId: String(productionReel._id), requestedWidthInches: 36, weightConsumedKg: 100 }],
+      outputSheets: [
+        { ply: 3, lengthInches: 36, widthInches: 24, sheetCount: 100, totalWeightKg: 60 },
+        { ply: 5, lengthInches: 48, widthInches: 36, sheetCount: 100, totalWeightKg: 30 }
+      ],
+      recoverableWasteKg: 5
+    }
+  });
+  assert.equal(production.status, 201);
+
+  const run = await ProductionRun.findOne({ runNumber: production.data.runNumber });
+  assert.equal(Number(run.totalInputWeightKg.toString()), 100);
+  assert.equal(Number(run.totalOutputWeightKg.toString()), 90);
+  assert.equal(Number(run.totalMaterialCost.toString()), 4400);
+  assert.equal(Number(run.materialCostPerOutputKg.toString()), 48.888889);
+  assert.equal(Number(run.recoverableWasteKg.toString()), 5);
+  assert.equal(Number(run.processLossKg.toString()), 5);
+
+  const outputSheets = await CorrugatedSheet.find({ productionRunId: run._id }).sort({ ply: 1 });
+  assert.equal(outputSheets.length, 2);
+  assert.ok(outputSheets.every(sheet => Number(sheet.unitCostPerKg.toString()) === 48.888889));
+  const availableBeforeConversion = await api('/api/conversion/sheets');
+  assert.equal(availableBeforeConversion.status, 200);
+  assert.equal(availableBeforeConversion.data.sheets[0].productionRunId.runNumber, run.runNumber);
+
+  const conversion = await api('/api/conversion', {
+    method: 'POST',
+    body: {
+      sheetId: String(outputSheets[0]._id),
+      sheetsConsumed: 50,
+      customerId: String(party._id),
+      itemName: 'Phase 2 Test Box',
+      dimensions: { length: 12, width: 10, height: 8 },
+      boxesProduced: 1000,
+      conversionDate: '2026-10-16'
+    }
+  });
+  assert.equal(conversion.status, 201);
+  const finishedBox = await FinishedBox.findOne({ batchNumber: conversion.data.batchNumber });
+  assert.equal(finishedBox.quantityProduced, 1000);
+  assert.equal(finishedBox.quantityAvailable, 1000);
+  assert.equal(finishedBox.costingStatus, 'available');
+  assert.equal(finishedBox.materialCost, 1466.67);
+  assert.equal(finishedBox.costPerBox, 1.47);
+
+  const remainingSheet = await CorrugatedSheet.findById(outputSheets[0]._id);
+  assert.equal(remainingSheet.sheetCount, 50);
+  assert.equal(Number(remainingSheet.totalWeightKg.toString()), 30);
+  const sheetIssue = await StockMovement.findOne({
+    referenceId: outputSheets[0]._id,
+    movementType: 'production_issue'
+  });
+  assert.equal(sheetIssue.quantityChange, -50);
+  assert.equal(Number(sheetIssue.weightChangeKg.toString()), -30);
+  const finishedMovement = await StockMovement.findOne({
+    referenceId: finishedBox._id,
+    itemType: 'finished_good'
+  });
+  assert.equal(finishedMovement.quantityChange, 1000);
+
+  const tinyResidualReel = await ReelUnit.create({
+    reelCode: 'PHASE2-REEL-002',
+    reelWidthInches: 24,
+    bf: 18,
+    gsm: 120,
+    quality: 'Natural',
+    originalWeightKg: 100,
+    remainingWeightKg: 100,
+    ratePerKg: 10,
+    landedRatePerKg: 10,
+    status: 'available'
+  });
+  const tinyResidualRun = await api('/api/production', {
+    method: 'POST',
+    body: {
+      shift: 'Night',
+      operatorName: 'Residual Stock Test',
+      runDate: '2026-10-20',
+      inputReels: [{ reelId: String(tinyResidualReel._id), requestedWidthInches: 24, weightConsumedKg: 99.9995 }],
+      outputSheets: [{ ply: 3, lengthInches: 24, widthInches: 18, sheetCount: 10, totalWeightKg: 99 }],
+      recoverableWasteKg: 0.1
+    }
+  });
+  assert.equal(tinyResidualRun.status, 201);
+  const residual = await ReelUnit.findById(tinyResidualReel._id);
+  assert.equal(residual.status, 'partial');
+  assert.equal(Number(residual.remainingWeightKg.toString()), 0.0005);
+
+  const fifoSheets = await api('/api/conversion/sheets');
+  assert.equal(fifoSheets.status, 200);
+  assert.equal(fifoSheets.data.sheets[0].productionRunId.runNumber, run.runNumber);
+  assert.equal(fifoSheets.data.sheets.at(-1).productionRunId.runNumber, tinyResidualRun.data.runNumber);
 });
