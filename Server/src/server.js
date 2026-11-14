@@ -20,6 +20,7 @@ const controlRoutes = require('./routes/control.routes');
 const usersRoutes = require('./routes/users.routes');
 const reportsRoutes = require('./routes/reports.routes');
 const expenseRoutes = require('./routes/expense.routes');
+const adminRecordsRoutes = require('./routes/adminRecords.routes');
 
 const app = express();
 const allowedOrigins = (process.env.CLIENT_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174')
@@ -67,6 +68,7 @@ app.use('/api/waste', wasteRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/expenses', expenseRoutes);
+app.use('/api/admin-records', adminRecordsRoutes);
 
 app.get('/api/health', (req, res) => {
   const databaseReady = mongoose.connection.readyState === 1;
