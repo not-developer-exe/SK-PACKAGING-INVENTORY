@@ -177,6 +177,7 @@ exports.recordProduction = async (req, res) => {
       });
 
       await StockMovement.create([{
+        movementDate: runDate,
         movementType: 'production_issue',
         referenceId: reel._id,
         referenceModel: 'ReelUnit',
@@ -224,6 +225,7 @@ exports.recordProduction = async (req, res) => {
       }], { session, ordered: true });
 
       await StockMovement.create([{
+        movementDate: runDate,
         movementType: 'sheet_cutting',
         referenceId: sheet._id,
         referenceModel: 'CorrugatedSheet',
