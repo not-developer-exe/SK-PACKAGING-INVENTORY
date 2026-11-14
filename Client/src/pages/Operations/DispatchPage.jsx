@@ -50,7 +50,7 @@ export default function DispatchPage() {
     fetchData();
   }, []);
 
-  const customerBoxes = availableBoxes.filter(box => box.customerId._id === customerId);
+  const customerBoxes = availableBoxes.filter(box => box.customerId?._id === customerId);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
