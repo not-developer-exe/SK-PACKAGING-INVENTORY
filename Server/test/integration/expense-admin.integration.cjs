@@ -323,6 +323,9 @@ test('inward posting preserves individual reel weights, landed cost and stock le
     item.width === 36 && item.bf === 18 && item.gsm === 140 && item.quality === 'Natural'
   );
   assert.equal(new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(receivedSpec.dateAdded)), '2026-11-01');
+  const fifoReels = await api('/api/inventory/reels/physical');
+  assert.equal(fifoReels.status, 200);
+  assert.equal(fifoReels.data.reels[0].reelCode, reels[0].reelCode);
 
   const duplicatePost = await api('/api/inward/' + receiptId + '/post', { method: 'POST' });
   assert.equal(duplicatePost.status, 409);
