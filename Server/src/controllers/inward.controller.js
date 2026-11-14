@@ -6,7 +6,7 @@ const Party = require('../models/Party.model');
 const Sequence = require('../models/Sequence.model');
 const writeAuditLog = require('../utils/writeAuditLog');
 const { calculateLandedRatePerKg } = require('../utils/materialCosting');
-const { buildDateRangeFilter } = require('../utils/dateFilters');
+const { buildDateRangeFilter, isValidDateOnly } = require('../utils/dateFilters');
 
 const toFiniteNumber = (value) => {
   if (value === null || value === undefined || value === '') return NaN;
@@ -26,7 +26,9 @@ exports.createDraftReceipt = async (req, res) => {
       return res.status(400).json({ message: 'A valid supplier, invoice reference and at least one line item are required.' });
     }
 
-    const parsedReceiptDate = receiptDate ? new Date(receiptDate) : new Date();
+    const parsedReceiptDate = receiptDate === undefined || receiptDate === null || receiptDate === ''
+      ? new Date()
+      : (isValidDateOnly(receiptDate) ? new Date(receiptDate + 'T00:00:00+05:30') : new Date(NaN));
     if (Number.isNaN(parsedReceiptDate.getTime())) {
       return res.status(400).json({ message: 'Receipt date must be a valid date.' });
     }
