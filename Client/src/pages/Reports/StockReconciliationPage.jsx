@@ -2,12 +2,13 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ClipboardCheck, RefreshCw } from 'lucide-react';
 import axiosClient from '../../api/axiosClient';
 import DateRangeFilter from '../../components/DateRangeFilter';
+import { toLocalDateInput } from '../../lib/date';
 
 export default function StockReconciliationPage() {
   const [reels, setReels] = useState([]);
   const [counts, setCounts] = useState({});
   const [history, setHistory] = useState([]);
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(toLocalDateInput());
   const [reason, setReason] = useState('Physical stock verification');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
