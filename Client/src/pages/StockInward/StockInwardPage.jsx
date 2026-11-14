@@ -49,7 +49,7 @@ export default function StockInwardPage() {
   }, []);
 
   const handleAddLine = () => {
-    setLines([...lines, { reelWidthInches: '', bf: '', gsm: '', quality: 'Natural', reelCount: '', totalWeightKg: '', ratePerKg: '', freightCharges: 0, otherCharges: 0, supplierBatchRef: '' }]);
+    setLines([...lines, { reelWidthInches: '', bf: '', gsm: '', quality: 'Natural', reelCount: '', totalWeightKg: '', ratePerKg: '', freightCharges: 0, otherCharges: 0, supplierBatchRef: '', reelWeightsKg: '' }]);
   };
 
   const handleLineChange = (index, field, value) => {
@@ -98,7 +98,7 @@ export default function StockInwardPage() {
       setShowModal(false);
       setInvoiceReference('');
       setNotes('');
-      setLines([{ reelWidthInches: '', bf: '', gsm: '', quality: 'Natural', reelCount: '', totalWeightKg: '', ratePerKg: '', freightCharges: 0, otherCharges: 0, supplierBatchRef: '' }]);
+      setLines([{ reelWidthInches: '', bf: '', gsm: '', quality: 'Natural', reelCount: '', totalWeightKg: '', ratePerKg: '', freightCharges: 0, otherCharges: 0, supplierBatchRef: '', reelWeightsKg: '' }]);
       fetchData();
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Failed to create draft');
