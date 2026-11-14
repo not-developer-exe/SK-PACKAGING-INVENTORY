@@ -66,7 +66,7 @@ export default function SalesInvoicesPage() {
 
       {error && <p role="alert" className="rounded-lg border border-red-100 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-2xl border border-slate-200 bg-white p-5"><p className="text-sm text-slate-500">Total Sales Amount</p><p className="mt-2 text-2xl font-bold text-slate-900">{money(totalSales)}</p></div>
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-5"><p className="text-sm text-emerald-700">Payment Received / Adjusted</p><p className="mt-2 text-2xl font-bold text-emerald-900">{money(totalReceived)}</p></div>
         <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-5"><p className="text-sm text-amber-700">Balance Due</p><p className="mt-2 text-2xl font-bold text-amber-900">{money(totalBalance)}</p></div>
