@@ -5,6 +5,7 @@ const StockMovement = require('../models/StockMovement.model');
 const Sequence = require('../models/Sequence.model');
 const AuditLog = require('../models/AuditLog.model');
 const { calculateReelReconciliation } = require('../utils/reelReconciliation');
+const { buildDateRangeFilter } = require('../utils/dateFilters');
 
 const asNumber = (value) => {
   if (value === '' || value === null || value === undefined) return NaN;
@@ -33,15 +34,16 @@ exports.getReconciliationCandidates = async (req, res) => {
 
 exports.getStockReconciliations = async (req, res) => {
   try {
-    const reconciliations = await StockReconciliation.find()
+    const filter = buildDateRangeFilter(req.query.from, req.query.to, 'countedAt');
+    const reconciliations = await StockReconciliation.find(filter)
       .populate('createdBy', 'name email')
       .sort({ countedAt: -1, createdAt: -1 })
-      .limit(100)
+      .limit(1000)
       .lean();
     return res.json({ reconciliations });
   } catch (error) {
     console.error('[STOCK RECONCILIATION] History query failed:', error.message);
-    return res.status(500).json({ message: 'Unable to load reconciliation history.' });
+    return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Unable to load reconciliation history.' });
   }
 };
 
