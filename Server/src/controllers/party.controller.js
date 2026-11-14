@@ -96,22 +96,46 @@ exports.updateParty = async (req, res) => {
 };
 
 exports.deleteParty = async (req, res) => {
+  const session = await mongoose.startSession();
   try {
-    const party = await Party.findById(req.params.id);
-    if (!party) return res.status(404).json({ message: 'Party not found' });
-    if (party.balance !== 0) {
-      return res.status(400).json({ message: 'Cannot delete. Settle balance to ₹0 first.' });
-    }
-    if (party.ledger.some(entry => entry.type !== 'Opening Balance')) {
-      return res.status(409).json({ message: 'This party has transaction history. It cannot be archived or deleted.' });
-    }
-    party.isActive = false;
-    await party.save();
-    await auditPartyChange(req, 'party.archived', party, 'Party archived: ' + party.name, { type: party.type });
-    return res.json({ message: 'Party archived successfully' });
+    let archivedParty;
+    await session.withTransaction(async () => {
+      const party = await Party.findById(req.params.id).session(session);
+      if (!party || party.isActive === false) {
+        throw Object.assign(new Error('Active party not found.'), { statusCode: 404 });
+      }
+      if (Math.abs(Number(party.balance || 0)) > 0.005) {
+        throw Object.assign(new Error('Cannot archive this party while its outstanding balance is not settled. Settle the balance to ₹0 first.'), { statusCode: 409 });
+      }
+      const unpaidInvoice = await Invoice.findOne({
+        customerId: party._id,
+        balanceDue: { $gt: 0.005 },
+        status: { $ne: 'Cancelled' }
+      }).session(session);
+      if (unpaidInvoice) {
+        throw Object.assign(new Error('Cannot archive this party while invoice ' + unpaidInvoice.invoiceNumber + ' has an outstanding balance.'), { statusCode: 409 });
+      }
+
+      // Keep the historical ledger and linked documents intact. Archiving only
+      // removes the party from active operational selectors.
+      party.isActive = false;
+      await party.save({ session });
+      await writeAuditLog(req, {
+        action: 'party.archived',
+        entityType: 'Party',
+        entityId: party._id,
+        entityLabel: party.name,
+        summary: 'Party archived: ' + party.name,
+        metadata: { type: party.type, balance: party.balance, retainedLedgerEntries: party.ledger.length }
+      }, session);
+      archivedParty = party;
+    });
+    return res.json({ message: 'Party archived successfully. Historical transactions and linked records have been retained.', party: archivedParty });
   } catch (error) {
-    console.error('[PARTIES] Delete failed:', error.message);
-    return res.status(500).json({ message: 'Unable to delete party.' });
+    console.error('[PARTIES] Archive failed:', error.message);
+    return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Unable to archive party.' });
+  } finally {
+    await session.endSession();
   }
 };
 
