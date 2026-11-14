@@ -19,6 +19,13 @@ test('splits aggregate weight evenly and flags the estimate explicitly', () => {
   assert.ok(Math.abs(result.reelWeightsKg.reduce((sum, weight) => sum + weight, 0) - 100) < 1e-9);
 });
 
+test('uses the individual reel total as the canonical stock weight within the rounding tolerance', () => {
+  const result = normalizeInwardReelWeights({
+    reelCount: 2, totalWeightKg: 100, reelWeightsKg: [49.995, 50]
+  });
+  assert.equal(result.totalWeightKg, 99.995);
+});
+
 test('rejects an individual weight list with the wrong number of reels', () => {
   assert.throws(() => normalizeInwardReelWeights({
     reelCount: 2, totalWeightKg: 100, reelWeightsKg: [50]
