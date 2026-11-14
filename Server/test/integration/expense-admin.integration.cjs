@@ -11,6 +11,10 @@ const User = require('../../src/models/User.model');
 const Party = require('../../src/models/Party.model');
 const Expense = require('../../src/models/Expense.model');
 const AuditLog = require('../../src/models/AuditLog.model');
+const Invoice = require('../../src/models/Invoice.model');
+const ReelUnit = require('../../src/models/ReelUnit.model');
+const ProductionRun = require('../../src/models/ProductionRun.model');
+const StockMovement = require('../../src/models/StockMovement.model');
 
 let server;
 let baseUrl;
@@ -145,4 +149,71 @@ test('admin console and expense register enforce roles and keep an audit trail',
   assert.ok(actions.some(item => item.action === 'expense.created'));
   assert.ok(actions.some(item => item.action === 'expense.updated'));
   assert.ok(actions.some(item => item.action === 'expense.deleted'));
+});
+
+
+test('payment allocations reverse atomically and production posting rolls back partial stock deductions', async () => {
+  const customer = await Party.create({ name: 'Payment Test Customer', type: 'Customer', balance: 1800, ledger: [
+    { type: 'Tax Invoice', ref: 'INV-TEST-1', debit: 1000, credit: 0, balance: 1000 },
+    { type: 'Tax Invoice', ref: 'INV-TEST-2', debit: 800, credit: 0, balance: 1800 }
+  ] });
+  const dispatchId = new mongoose.Types.ObjectId();
+  const firstInvoice = await Invoice.create({
+    invoiceNumber: 'INV-TEST-1', invoiceDate: new Date('2026-11-01'), customerId: customer._id, dispatchId,
+    items: [], subTotal: 1000, gstPercent: 0, cgstAmount: 0, sgstAmount: 0, grandTotal: 1000, balanceDue: 1000, status: 'Pending'
+  });
+  const secondInvoice = await Invoice.create({
+    invoiceNumber: 'INV-TEST-2', invoiceDate: new Date('2026-11-02'), customerId: customer._id, dispatchId: new mongoose.Types.ObjectId(),
+    items: [], subTotal: 800, gstPercent: 0, cgstAmount: 0, sgstAmount: 0, grandTotal: 800, balanceDue: 800, status: 'Pending'
+  });
+
+  const payment = await api('/api/parties/' + customer._id + '/transaction', {
+    method: 'POST',
+    body: { amount: 1500, direction: 'in', mode: 'UPI', ref: 'UTR-TEST-01' }
+  });
+  assert.equal(payment.status, 200);
+  assert.equal((await Invoice.findById(firstInvoice._id)).balanceDue, 0);
+  assert.equal((await Invoice.findById(secondInvoice._id)).balanceDue, 300);
+  const paymentEntry = payment.data.ledger[payment.data.ledger.length - 1];
+
+  const reversed = await api('/api/parties/' + customer._id + '/transaction/' + paymentEntry._id, { method: 'DELETE' });
+  assert.equal(reversed.status, 200);
+  assert.equal((await Invoice.findById(firstInvoice._id)).balanceDue, 1000);
+  assert.equal((await Invoice.findById(secondInvoice._id)).balanceDue, 800);
+  assert.equal((await Party.findById(customer._id)).balance, 1800);
+
+  const availableReel = await ReelUnit.create({
+    reelCode: 'INT-ROLL-001', reelWidthInches: 24, bf: 18, gsm: 120, quality: 'Natural',
+    originalWeightKg: mongoose.Types.Decimal128.fromString('100'),
+    remainingWeightKg: mongoose.Types.Decimal128.fromString('100'),
+    ratePerKg: mongoose.Types.Decimal128.fromString('50'),
+    landedRatePerKg: mongoose.Types.Decimal128.fromString('52'),
+    status: 'available'
+  });
+  const unavailableReel = await ReelUnit.create({
+    reelCode: 'INT-ROLL-002', reelWidthInches: 25, bf: 18, gsm: 120, quality: 'Natural',
+    originalWeightKg: mongoose.Types.Decimal128.fromString('10'),
+    remainingWeightKg: mongoose.Types.Decimal128.fromString('10'),
+    ratePerKg: mongoose.Types.Decimal128.fromString('50'),
+    status: 'consumed'
+  });
+
+  const failedRun = await api('/api/production', {
+    method: 'POST',
+    body: {
+      shift: 'Morning',
+      operatorName: 'Integration Test',
+      recoverableWasteKg: 1,
+      inputReels: [
+        { reelId: String(availableReel._id), requestedWidthInches: 24, weightConsumedKg: 20 },
+        { reelId: String(unavailableReel._id), requestedWidthInches: 24, weightConsumedKg: 1 }
+      ],
+      outputSheets: [{ ply: 3, lengthInches: 36, widthInches: 24, sheetCount: 100, totalWeightKg: 10 }]
+    }
+  });
+  assert.equal(failedRun.status, 409);
+  const refreshedReel = await ReelUnit.findById(availableReel._id);
+  assert.equal(refreshedReel.remainingWeightKg.toString(), '100');
+  assert.equal(await ProductionRun.countDocuments(), 0);
+  assert.equal(await StockMovement.countDocuments({ referenceId: availableReel._id }), 0);
 });
