@@ -8,7 +8,7 @@ const { calculateProductionBalance } = require('../utils/productionAccounting');
 const writeAuditLog = require('../utils/writeAuditLog');
 const { calculateWidthSubstitution } = require('../utils/widthSubstitution');
 const { resolveLandedRatePerKg, calculateMaterialCost, calculateUnitMaterialCost } = require('../utils/materialCosting');
-const { buildDateRangeFilter } = require('../utils/dateFilters');
+const { buildDateRangeFilter, isValidDateOnly } = require('../utils/dateFilters');
 
 exports.getProductionRuns = async (req, res) => {
   try {
@@ -45,10 +45,16 @@ exports.recordProduction = async (req, res) => {
   const {
     shift,
     operatorName,
+    runDate: rawRunDate,
     inputReels,
     outputSheets,
     recoverableWasteKg: rawRecoverableWasteKg
   } = req.body || {};
+
+  if (rawRunDate !== undefined && !isValidDateOnly(rawRunDate)) {
+    return res.status(400).json({ message: 'Production date must be a real calendar date in YYYY-MM-DD format.' });
+  }
+  const runDate = rawRunDate ? new Date(rawRunDate + 'T00:00:00+05:30') : new Date();
 
   if (!Array.isArray(inputReels) || inputReels.length === 0 ||
       !Array.isArray(outputSheets) || outputSheets.length === 0) {
@@ -189,6 +195,7 @@ exports.recordProduction = async (req, res) => {
 
     const [run] = await ProductionRun.create([{
       runNumber,
+      runDate,
       shift,
       operatorName,
       inputReels: tracedInputs,
