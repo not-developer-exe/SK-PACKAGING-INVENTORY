@@ -3,7 +3,13 @@ const { buildDateRangeFilter } = require('../utils/dateFilters');
 
 exports.getLedger = async (req, res) => {
   try {
-    const filter = buildDateRangeFilter(req.query.from, req.query.to, 'createdAt');
+    const movementDateRange = buildDateRangeFilter(req.query.from, req.query.to, 'movementDate').movementDate;
+    const filter = movementDateRange ? {
+      $or: [
+        { movementDate: movementDateRange },
+        { movementDate: { $exists: false }, createdAt: movementDateRange }
+      ]
+    } : {};
     if (req.query.movementType) {
       const allowed = ['inward_receipt', 'production_issue', 'sheet_cutting', 'adjustment', 'dispatch'];
       if (!allowed.includes(req.query.movementType)) return res.status(400).json({ message: 'Invalid movement type.' });
@@ -15,7 +21,7 @@ exports.getLedger = async (req, res) => {
     }
     const movements = await StockMovement.find(filter)
       .populate('performedBy', 'name')
-      .sort({ createdAt: -1 })
+      .sort({ movementDate: -1, createdAt: -1 })
       .limit(1000); 
       
     res.json({ movements });
