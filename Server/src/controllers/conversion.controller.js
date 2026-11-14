@@ -61,10 +61,9 @@ exports.recordConversion = async (req, res) => {
   let response;
   try {
     session.startTransaction();
-    const [sheet, customer] = await Promise.all([
-        CorrugatedSheet.findById(sheetId).session(session),
-        Party.findById(customerId).session(session)
-      ]);
+    // MongoDB transactions must not run parallel operations on the same session.
+    const sheet = await CorrugatedSheet.findById(sheetId).session(session);
+    const customer = await Party.findById(customerId).session(session);
       if (!sheet || sheet.status !== 'available') {
         const error = new Error('Source sheet batch is unavailable or has already been consumed.');
         error.statusCode = 409;
