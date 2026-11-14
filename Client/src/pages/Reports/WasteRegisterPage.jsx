@@ -15,6 +15,7 @@ export default function WasteRegisterPage() {
   const [buyerName, setBuyerName] = useState('');
   const [weightSoldKg, setWeightSoldKg] = useState('');
   const [ratePerKg, setRatePerKg] = useState('');
+  const [saleDate, setSaleDate] = useState(() => { const date = new Date(); return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10); });
 
   const fetchData = async (dateParams = {}) => {
     try {
@@ -42,7 +43,7 @@ export default function WasteRegisterPage() {
         return;
       }
 
-      await wasteService.recordSale({ buyerName, weightSoldKg, ratePerKg });
+      await wasteService.recordSale({ buyerName, weightSoldKg, ratePerKg, saleDate });
       setBuyerName('');
       setWeightSoldKg('');
       setRatePerKg('');
@@ -101,7 +102,10 @@ export default function WasteRegisterPage() {
         <h2 className="mb-4 text-sm font-semibold text-slate-900 flex items-center gap-2">
           <IndianRupee size={18} className="text-emerald-600" /> Record Scrap Sale
         </h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-5">
+          <div>
+            <input type="date" required aria-label="Scrap sale date" value={saleDate} onChange={e => setSaleDate(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400" />
+          </div>
           <div>
             <input type="text" required placeholder="Buyer / Vendor Name" value={buyerName} onChange={e => setBuyerName(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400" />
           </div>
@@ -140,7 +144,7 @@ export default function WasteRegisterPage() {
             <tbody className="divide-y divide-slate-100">
               {data.productionWaste.map((run) => (
                 <tr key={run._id} className="hover:bg-slate-50">
-                  <td className="px-5 py-4 text-slate-600">{new Date(run.createdAt).toLocaleString('en-IN')}</td>
+                  <td className="px-5 py-4 text-slate-600">{new Date(run.runDate || run.createdAt).toLocaleString('en-IN')}</td>
                   <td className="px-5 py-4 font-medium text-slate-900">Run {run.runNumber}</td>
                   <td className="px-5 py-4 text-right font-medium text-amber-600">+{Number(run.recoverableWasteKg || 0).toFixed(2)}</td>
                   <td className="px-5 py-4 text-slate-700">{run.operatorName}</td>
