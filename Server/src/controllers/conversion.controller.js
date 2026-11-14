@@ -7,6 +7,7 @@ const Sequence = require('../models/Sequence.model');
 const writeAuditLog = require('../utils/writeAuditLog');
 const { calculateSheetConsumption } = require('../utils/sheetConversion');
 const { calculateMaterialCost } = require('../utils/materialCosting');
+const { buildDateRangeFilter, isValidDateOnly } = require('../utils/dateFilters');
 
 exports.recordConversion = async (req, res) => {
   const {
@@ -15,9 +16,14 @@ exports.recordConversion = async (req, res) => {
     customerId,
     itemName,
     dimensions,
-    boxesProduced: rawBoxesProduced
+    boxesProduced: rawBoxesProduced,
+    conversionDate: rawConversionDate
   } = req.body || {};
 
+  if (rawConversionDate !== undefined && !isValidDateOnly(rawConversionDate)) {
+    return res.status(400).json({ message: 'Conversion date must be a real calendar date in YYYY-MM-DD format.' });
+  }
+  const conversionDate = rawConversionDate ? new Date(rawConversionDate + 'T00:00:00+05:30') : new Date();
   const sheetsConsumed = Number(rawSheetsConsumed);
   const boxesProduced = Number(rawBoxesProduced);
   if (!mongoose.isValidObjectId(sheetId) || !mongoose.isValidObjectId(customerId)) {
@@ -107,6 +113,7 @@ exports.recordConversion = async (req, res) => {
           height: Number(dimensions.height)
         },
         sourceSheetId: sheet._id,
+        manufacturedAt: conversionDate,
         quantityProduced: boxesProduced,
         quantityAvailable: boxesProduced,
         materialCost,
@@ -185,5 +192,25 @@ exports.getAvailableSheets = async (req, res) => {
   } catch (error) {
     console.error('[CONVERSION] Sheet query failed:', error.message);
     return res.status(500).json({ message: 'Unable to fetch available sheet stock.' });
+  }
+};
+
+exports.getFinishedGoods = async (req, res) => {
+  try {
+    const filter = buildDateRangeFilter(req.query.from, req.query.to, 'manufacturedAt');
+    if (req.query.customerId) {
+      if (!mongoose.isValidObjectId(req.query.customerId)) return res.status(400).json({ message: 'Invalid customer ID.' });
+      filter.customerId = req.query.customerId;
+    }
+    const finishedGoods = await FinishedBox.find(filter)
+      .populate('customerId', 'name')
+      .populate('sourceSheetId', 'ply lengthInches widthInches')
+      .sort({ manufacturedAt: -1, createdAt: -1 })
+      .limit(1000)
+      .lean();
+    return res.json({ finishedGoods });
+  } catch (error) {
+    console.error('[CONVERSION] Finished goods history query failed:', error.message);
+    return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Unable to fetch finished goods history.' });
   }
 };
