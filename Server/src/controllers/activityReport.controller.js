@@ -6,6 +6,7 @@ const Invoice = require('../models/Invoice.model');
 const Expense = require('../models/Expense.model');
 const ScrapSale = require('../models/ScrapSale.model');
 const StockMovement = require('../models/StockMovement.model');
+const Party = require('../models/Party.model');
 const { buildDateRangeFilter } = require('../utils/dateFilters');
 
 const numeric = (value) => Number(value === null || value === undefined ? 0 : value.toString());
@@ -37,7 +38,8 @@ function emptyPeriod(key) {
     stockMovements: 0,
     reelQtyChange: 0, reelWeightChangeKg: 0,
     sheetQtyChange: 0, sheetWeightChangeKg: 0,
-    finishedGoodsQtyChange: 0
+    finishedGoodsQtyChange: 0,
+    customerCollections: 0, supplierPayments: 0
   };
 }
 
@@ -89,6 +91,10 @@ exports.getActivityReport = async (req, res) => {
     const expenseFilter = buildDateRangeFilter(req.query.from, req.query.to, 'expenseDate');
     const scrapFilter = buildDateRangeFilter(req.query.from, req.query.to, 'saleDate');
     const movementDateRange = buildDateRangeFilter(req.query.from, req.query.to, 'movementDate').movementDate;
+    const paymentDateRange = buildDateRangeFilter(req.query.from, req.query.to, 'ledger.date')['ledger.date'];
+    const paymentPartyFilter = paymentDateRange
+      ? { ledger: { $elemMatch: { date: paymentDateRange, type: { $in: ['Payment Received', 'Payment Sent'] } } } }
+      : { 'ledger.type': { $in: ['Payment Received', 'Payment Sent'] } };
     const movementFilter = movementDateRange ? {
       $or: [
         { movementDate: movementDateRange },
@@ -99,7 +105,7 @@ exports.getActivityReport = async (req, res) => {
     productionFilter.status = 'completed';
     invoiceFilter.status = { $ne: 'Cancelled' };
 
-    const [receipts, runs, finishedGoods, dispatches, invoices, expenses, scrapSales, movements] = await Promise.all([
+    const [receipts, runs, finishedGoods, dispatches, invoices, expenses, scrapSales, movements, paymentParties] = await Promise.all([
       InwardReceipt.find(receiptFilter).populate('supplierId', 'name').lean(),
       ProductionRun.find(productionFilter).lean(),
       FinishedBox.find(finishedFilter).populate('customerId', 'name').lean(),
@@ -107,7 +113,8 @@ exports.getActivityReport = async (req, res) => {
       Invoice.find(invoiceFilter).populate('customerId', 'name').lean(),
       Expense.find(expenseFilter).lean(),
       ScrapSale.find(scrapFilter).lean(),
-      StockMovement.find(movementFilter).lean()
+      StockMovement.find(movementFilter).lean(),
+      Party.find(paymentPartyFilter).select('name type ledger').lean()
     ]);
 
     const dailyMap = new Map();
@@ -173,6 +180,20 @@ exports.getActivityReport = async (req, res) => {
       party.invoices += 1;
       party.salesExGst += Number(invoice.subTotal || 0);
       party.receivables += Number(invoice.balanceDue || 0);
+    }
+
+    for (const party of paymentParties) {
+      for (const entry of party.ledger || []) {
+        if (!['Payment Received', 'Payment Sent'].includes(entry.type)) continue;
+        const date = new Date(entry.date);
+        if (Number.isNaN(date.getTime())) continue;
+        if (paymentDateRange && ((paymentDateRange.$gte && date < paymentDateRange.$gte) || (paymentDateRange.$lt && date >= paymentDateRange.$lt))) continue;
+        if (entry.type === 'Payment Received') {
+          add(date, (row) => { row.customerCollections += Number(entry.credit || 0); });
+        } else {
+          add(date, (row) => { row.supplierPayments += Number(entry.debit || 0); });
+        }
+      }
     }
 
     for (const expense of expenses) {
