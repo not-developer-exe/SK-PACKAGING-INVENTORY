@@ -9,7 +9,7 @@ export const dispatchService = {
     const { data } = await axiosClient.get("/dispatch");
     return data.dispatches;
   },
-  async recordDispatch(payload) {
+  async cancelDispatch(id, reason) {\n    const { data } = await axiosClient.patch(`/dispatch/${id}/cancel`, { reason });\n    return data;\n  },\n  async recordDispatch(payload) {
     const { data } = await axiosClient.post("/dispatch", payload);
     return data;
   },
