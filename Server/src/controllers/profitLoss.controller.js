@@ -118,11 +118,13 @@ exports.getProfitLoss = async (req, res) => {
       expenseByCategory,
       notes: [
         'Sales revenue is shown excluding GST.',
-        'Cost of goods sold uses reel landed cost allocated to produced sheets by output weight, then to finished boxes by consumed sheet weight.',
+        'Cost of goods sold currently captures raw-material cost: reel landed cost is allocated to produced sheets by output weight, then to finished boxes by consumed sheet weight.',
+        'Factory conversion overheads such as labour, power and rent are recorded as period operating expenses, not allocated into unsold finished-goods inventory.',
         'Invoices without a recorded manufacturing cost are excluded from gross-profit totals and counted as uncosted.',
         'Scrap sale proceeds are shown separately and are not included in gross profit.',
         'Process-loss cost is an estimate using average raw material cost per input kilogram; it is not a separately posted accounting expense.',
-        'Operating profit = costed gross profit + scrap proceeds - recorded operating expenses. Finance costs are then deducted to show net profit before tax.',
+        'Operating profit = costed material gross profit + scrap proceeds - recorded operating expenses. Finance costs are then deducted to show net profit before tax.',
+        'This is an operational management report, not a statutory financial statement; depreciation, income-tax provisions and required inventory overhead adjustments are not included.',
         'Invoices without cost snapshots remain excluded from gross profit and operating profit; review costing coverage before relying on the result.',
         'Expenses marked stock landed cost are excluded from expense totals because eligible inbound freight should already be capitalized into reel landed cost.'
       ]
