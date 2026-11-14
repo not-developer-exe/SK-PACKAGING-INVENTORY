@@ -10,6 +10,17 @@ function calculateLandedRatePerKg({ ratePerKg, freightCharges = 0, otherCharges 
   return Number((rate + (freight + other) / weight).toFixed(6));
 }
 
+function resolveLandedRatePerKg(landedRatePerKg, baseRatePerKg) {
+  const landed = Number(landedRatePerKg);
+  const base = Number(baseRatePerKg);
+  if (!Number.isFinite(landed) || landed < 0 || !Number.isFinite(base) || base < 0) {
+    throw new TypeError('Landed and base rates must be finite and non-negative.');
+  }
+  // Legacy reel records predate landedRatePerKg; a missing/default zero landed rate
+  // must not erase their recorded base purchase rate.
+  return landed > 0 || base === 0 ? landed : base;
+}
+
 function calculateMaterialCost(weightKg, ratePerKg) {
   const weight = Number(weightKg);
   const rate = Number(ratePerKg);
@@ -28,4 +39,4 @@ function calculateUnitMaterialCost(totalMaterialCost, outputWeightKg) {
   return Number((cost / weight).toFixed(6));
 }
 
-module.exports = { calculateLandedRatePerKg, calculateMaterialCost, calculateUnitMaterialCost };
+module.exports = { calculateLandedRatePerKg, resolveLandedRatePerKg, calculateMaterialCost, calculateUnitMaterialCost };
