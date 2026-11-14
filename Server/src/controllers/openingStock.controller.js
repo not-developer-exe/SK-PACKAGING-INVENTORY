@@ -102,6 +102,7 @@ exports.createOpeningStockAdjustment = async (req, res) => {
             originalWeightKg: weight,
             remainingWeightKg: weight,
             ratePerKg: line.ratePerKg,
+            landedRatePerKg: line.ratePerKg,
             status: 'available'
           };
         });
