@@ -104,6 +104,25 @@ test('admin console and expense register enforce roles and keep an audit trail',
   assert.equal(unchangedParty.balance, 0);
   assert.equal(unchangedParty.ledger.length, 0);
 
+  const auditedParty = await api('/api/parties', {
+    method: 'POST',
+    body: { name: 'Audit Trail Supplier', type: 'Supplier', phone: '9999999999', city: 'Gwalior' }
+  });
+  assert.equal(auditedParty.status, 201);
+  const partyUpdate = await api('/api/parties/' + auditedParty.data._id, {
+    method: 'PATCH',
+    body: { city: 'Indore' }
+  });
+  assert.equal(partyUpdate.status, 200);
+  const partyArchive = await api('/api/parties/' + auditedParty.data._id, { method: 'DELETE' });
+  assert.equal(partyArchive.status, 200);
+  const partyAuditActions = await AuditLog.find({
+    entityType: 'Party',
+    entityId: auditedParty.data._id,
+    action: { $in: ['party.created', 'party.updated', 'party.archived'] }
+  }).lean();
+  assert.deepEqual(new Set(partyAuditActions.map(item => item.action)), new Set(['party.created', 'party.updated', 'party.archived']));
+
   const protectedInvoiceList = await api('/api/admin-records/invoices');
   assert.equal(protectedInvoiceList.status, 200);
   assert.equal(protectedInvoiceList.data.readOnly, true);
