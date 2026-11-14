@@ -79,7 +79,19 @@ exports.getPhysicalReels = async (req, res) => {
     const reels = await require("../models/ReelUnit.model")
       .find({ status: { $in: ["available", "partial"] } })
       .populate("supplierId", "name")
-      .sort({ createdAt: 1 }); // Oldest reels first (FIFO)
+      .populate("inwardReceiptId", "receiptDate")
+      .populate("openingStockAdjustmentId", "adjustmentDate")
+      .sort({ createdAt: 1 });
+
+    // FIFO follows the original receipt/stock-entry date, not when a backdated record was entered.
+    const receivedAt = (reel) =>
+      reel.inwardReceiptId?.receiptDate ||
+      reel.openingStockAdjustmentId?.adjustmentDate ||
+      reel.createdAt;
+    reels.sort((a, b) =>
+      new Date(receivedAt(a)).getTime() - new Date(receivedAt(b)).getTime() ||
+      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
     res.json({ reels });
   } catch (error) {
     res
