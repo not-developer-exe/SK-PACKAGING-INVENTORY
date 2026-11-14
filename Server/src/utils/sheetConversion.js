@@ -7,11 +7,11 @@ function calculateSheetConsumption({ availableSheets, availableWeightKg, sheetsC
       !Number.isInteger(requested) || requested <= 0) {
     throw new TypeError('Sheet stock and requested quantity must be valid non-negative values.');
   }
-  if (requested > stockCount) {
-    throw new RangeError('Insufficient sheets. Available: ' + stockCount + ', requested: ' + requested + '.');
-  }
   if (stockCount === 0 || stockWeight === 0) {
     throw new RangeError('The selected sheet batch has no remaining weight or quantity.');
+  }
+  if (requested > stockCount) {
+    throw new RangeError('Insufficient sheets. Available: ' + stockCount + ', requested: ' + requested + '.');
   }
   const weightPerSheet = stockWeight / stockCount;
   const consumedWeightKg = weightPerSheet * requested;
