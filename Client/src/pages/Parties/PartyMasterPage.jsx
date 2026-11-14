@@ -12,6 +12,8 @@ export default function PartyMasterPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const [parties, setParties] = useState([]);
+  const [archivedParties, setArchivedParties] = useState([]);
+  const [showArchived, setShowArchived] = useState(false);
   const [selectedParty, setSelectedParty] = useState(null);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('All');
@@ -46,6 +48,31 @@ export default function PartyMasterPage() {
   };
 
   useEffect(() => { loadParties(); }, []);
+
+  const loadArchivedParties = async () => {
+    try {
+      const { data } = await axiosClient.get('/parties/archived');
+      setArchivedParties(data.parties || []);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Unable to load archived parties.');
+    }
+  };
+
+  const restoreParty = async (party) => {
+    if (!window.confirm('Restore ' + party.name + ' to active customer/supplier lists?')) return;
+    setSaving(true);
+    setError('');
+    try {
+      const { data } = await axiosClient.patch('/parties/' + party._id + '/restore');
+      setArchivedParties((current) => current.filter((item) => item._id !== party._id));
+      setParties((current) => [...current, data.party].sort((a, b) => a.name.localeCompare(b.name)));
+      setSuccess('Party restored successfully.');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Unable to restore party.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const filteredParties = useMemo(() => parties.filter((party) => {
     const matchesSearch = party.name.toLowerCase().includes(search.toLowerCase());
@@ -162,7 +189,10 @@ export default function PartyMasterPage() {
           <h1 className="text-2xl font-bold text-slate-900">Party Master</h1>
           <p className="mt-1 text-sm text-slate-500">Live customer and supplier records with account statements.</p>
         </div>
-        {!selectedParty && <button onClick={openAdd} className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white"><UserPlus size={16} className="mr-2 inline" />Add New Party</button>}
+        {!selectedParty && <div className="flex flex-wrap gap-2">
+          {isAdmin && <button onClick={() => { const next = !showArchived; setShowArchived(next); if (next) loadArchivedParties(); }} className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700">{showArchived ? 'Hide archived' : 'Archived parties'}</button>}
+          <button onClick={openAdd} className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white"><UserPlus size={16} className="mr-2 inline" />Add New Party</button>
+        </div>}
       </div>
 
       {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
@@ -242,6 +272,14 @@ export default function PartyMasterPage() {
           )}
         </div>
       )}
+
+      {!selectedParty && isAdmin && showArchived && <section className="rounded-2xl border border-slate-200 bg-white p-4">
+        <div className="mb-3 flex items-center justify-between"><h2 className="font-semibold text-slate-900">Archived parties</h2><button onClick={loadArchivedParties} className="text-sm text-blue-700">Refresh</button></div>
+        {archivedParties.length ? <div className="divide-y">{archivedParties.map((party) => <div key={party._id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+          <div><p className="font-medium text-slate-900">{party.name}</p><p className="text-xs text-slate-500">{party.type} · Balance {money(party.balance)} · {party.ledger?.length || 0} retained ledger entries</p></div>
+          <button disabled={saving} onClick={() => restoreParty(party)} className="rounded-lg border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-700 disabled:opacity-50">Restore</button>
+        </div>)}</div> : <p className="text-sm text-slate-500">No archived parties.</p>}
+      </section>}
 
       {showPartyModal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => setShowPartyModal(false)}>
         <form onSubmit={saveParty} onClick={(e) => e.stopPropagation()} className="w-full max-w-lg space-y-4 rounded-2xl bg-white p-6 shadow-xl">
