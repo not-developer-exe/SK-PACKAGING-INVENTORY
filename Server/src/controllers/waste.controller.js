@@ -4,7 +4,7 @@ const ScrapSale = require('../models/ScrapSale.model');
 const WasteInventory = require('../models/WasteInventory.model');
 const { calculateScrapAvailability } = require('../utils/productionAccounting');
 const writeAuditLog = require('../utils/writeAuditLog');
-const { buildDateRangeFilter } = require('../utils/dateFilters');
+const { buildDateRangeFilter, isValidDateOnly } = require('../utils/dateFilters');
 
 const asNumber = (value) => {
   if (value === null || value === undefined) return 0;
@@ -69,6 +69,11 @@ exports.getWasteStats = async (req, res) => {
 
 exports.recordScrapSale = async (req, res) => {
   const buyerName = typeof req.body?.buyerName === 'string' ? req.body.buyerName.trim() : '';
+  const rawSaleDate = req.body?.saleDate;
+  if (rawSaleDate !== undefined && !isValidDateOnly(rawSaleDate)) {
+    return res.status(400).json({ message: 'Scrap sale date must be a real calendar date in YYYY-MM-DD format.' });
+  }
+  const saleDate = rawSaleDate ? new Date(rawSaleDate + 'T00:00:00+05:30') : new Date();
   const weightSoldKg = Number(req.body?.weightSoldKg);
   const ratePerKg = Number(req.body?.ratePerKg);
 
@@ -107,6 +112,7 @@ exports.recordScrapSale = async (req, res) => {
 
       const totalAmount = Math.round(weightSoldKg * ratePerKg * 100) / 100;
       const [sale] = await ScrapSale.create([{
+        saleDate,
         buyerName,
         weightSoldKg,
         ratePerKg,
