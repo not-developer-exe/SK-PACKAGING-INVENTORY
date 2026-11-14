@@ -22,6 +22,24 @@ const models = {
 
 const immutableFields = new Set(['_id', '__v', 'createdAt', 'updatedAt', 'password']);
 
+// These records are connected to stock balances, financial ledgers, invoices,
+// or audit evidence. Editing them as isolated documents can silently break
+// reconciliation. Correct them through their domain workflow instead.
+const workflowManagedEntities = new Set([
+  'reels',
+  'sheets',
+  'finishedBoxes',
+  'productionRuns',
+  'dispatches',
+  'invoices',
+  'inwardReceipts',
+  'scrapSales',
+  'wasteInventory',
+  'stockMovements',
+  'openingStockAdjustments',
+  'stockReconciliations'
+]);
+
 function normalize(value) {
   if (value === null || value === undefined) return value;
   if (value instanceof Date) return value.toISOString();
@@ -50,7 +68,7 @@ exports.listAdminRecords = async (req, res) => {
     const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 100) : '';
     const filter = {};
     if (search) {
-      const escaped = search.replace(/[.*+?^$()|[\]\\]/g, '\\$&').replaceAll('{', '\\{').replaceAll('}', '\\}');
+      const escaped = search.replace(/[.*+?^$()|[\\]\\\\]/g, '\\\\$&').replaceAll('{', '\\\\{').replaceAll('}', '\\\\}');
       const expression = new RegExp(escaped, 'i');
       const searchableStrings = Object.entries(Model.schema.paths)
         .filter(([path, schema]) => schema.instance === 'String' && !path.toLowerCase().includes('password'))
@@ -68,7 +86,15 @@ exports.listAdminRecords = async (req, res) => {
       Model.find(filter).sort({ updatedAt: -1, createdAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).lean(),
       Model.countDocuments(filter)
     ]);
-    return res.json({ entity: req.params.entity, records: records.map(serialize), page, limit, total, totalPages: Math.ceil(total / limit) });
+    return res.json({
+      entity: req.params.entity,
+      records: records.map(serialize),
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      readOnly: req.params.entity === 'auditLogs' || workflowManagedEntities.has(req.params.entity)
+    });
   } catch (error) {
     console.error('[ADMIN RECORDS] List failed:', error.message);
     return res.status(500).json({ message: 'Unable to load records.' });
@@ -79,6 +105,12 @@ exports.updateAdminRecord = async (req, res) => {
   const Model = models[req.params.entity];
   if (!Model) return res.status(404).json({ message: 'Unsupported record type.' });
   if (req.params.entity === 'auditLogs') return res.status(403).json({ message: 'Audit history is read-only.' });
+  if (workflowManagedEntities.has(req.params.entity)) {
+    return res.status(403).json({
+      message: 'This record is connected to inventory or accounting ledgers and is read-only in the generic data console. Use its dedicated module workflow or a controlled reversal/reconciliation.',
+      entity: req.params.entity
+    });
+  }
   if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid record ID.' });
   const { document, reason } = req.body || {};
   if (!document || typeof document !== 'object' || Array.isArray(document)) {
