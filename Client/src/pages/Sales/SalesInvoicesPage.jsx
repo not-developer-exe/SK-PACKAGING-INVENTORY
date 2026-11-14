@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Plus, Filter, RefreshCw } from 'lucide-react';
 import axiosClient from '../../api/axiosClient';
+import DateRangeFilter from '../../components/DateRangeFilter';
 
 const money = (value) => '₹' + Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -12,12 +13,14 @@ export default function SalesInvoicesPage() {
   const [statusFilter, setStatusFilter] = useState('All');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
 
-  const loadInvoices = async () => {
+  const loadInvoices = async (dateParams = {}) => {
     setLoading(true);
     setError('');
     try {
-      const { data } = await axiosClient.get('/invoices');
+      const { data } = await axiosClient.get('/invoices', { params: dateParams });
       setInvoices(data.invoices || []);
     } catch (err) {
       setError(err.response?.data?.message || 'Unable to load invoices.');
@@ -59,10 +62,12 @@ export default function SalesInvoicesPage() {
           <p className="mt-1 text-sm text-slate-500">Live invoices, receipts allocated and customer receivables.</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={loadInvoices} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-600"><RefreshCw size={15} className="mr-1 inline" />Refresh</button>
+          <button onClick={() => loadInvoices({ from, to })} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-600"><RefreshCw size={15} className="mr-1 inline" />Refresh</button>
           <button onClick={() => navigate('/sales/new')} className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white"><Plus size={16} className="mr-1 inline" />New GST Invoice</button>
         </div>
       </div>
+
+      <DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => loadInvoices({ from, to })} onReset={() => { setFrom(''); setTo(''); loadInvoices({}); }} loading={loading} label="Invoice date range" />
 
       {error && <p role="alert" className="rounded-lg border border-red-100 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
 
