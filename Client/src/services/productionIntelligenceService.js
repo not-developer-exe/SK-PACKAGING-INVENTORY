@@ -1,4 +1,4 @@
-import axiosClient from '../../api/axiosClient';
+import axiosClient from '../api/axiosClient';
 export const productionIntelligenceService={
  async getPlans(params={}){const {data}=await axiosClient.get('/production-plans',{params});return data.plans||[];},
  async createPlan(payload){const {data}=await axiosClient.post('/production-plans',payload);return data.plan;},
