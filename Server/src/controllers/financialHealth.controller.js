@@ -20,14 +20,14 @@ exports.getFinancialHealth = async (req, res) => {
     const today = formatDateOnlyLocal(new Date());
     const from = req.query.from || today.slice(0, 7) + '-01';
     const to = req.query.to || today;
-    const range = buildDateRangeFilter(from, to, 'unused');
+    const expenseDateFilter = buildDateRangeFilter(from, to, 'expenseDate');
     const fromDate = new Date(from + 'T00:00:00+05:30');
     const toExclusive = new Date(to + 'T00:00:00+05:30');
     toExclusive.setDate(toExclusive.getDate() + 1);
     const [invoices, expenses, parties, scrapSales] = await Promise.all([
       Invoice.find({ status: { $ne: 'Cancelled' } }).select('invoiceNumber invoiceDate customerId grandTotal balanceDue payments status').populate('customerId', 'name').lean(),
-      Expense.find(buildDateRangeFilter(from, to, 'expenseDate')).select('expenseDate amount category costTreatment paymentMode vendor').lean(),
-      Party.find({ isActive: { $ne: false } }).select('name type balance ledger').lean(),
+      Expense.find(expenseDateFilter).select('expenseDate amount category costTreatment paymentMode vendor').lean(),
+      Party.find({}).select('name type balance ledger isActive').lean(),
       ScrapSale.find(buildDateRangeFilter(from, to, 'saleDate')).select('saleDate totalAmount buyerName').lean()
     ]);
 
@@ -124,7 +124,7 @@ exports.getFinancialHealth = async (req, res) => {
       },
       notes: [
         'Customer collections use payment allocations recorded against invoices, not invoice totals.',
-        'Supplier payments use Payment Sent entries in party ledgers.',
+        'Supplier payments use Payment Sent entries in all party ledgers, including archived parties, so historical outflows remain visible.',
         'Expenses use their recorded expense date as a cash-outflow proxy; the register does not currently store a separate payment date or unpaid expense status.',
         'Stock landed-cost expenses are excluded to avoid double counting freight already capitalized into reel landed cost.',
         'Receivable aging is based on invoice date because contractual due dates are not currently stored.',

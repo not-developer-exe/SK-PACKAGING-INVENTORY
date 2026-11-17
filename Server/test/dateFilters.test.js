@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { isValidDateOnly, buildDateRangeFilter } = require('../src/utils/dateFilters');
+const { isValidDateOnly, buildDateRangeFilter, formatDateOnlyLocal } = require('../src/utils/dateFilters');
 
 test('accepts real calendar dates and leap days', () => {
   assert.equal(isValidDateOnly('2024-02-29'), true);
@@ -27,8 +27,8 @@ test('rejects invalid and reversed date ranges with HTTP 400 errors', () => {
 });
 
 
-test('formats default report dates using local calendar components', () => {
-  const { formatDateOnlyLocal } = require('../src/utils/dateFilters');
-  const date = new Date(2026, 10, 1, 0, 15, 0);
-  assert.equal(formatDateOnlyLocal(date), '2026-11-01');
+test('formats report dates using the India calendar regardless of server timezone', () => {
+  assert.equal(formatDateOnlyLocal(new Date('2026-10-31T20:00:00.000Z')), '2026-11-01');
+  assert.equal(formatDateOnlyLocal(new Date('2026-11-01T17:59:59.000Z')), '2026-11-01');
+  assert.equal(formatDateOnlyLocal(new Date('2026-11-01T18:30:00.000Z')), '2026-11-02');
 });

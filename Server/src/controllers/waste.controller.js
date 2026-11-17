@@ -92,14 +92,15 @@ exports.recordScrapSale = async (req, res) => {
         { upsert: true, new: true, setDefaultsOnInsert: true, session }
       );
 
-      const [generatedRows, soldRows] = await Promise.all([
-        ProductionRun.aggregate([
-          { $group: { _id: null, total: { $sum: { $ifNull: ['$recoverableWasteKg', 0] } } } }
-        ]).session(session),
-        ScrapSale.aggregate([
-          { $group: { _id: null, total: { $sum: '$weightSoldKg' } } }
-        ]).session(session)
-      ]);
+      // Do not run parallel operations on a single MongoDB transaction session.
+      // The shared WasteInventory revision write serializes concurrent scrap sales;
+      // sequential reads keep the availability calculation on the same snapshot.
+      const generatedRows = await ProductionRun.aggregate([
+        { $group: { _id: null, total: { $sum: { $ifNull: ['$recoverableWasteKg', 0] } } } }
+      ]).session(session);
+      const soldRows = await ScrapSale.aggregate([
+        { $group: { _id: null, total: { $sum: '$weightSoldKg' } } }
+      ]).session(session);
 
       const generated = asNumber(generatedRows[0] && generatedRows[0].total);
       const sold = asNumber(soldRows[0] && soldRows[0].total);

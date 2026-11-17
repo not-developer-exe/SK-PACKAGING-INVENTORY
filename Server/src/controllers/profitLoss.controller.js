@@ -1,4 +1,3 @@
-const mongoose = require('mongoose');
 const Invoice = require('../models/Invoice.model');
 const ScrapSale = require('../models/ScrapSale.model');
 const ProductionRun = require('../models/ProductionRun.model');
@@ -11,10 +10,10 @@ const numeric = (value) => Number(value === null || value === undefined ? 0 : va
 
 exports.getProfitLoss = async (req, res) => {
   try {
-    const today = new Date();
-    const defaultFrom = formatDateOnlyLocal(new Date(today.getFullYear(), today.getMonth(), 1));
+    const today = formatDateOnlyLocal(new Date());
+    const defaultFrom = today.slice(0, 7) + '-01';
     const from = req.query.from || defaultFrom;
-    const to = req.query.to || formatDateOnlyLocal(today);
+    const to = req.query.to || today;
     if (!isValidDateOnly(from) || !isValidDateOnly(to)) {
       return res.status(400).json({ message: 'Use YYYY-MM-DD for report dates.' });
     }
