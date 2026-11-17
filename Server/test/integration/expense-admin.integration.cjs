@@ -128,8 +128,8 @@ test('admin console and expense register enforce roles and keep an audit trail',
     type: 'Both',
     balance: 0,
     ledger: [
-      { type: 'Payment Received', ref: 'OLD-RECEIPT', debit: 0, credit: 500, balance: -500 },
-      { type: 'Payment Sent', ref: 'OLD-PAYMENT', debit: 500, credit: 0, balance: 0 }
+      { date: new Date('2026-11-14T00:00:00+05:30'), type: 'Payment Received', ref: 'OLD-RECEIPT', debit: 0, credit: 500, balance: -500 },
+      { date: new Date('2026-11-14T00:00:00+05:30'), type: 'Payment Sent', ref: 'OLD-PAYMENT', debit: 500, credit: 0, balance: 0 }
     ]
   });
   const historicalArchive = await api('/api/parties/' + historicalParty._id, { method: 'DELETE' });
@@ -138,6 +138,9 @@ test('admin console and expense register enforce roles and keep an audit trail',
   assert.equal(archivedHistoricalParty.isActive, false);
   assert.equal(archivedHistoricalParty.ledger.length, 2);
   assert.equal(archivedHistoricalParty.balance, 0);
+  const historicalCashFlow = await api('/api/reports/financial-health?from=2026-11-01&to=2026-11-30');
+  assert.equal(historicalCashFlow.status, 200);
+  assert.equal(historicalCashFlow.data.cashFlow.supplierPayments, 500);
   const archivedPartyList = await api('/api/parties/archived');
   assert.equal(archivedPartyList.status, 200);
   assert.ok(archivedPartyList.data.parties.some(item => String(item._id) === String(historicalParty._id)));
@@ -730,6 +733,28 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
   assert.equal(updatedInvoice.payments.length, 2);
   assert.equal(finalPayment.data.balance, 0);
 
+  const accountantDelivery = await api('/api/dispatch/' + dispatch._id + '/delivered', {
+    method: 'PATCH',
+    cookie: accountantCookie,
+    body: { notes: 'POD signed by receiving customer.' }
+  });
+  assert.equal(accountantDelivery.status, 403);
+  const deliveryConfirmation = await api('/api/dispatch/' + dispatch._id + '/delivered', {
+    method: 'PATCH',
+    body: { notes: 'POD signed by receiving customer; reference POD-001.' }
+  });
+  assert.equal(deliveryConfirmation.status, 200);
+  assert.equal(deliveryConfirmation.data.dispatch.status, 'delivered');
+  assert.ok(deliveryConfirmation.data.dispatch.deliveredAt);
+  assert.equal(deliveryConfirmation.data.dispatch.deliveryNotes, 'POD signed by receiving customer; reference POD-001.');
+  const trace = await api('/api/production-intelligence/trace?batchNumber=' + encodeURIComponent(finishedBox.batchNumber));
+  assert.equal(trace.status, 200);
+  assert.ok(trace.data.trace.dispatches.some(item =>
+    String(item._id) === String(dispatch._id) &&
+    item.status === 'delivered' &&
+    item.deliveryNotes === 'POD signed by receiving customer; reference POD-001.'
+  ));
+
   for (const expense of [
     { expenseDate: '2026-10-18', category: 'electricity', amount: 200, paymentMode: 'bank_transfer', costTreatment: 'operating_expense' },
     { expenseDate: '2026-10-18', category: 'interest', amount: 100, paymentMode: 'bank_transfer', costTreatment: 'finance_cost' },
@@ -807,4 +832,19 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
   assert.equal(fifoSheets.status, 200);
   assert.equal(fifoSheets.data.sheets[0].productionRunId.runNumber, run.runNumber);
   assert.equal(fifoSheets.data.sheets.at(-1).productionRunId.runNumber, tinyResidualRun.data.runNumber);
+
+  const scrapSale = await api('/api/waste/sale', {
+    method: 'POST',
+    body: { buyerName: 'Integration Scrap Buyer', saleDate: '2026-10-21', weightSoldKg: 4.5, ratePerKg: 10 }
+  });
+  assert.equal(scrapSale.status, 201);
+  assert.equal(scrapSale.data.sale.totalAmount, 45);
+  const oversoldScrap = await api('/api/waste/sale', {
+    method: 'POST',
+    body: { buyerName: 'Integration Scrap Buyer', saleDate: '2026-10-21', weightSoldKg: 1, ratePerKg: 10 }
+  });
+  assert.equal(oversoldScrap.status, 409);
+  const wasteStats = await api('/api/waste');
+  assert.equal(wasteStats.status, 200);
+  assert.ok(Math.abs(wasteStats.data.currentWasteInventory - 0.6) < 1e-9);
 });
