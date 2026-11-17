@@ -704,6 +704,11 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
   assert.equal(cancelledDispatch.status, 200);
   assert.equal(cancelledDispatch.data.dispatch.status, 'cancelled');
   assert.equal((await FinishedBox.findById(finishedBox._id)).quantityAvailable, 400);
+  const cancelledDispatchActivity = await api('/api/reports/activity?from=2026-10-18&to=2026-10-18');
+  assert.equal(cancelledDispatchActivity.status, 200);
+  assert.equal(cancelledDispatchActivity.data.summary.dispatches, 0);
+  assert.equal(cancelledDispatchActivity.data.summary.boxesDispatched, 0);
+  assert.equal(cancelledDispatchActivity.data.summary.cancelledDispatches, 1);
   assert.ok(await StockMovement.exists({
     referenceId: secondDispatch._id,
     movementType: 'adjustment',

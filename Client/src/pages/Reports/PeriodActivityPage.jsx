@@ -54,7 +54,7 @@ export default function PeriodActivityPage() {
             <Metric icon={Package} label="Paper inward" value={qty(report.summary.inwardWeightKg) + ' kg'} detail={report.summary.inwardReceipts + ' receipts · ' + qty(report.summary.inwardReels) + ' reels'} />
             <Metric icon={Factory} label="Production" value={report.summary.productionRuns + ' runs'} detail={qty(report.summary.inputWeightKg) + ' kg input · ' + qty(report.summary.sheetOutputWeightKg) + ' kg sheets'} />
             <Metric icon={Package} label="Finished goods" value={qty(report.summary.boxesProduced) + ' boxes'} detail={report.summary.finishedBatches + ' batches'} />
-            <Metric icon={Truck} label="Dispatches" value={qty(report.summary.boxesDispatched) + ' boxes'} detail={report.summary.dispatches + ' challans'} />
+            <Metric icon={Truck} label="Dispatches" value={qty(report.summary.boxesDispatched) + ' boxes'} detail={report.summary.dispatches + ' active challans · ' + (report.summary.cancelledDispatches || 0) + ' cancelled'} />
             <Metric icon={Receipt} label="Sales (ex-GST)" value={money(report.summary.salesExGst)} detail={report.summary.invoices + ' invoices'} />
             <Metric icon={Wallet} label="Expenses recorded" value={money(report.summary.expenses)} detail={report.summary.expenseEntries + ' entries'} />
             <Metric icon={Trash2} label="Scrap sold" value={qty(report.summary.scrapWeightKg) + ' kg'} detail={money(report.summary.scrapRevenue) + ' proceeds · ' + report.summary.scrapSales + ' sales'} />
@@ -81,7 +81,7 @@ export default function PeriodActivityPage() {
                     <th className="px-3 py-3">{view === 'daily' ? 'Date' : 'Month'}</th>
                     <th className="px-3 py-3 text-right">Inward kg</th><th className="px-3 py-3 text-right">Reels</th>
                     <th className="px-3 py-3 text-right">Production runs</th><th className="px-3 py-3 text-right">Input kg</th><th className="px-3 py-3 text-right">Sheet kg</th>
-                    <th className="px-3 py-3 text-right">Boxes made</th><th className="px-3 py-3 text-right">Dispatch boxes</th>
+                    <th className="px-3 py-3 text-right">Boxes made</th><th className="px-3 py-3 text-right">Dispatch boxes</th><th className="px-3 py-3 text-right">Cancelled challans</th>
                     <th className="px-3 py-3 text-right">Invoices</th><th className="px-3 py-3 text-right">Sales</th>
                     <th className="px-3 py-3 text-right">Receivables</th><th className="px-3 py-3 text-right">Collections</th><th className="px-3 py-3 text-right">Supplier payments</th><th className="px-3 py-3 text-right">Expenses</th>
                     <th className="px-3 py-3 text-right">Scrap kg</th><th className="px-3 py-3 text-right">Scrap revenue</th><th className="px-3 py-3 text-right">Reel Δ kg</th><th className="px-3 py-3 text-right">Sheet Δ kg</th><th className="px-3 py-3 text-right">Finished qty Δ</th><th className="px-3 py-3 text-right">Stock moves</th>
@@ -90,11 +90,11 @@ export default function PeriodActivityPage() {
                     <td className="px-3 py-3 font-semibold">{row.key}</td>
                     <td className="px-3 py-3 text-right">{qty(row.inwardWeightKg)}</td><td className="px-3 py-3 text-right">{qty(row.inwardReels)}</td>
                     <td className="px-3 py-3 text-right">{row.productionRuns}</td><td className="px-3 py-3 text-right">{qty(row.inputWeightKg)}</td><td className="px-3 py-3 text-right">{qty(row.sheetOutputWeightKg)}</td>
-                    <td className="px-3 py-3 text-right">{qty(row.boxesProduced)}</td><td className="px-3 py-3 text-right">{qty(row.boxesDispatched)}</td>
+                    <td className="px-3 py-3 text-right">{qty(row.boxesProduced)}</td><td className="px-3 py-3 text-right">{qty(row.boxesDispatched)}</td><td className="px-3 py-3 text-right">{row.cancelledDispatches || 0}</td>
                     <td className="px-3 py-3 text-right">{row.invoices}</td><td className="px-3 py-3 text-right font-medium">{money(row.salesExGst)}</td>
                     <td className="px-3 py-3 text-right">{money(row.receivables)}</td><td className="px-3 py-3 text-right">{money(row.customerCollections)}</td><td className="px-3 py-3 text-right">{money(row.supplierPayments)}</td><td className="px-3 py-3 text-right">{money(row.expenses)}</td>
                     <td className="px-3 py-3 text-right">{qty(row.scrapWeightKg)}</td><td className="px-3 py-3 text-right">{money(row.scrapRevenue)}</td><td className="px-3 py-3 text-right">{qty(row.reelWeightChangeKg)}</td><td className="px-3 py-3 text-right">{qty(row.sheetWeightChangeKg)}</td><td className="px-3 py-3 text-right">{qty(row.finishedGoodsQtyChange)}</td><td className="px-3 py-3 text-right">{row.stockMovements}</td>
-                  </tr>)}{!rows.length && <EmptyRow colSpan={20} />}</tbody>
+                  </tr>)}{!rows.length && <EmptyRow colSpan={21} />}</tbody>
                 </table>
               ) : view === 'party' ? (
                 <table className="w-full min-w-[1100px] text-left text-sm">

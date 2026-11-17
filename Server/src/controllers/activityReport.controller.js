@@ -31,7 +31,7 @@ function emptyPeriod(key) {
     inwardReceipts: 0, inwardReels: 0, inwardWeightKg: 0,
     productionRuns: 0, inputWeightKg: 0, sheetOutputWeightKg: 0,
     finishedBatches: 0, boxesProduced: 0,
-    dispatches: 0, boxesDispatched: 0,
+    dispatches: 0, boxesDispatched: 0, cancelledDispatches: 0,
     invoices: 0, salesExGst: 0, receivables: 0,
     expenses: 0, expenseEntries: 0,
     scrapSales: 0, scrapWeightKg: 0, scrapRevenue: 0,
@@ -161,6 +161,10 @@ exports.getActivityReport = async (req, res) => {
 
     for (const dispatch of dispatches) {
       const quantity = (dispatch.boxes || []).reduce((sum, line) => sum + Number(line.dispatchQuantity || 0), 0);
+      if (dispatch.status === 'cancelled') {
+        add(dispatch.dispatchDate, (row) => { row.cancelledDispatches += 1; });
+        continue;
+      }
       add(dispatch.dispatchDate, (row) => {
         row.dispatches += 1;
         row.boxesDispatched += quantity;
