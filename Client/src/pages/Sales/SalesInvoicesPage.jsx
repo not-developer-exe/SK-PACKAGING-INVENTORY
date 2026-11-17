@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Filter, RefreshCw } from 'lucide-react';
+import { Search, Plus, Filter, RefreshCw, Ban } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 import axiosClient from '../../api/axiosClient';
 import DateRangeFilter from '../../components/DateRangeFilter';
 import { partiesService } from '../../services/partiesService';
@@ -9,6 +10,7 @@ const money = (value) => '₹' + Number(value || 0).toLocaleString('en-IN', { mi
 
 export default function SalesInvoicesPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [invoices, setInvoices] = useState([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -18,6 +20,7 @@ export default function SalesInvoicesPage() {
   const [to, setTo] = useState('');
   const [customerFilter, setCustomerFilter] = useState('');
   const [customers, setCustomers] = useState([]);
+  const [cancellingId, setCancellingId] = useState('');
 
   const loadInvoices = async (dateParams = {}) => {
     setLoading(true);
@@ -42,6 +45,20 @@ export default function SalesInvoicesPage() {
     const matchesStatus = statusFilter === 'All' || invoice.status === statusFilter;
     return matchesSearch && matchesStatus;
   }), [invoices, search, statusFilter]);
+
+
+  const cancelInvoice = async (invoice) => {
+    const reason = window.prompt('Reason for cancelling invoice ' + invoice.invoiceNumber + ' (minimum 10 characters):');
+    if (reason === null) return;
+    if (reason.trim().length < 10) { setError('Please enter a cancellation reason of at least 10 characters.'); return; }
+    if (!window.confirm('Cancel this unpaid invoice and reverse its customer ledger debit?')) return;
+    setCancellingId(invoice._id); setError('');
+    try {
+      await axiosClient.patch('/invoices/' + invoice._id + '/cancel', { reason: reason.trim() });
+      await loadInvoices({ from, to, customerId: customerFilter });
+    } catch (err) { setError(err.response?.data?.message || 'Unable to cancel invoice.'); }
+    finally { setCancellingId(''); }
+  };
 
   const activeInvoices = invoices.filter((invoice) => invoice.status !== 'Cancelled');
   const totalSales = activeInvoices.reduce((sum, invoice) => sum + Number(invoice.grandTotal || 0), 0);
@@ -89,7 +106,7 @@ export default function SalesInvoicesPage() {
         {loading ? <p className="p-10 text-center text-sm text-slate-500">Loading invoices...</p> : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-left text-sm">
-              <thead className="border-b bg-white text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-4">Date</th><th className="px-5 py-4">Invoice No.</th><th className="px-5 py-4">Customer</th><th className="px-5 py-4">Challan</th><th className="px-5 py-4 text-right">Invoice Total</th><th className="px-5 py-4 text-right">Balance Due</th><th className="px-5 py-4 text-right">Gross Profit</th><th className="px-5 py-4 text-center">Status</th></tr></thead>
+              <thead className="border-b bg-white text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-4">Date</th><th className="px-5 py-4">Invoice No.</th><th className="px-5 py-4">Customer</th><th className="px-5 py-4">Challan</th><th className="px-5 py-4 text-right">Invoice Total</th><th className="px-5 py-4 text-right">Balance Due</th><th className="px-5 py-4 text-right">Gross Profit</th><th className="px-5 py-4 text-center">Status</th>{user?.role === "admin" && <th className="px-5 py-4 text-center">Action</th>}</tr></thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredInvoices.map((invoice) => <tr key={invoice._id} className="hover:bg-slate-50">
                   <td className="px-5 py-4 text-slate-600">{new Date(invoice.invoiceDate).toLocaleDateString('en-IN')}</td>
@@ -99,9 +116,9 @@ export default function SalesInvoicesPage() {
                   <td className="px-5 py-4 text-right font-medium">{money(invoice.grandTotal)}</td>
                   <td className="px-5 py-4 text-right font-semibold text-amber-700">{money(invoice.balanceDue)}</td>
                   <td className="px-5 py-4 text-right font-semibold">{invoice.costingStatus === 'available' ? money(invoice.grossProfit) : 'Cost pending'}</td>
-                  <td className="px-5 py-4 text-center"><span className={'inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ' + (statusStyle[invoice.status] || statusStyle.Pending)}>{invoice.status}</span></td>
+                  <td className="px-5 py-4 text-center"><span className={'inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ' + (statusStyle[invoice.status] || statusStyle.Pending)}>{invoice.status}</span></td>{user?.role === "admin" && <td className="px-5 py-4 text-center">{invoice.status !== "Cancelled" && invoice.balanceDue >= invoice.grandTotal - 0.005 && !(invoice.payments || []).length ? <button disabled={cancellingId === invoice._id} onClick={() => cancelInvoice(invoice)} className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2 py-1 text-xs text-red-700 disabled:opacity-50"><Ban size={13}/>{cancellingId === invoice._id ? "Cancelling…" : "Cancel"}</button> : <span className="text-xs text-slate-400">—</span>}</td>}
                 </tr>)}
-                {!filteredInvoices.length && <tr><td colSpan="8" className="p-10 text-center text-slate-500">No invoices found for this filter.</td></tr>}
+                {!filteredInvoices.length && <tr><td colSpan={user?.role === "admin" ? 9 : 8} className="p-10 text-center text-slate-500">No invoices found for this filter.</td></tr>}
               </tbody>
             </table>
           </div>
