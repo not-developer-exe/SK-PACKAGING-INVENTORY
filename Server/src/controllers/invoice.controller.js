@@ -9,6 +9,42 @@ const { buildDateRangeFilter, isValidDateOnly } = require('../utils/dateFilters'
 const { matchesDispatchQuantities } = require('../utils/dispatchInvoiceValidation');
 const { recalculatePartyLedger } = require('../utils/partyLedger');
 
+
+exports.cancelInvoice = async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid invoice ID.' });
+  const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
+  if (reason.length < 10 || reason.length > 500) return res.status(400).json({ message: 'Enter a cancellation reason between 10 and 500 characters.' });
+  const session = await mongoose.startSession();
+  try {
+    let cancelled;
+    await session.withTransaction(async () => {
+      const target = await Invoice.findById(req.params.id).session(session);
+      if (!target) throw Object.assign(new Error('Invoice not found.'), { statusCode: 404 });
+      if (target.status === 'Cancelled') throw Object.assign(new Error('Invoice is already cancelled.'), { statusCode: 409 });
+      if ((target.payments || []).length || Math.abs(Number(target.balanceDue || 0) - Number(target.grandTotal || 0)) > 0.005) {
+        throw Object.assign(new Error('This invoice has payment allocations. A credit-note/refund workflow is required; it cannot be cancelled directly.'), { statusCode: 409 });
+      }
+      const dispatch = await Dispatch.findById(target.dispatchId).session(session);
+      if (dispatch?.status === 'delivered') throw Object.assign(new Error('A delivered dispatch cannot be cancelled through this workflow.'), { statusCode: 409 });
+      const party = await Party.findById(target.customerId).session(session);
+      if (!party) throw Object.assign(new Error('Linked customer ledger was not found. No changes were made.'), { statusCode: 409 });
+      const ledgerEntry = party.ledger.find(entry => entry.type === 'Tax Invoice' && entry.ref === target.invoiceNumber);
+      if (!ledgerEntry) throw Object.assign(new Error('Matching invoice entry was not found in the customer ledger. Reconcile the ledger before cancelling.'), { statusCode: 409 });
+      party.ledger.pull({ _id: ledgerEntry._id });
+      party.balance = recalculatePartyLedger(party.ledger);
+      await party.save({ session });
+      target.status = 'Cancelled';
+      target.balanceDue = 0;
+      await target.save({ session });
+      await writeAuditLog(req, { action: 'invoice.cancelled', entityType: 'Invoice', entityId: target._id, entityLabel: target.invoiceNumber, summary: 'Invoice cancelled: ' + target.invoiceNumber, metadata: { reason, customerId: String(target.customerId), dispatchId: String(target.dispatchId), grandTotal: target.grandTotal } }, session);
+      cancelled = target;
+    });
+    return res.json({ message: 'Invoice cancelled and customer ledger debit reversed.', invoice: cancelled });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Unable to cancel invoice.' });
+  } finally { await session.endSession(); }
+};
+
 exports.getInvoices = async (req, res) => {
   try {
     const filter = buildDateRangeFilter(req.query.from, req.query.to, 'invoiceDate');
