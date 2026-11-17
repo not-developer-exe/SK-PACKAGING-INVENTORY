@@ -179,6 +179,29 @@ test('admin console and expense register enforce roles and keep an audit trail',
   assert.equal(await ReelUnit.countDocuments({ inwardReceiptId: archivedSupplierReceiptId }), 0);
   assert.equal((await require('../../src/models/InwardReceipt.model').findById(archivedSupplierReceiptId)).status, 'draft');
 
+  const supplierBillParty = await Party.create({ name: 'Supplier Bill Ledger Test', type: 'Supplier' });
+  const purchaseBill = await api('/api/parties/' + supplierBillParty._id + '/purchase-bill', {
+    method: 'POST',
+    body: { invoiceReference: 'SUP-BILL-2026-001', amount: 10000.5, date: '2026-11-14' }
+  });
+  assert.equal(purchaseBill.status, 201);
+  assert.equal(purchaseBill.data.party.balance, -10000.5);
+  const duplicatePurchaseBill = await api('/api/parties/' + supplierBillParty._id + '/purchase-bill', {
+    method: 'POST',
+    body: { invoiceReference: 'sup-bill-2026-001', amount: 10000.5, date: '2026-11-14' }
+  });
+  assert.equal(duplicatePurchaseBill.status, 409);
+  const supplierPayment = await api('/api/parties/' + supplierBillParty._id + '/transaction', {
+    method: 'POST',
+    body: { amount: 4000.5, mode: 'NEFT', ref: 'SUP-UTR-001', direction: 'out', date: '2026-11-14' }
+  });
+  assert.equal(supplierPayment.status, 200);
+  assert.equal(supplierPayment.data.balance, -6000);
+  const supplierFinancials = await api('/api/reports/financial-health?from=2026-11-01&to=2026-11-30');
+  assert.equal(supplierFinancials.status, 200);
+  assert.equal(supplierFinancials.data.payables.total, 6000);
+  assert.equal(supplierFinancials.data.cashFlow.supplierPayments, 4500.5);
+
   const partyWithUnpaidInvoice = await Party.create({ name: 'Party With Outstanding Invoice', type: 'Customer', balance: 0 });
   await Invoice.create({
     invoiceNumber: 'INV-PARTY-ARCHIVE-BLOCK',

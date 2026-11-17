@@ -193,6 +193,66 @@ exports.deleteParty = async (req, res) => {
   }
 };
 
+exports.recordPurchaseBill = async (req, res) => {
+  const invoiceReference = typeof req.body?.invoiceReference === 'string' ? req.body.invoiceReference.trim() : '';
+  const amount = Number(req.body?.amount);
+  const rawDate = req.body?.date;
+  if (!invoiceReference || invoiceReference.length > 120 ||
+      !Number.isFinite(amount) || amount <= 0 || !isValidDateOnly(rawDate)) {
+    return res.status(400).json({ message: 'Enter a supplier invoice reference, valid date and positive total payable amount.' });
+  }
+
+  const session = await mongoose.startSession();
+  try {
+    let updatedParty;
+    await session.withTransaction(async () => {
+      const party = await Party.findById(req.params.id).session(session);
+      if (!party || party.isActive === false) {
+        throw Object.assign(new Error('Active supplier not found.'), { statusCode: 404 });
+      }
+      if (!['Supplier', 'Both'].includes(party.type)) {
+        throw Object.assign(new Error('Purchase bills can only be recorded against a supplier.'), { statusCode: 400 });
+      }
+      const normalizedReference = invoiceReference.toLowerCase();
+      if (party.ledger.some((entry) =>
+        entry.type === 'Purchase Bill' && String(entry.ref || '').trim().toLowerCase() === normalizedReference
+      )) {
+        throw Object.assign(new Error('This supplier invoice reference has already been recorded.'), { statusCode: 409 });
+      }
+
+      const billAmount = Number(amount.toFixed(2));
+      party.ledger.push({
+        date: new Date(rawDate + 'T00:00:00+05:30'),
+        type: 'Purchase Bill',
+        ref: invoiceReference,
+        debit: 0,
+        credit: billAmount,
+        balance: 0
+      });
+      party.balance = recalculatePartyLedger(party.ledger);
+      await party.save({ session });
+      await writeAuditLog(req, {
+        action: 'supplier.purchase_bill_recorded',
+        entityType: 'Party',
+        entityId: party._id,
+        entityLabel: party.name,
+        summary: 'Supplier purchase bill recorded for ' + party.name + ': ' + invoiceReference,
+        metadata: { invoiceReference, amount: billAmount, billDate: rawDate, resultingBalance: party.balance }
+      }, session);
+      updatedParty = party;
+    });
+    return res.status(201).json({ message: 'Supplier purchase bill recorded in the party ledger.', party: updatedParty });
+  } catch (error) {
+    console.error('[PARTIES] Purchase bill posting failed:', error.message);
+    if (transactionUnavailable(error)) {
+      return res.status(503).json({ message: 'Purchase bill posting requires MongoDB transaction support.' });
+    }
+    return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Unable to record supplier purchase bill.' });
+  } finally {
+    await session.endSession();
+  }
+};
+
 exports.addTransaction = async (req, res) => {
   const { amount: rawAmount, mode, ref = '', direction, date: rawDate } = req.body || {};
   const amount = Number(rawAmount);

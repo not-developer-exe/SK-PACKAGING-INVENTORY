@@ -29,6 +29,8 @@ export default function PartyMasterPage() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentDirection, setPaymentDirection] = useState('in');
   const [payment, setPayment] = useState({ amount: '', mode: 'NEFT', ref: '', date: toLocalDateInput() });
+  const [showPurchaseBillModal, setShowPurchaseBillModal] = useState(false);
+  const [purchaseBill, setPurchaseBill] = useState({ invoiceReference: '', amount: '', date: toLocalDateInput() });
 
   const loadParties = async () => {
     setLoading(true);
@@ -159,6 +161,29 @@ export default function PartyMasterPage() {
     }
   };
 
+  const recordPurchaseBill = async (event) => {
+    event.preventDefault();
+    if (!selectedParty) return;
+    setSaving(true);
+    setError('');
+    try {
+      const { data } = await axiosClient.post('/parties/' + selectedParty._id + '/purchase-bill', {
+        invoiceReference: purchaseBill.invoiceReference,
+        amount: Number(purchaseBill.amount),
+        date: purchaseBill.date
+      });
+      setParties((current) => current.map((item) => item._id === data.party._id ? data.party : item));
+      setSelectedParty(data.party);
+      setPurchaseBill({ invoiceReference: '', amount: '', date: toLocalDateInput() });
+      setShowPurchaseBillModal(false);
+      setSuccess('Supplier purchase bill recorded. Party payable has been updated.');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Unable to record supplier purchase bill.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const deleteTransaction = async (txn) => {
     if (!isAdmin || !selectedParty) return;
     if (!window.confirm('Delete ledger entry ' + (txn.ref || txn.type) + '?')) return;
@@ -225,6 +250,7 @@ export default function PartyMasterPage() {
               <div className="flex flex-wrap gap-2">
                 <button onClick={() => { setPaymentDirection('in'); setShowPaymentModal(true); }} className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700"><ArrowDownRight size={15} className="mr-1 inline" />Payment In</button>
                 <button onClick={() => { setPaymentDirection('out'); setShowPaymentModal(true); }} className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700"><ArrowUpRight size={15} className="mr-1 inline" />Payment Out</button>
+                {['Supplier', 'Both'].includes(selectedParty.type) && <button onClick={() => { setPurchaseBill({ invoiceReference: '', amount: '', date: toLocalDateInput() }); setShowPurchaseBillModal(true); }} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700"><Receipt size={15} className="mr-1 inline" />Purchase Bill</button>}
               </div>
             </div>
             <div className="border-b border-slate-100 p-4"><DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => {}} onReset={() => { setFrom(''); setTo(''); }} label="Account statement date range" /></div>
@@ -309,6 +335,16 @@ export default function PartyMasterPage() {
           <label className="block text-sm">Amount (₹)<input type="number" min="0.01" step="0.01" required value={payment.amount} onChange={(e) => setPayment({ ...payment, amount: e.target.value })} className="mt-1 w-full rounded-lg border px-3 py-2" /></label>
           <div className="grid grid-cols-2 gap-3"><label className="block text-sm">Mode<select value={payment.mode} onChange={(e) => setPayment({ ...payment, mode: e.target.value })} className="mt-1 w-full rounded-lg border bg-white px-3 py-2"><option>NEFT</option><option>RTGS</option><option>UPI</option><option>Cash</option><option>Cheque</option></select></label><label className="block text-sm">UTR / Reference<input value={payment.ref} onChange={(e) => setPayment({ ...payment, ref: e.target.value })} className="mt-1 w-full rounded-lg border px-3 py-2" /></label></div>
           <div className="flex justify-end gap-2"><button type="button" onClick={() => setShowPaymentModal(false)} className="rounded-lg border px-4 py-2 text-sm">Cancel</button><button disabled={saving} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{saving ? 'Saving...' : 'Post payment'}</button></div>
+        </form>
+      </div>}
+      {showPurchaseBillModal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => setShowPurchaseBillModal(false)}>
+        <form onSubmit={recordPurchaseBill} onClick={(e) => e.stopPropagation()} className="w-full max-w-md space-y-4 rounded-2xl bg-white p-6 shadow-xl">
+          <div className="flex items-center justify-between"><h2 className="text-lg font-bold">Record supplier purchase bill</h2><button type="button" onClick={() => setShowPurchaseBillModal(false)}><X size={19} /></button></div>
+          <label className="block text-sm">Supplier invoice number<input required maxLength="120" value={purchaseBill.invoiceReference} onChange={(e) => setPurchaseBill({ ...purchaseBill, invoiceReference: e.target.value })} className="mt-1 w-full rounded-lg border px-3 py-2" /></label>
+          <label className="block text-sm">Bill date<input type="date" required value={purchaseBill.date} onChange={(e) => setPurchaseBill({ ...purchaseBill, date: e.target.value })} className="mt-1 w-full rounded-lg border px-3 py-2" /></label>
+          <label className="block text-sm">Total payable amount (₹)<input type="number" min="0.01" step="0.01" required value={purchaseBill.amount} onChange={(e) => setPurchaseBill({ ...purchaseBill, amount: e.target.value })} className="mt-1 w-full rounded-lg border px-3 py-2" /></label>
+          <p className="text-xs text-slate-500">Enter the supplier invoice's final payable amount, including applicable GST and charges. This records the liability only; stock must still be received separately through Stock Inward.</p>
+          <div className="flex justify-end gap-2"><button type="button" onClick={() => setShowPurchaseBillModal(false)} className="rounded-lg border px-4 py-2 text-sm">Cancel</button><button disabled={saving} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{saving ? 'Saving...' : 'Post purchase bill'}</button></div>
         </form>
       </div>}
     </div>

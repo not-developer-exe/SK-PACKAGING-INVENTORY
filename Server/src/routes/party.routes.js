@@ -8,6 +8,7 @@ const {
   getArchivedParties,
   restoreParty,
   addTransaction,
+  recordPurchaseBill,
   deleteTransaction
 } = require('../controllers/party.controller');
 const { protect } = require('../middlewares/auth.middleware');
@@ -21,6 +22,7 @@ router.patch('/:id/restore', requireRole('admin'), restoreParty);
 router.patch('/:id', updateParty);
 router.delete('/:id', requireRole('admin'), deleteParty);
 router.post('/:id/transaction', addTransaction);
+router.post('/:id/purchase-bill', recordPurchaseBill);
 router.delete('/:partyId/transaction/:txnId', requireRole('admin'), deleteTransaction);
 
 module.exports = router;
