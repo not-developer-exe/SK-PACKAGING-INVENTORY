@@ -2,7 +2,7 @@ import React from 'react';
 import { Routes, Route, Link, useLocation, Navigate, Outlet, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, FileText, Package, ArrowDownToLine, Factory, ClipboardCheck,
-  Scissors, Truck, LogOut, FilePlus2, BookOpen, Trash2, ShieldCheck, ChartNoAxesCombined, Receipt, Database
+  Scissors, Truck, LogOut, FilePlus2, BookOpen, Trash2, ShieldCheck, ChartNoAxesCombined, Receipt, Database, Wallet
 } from 'lucide-react';
 
 import { useAuth } from './context/AuthContext';
@@ -27,6 +27,7 @@ import PeriodActivityPage from './pages/Reports/PeriodActivityPage';
 import AdminRecordsPage from './pages/Reports/AdminRecordsPage';
 import ProductSpecificationPage from './pages/Products/ProductSpecificationPage';
 import ProductionIntelligencePage from './pages/Production/ProductionIntelligencePage';
+import FinancialHealthPage from './pages/Reports/FinancialHealthPage';
 
 function RequireAuth() {
   const { user, loading } = useAuth();
@@ -46,6 +47,7 @@ function Sidebar() {
       { name: 'Party Master', path: '/parties', icon: Users },
       { name: 'Sales Invoices', path: '/sales', icon: FileText },
       { name: 'Profit & Loss', path: '/reports/profit-loss', icon: ChartNoAxesCombined },
+      { name: 'Cash Flow & Dues', path: '/reports/financial-health', icon: Wallet },
       { name: 'Factory Activity', path: '/reports/activity', icon: ChartNoAxesCombined },
       { name: 'Expenses', path: '/expenses', icon: Receipt },
       { name: 'New GST Invoice', path: '/sales/new', icon: FilePlus2 }
@@ -114,6 +116,7 @@ export default function App() {
           <Route path="sales" element={<SalesInvoicesPage />} />
           <Route path="sales/new" element={<CreateInvoicePage />} />
           <Route path="reports/profit-loss" element={<ProfitLossPage />} />
+          <Route path="reports/financial-health" element={<FinancialHealthPage />} />
           <Route path="reports/activity" element={<PeriodActivityPage />} />
           <Route path="expenses" element={<ExpensesPage />} />
           <Route path="inventory/reels" element={<ReelStockPage />} />
