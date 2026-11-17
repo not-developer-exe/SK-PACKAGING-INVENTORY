@@ -1,0 +1,1 @@
+const express=require('express');const router=express.Router();const {protect}=require('../middlewares/auth.middleware');const c=require('../controllers/productionPlan.controller');router.use(protect);router.get('/',c.listPlans);router.post('/',c.createPlan);router.patch('/:id/status',c.updatePlanStatus);module.exports=router;

@@ -26,6 +26,7 @@ import ExpensesPage from './pages/Reports/ExpensesPage';
 import PeriodActivityPage from './pages/Reports/PeriodActivityPage';
 import AdminRecordsPage from './pages/Reports/AdminRecordsPage';
 import ProductSpecificationPage from './pages/Products/ProductSpecificationPage';
+import ProductionIntelligencePage from './pages/Production/ProductionIntelligencePage';
 
 function RequireAuth() {
   const { user, loading } = useAuth();
@@ -63,6 +64,7 @@ function Sidebar() {
     ] }] : []),
     { group: 'Factory Operations', items: [
       { name: 'Production', path: '/operations/production', icon: Factory },
+      { name: 'Production Planning & Reports', path: '/operations/production-intelligence', icon: ChartNoAxesCombined },
       { name: 'Conversion', path: '/operations/conversion', icon: Scissors },
       { name: 'Box Dispatch', path: '/operations/dispatch', icon: Truck },
       { name: 'Waste Register', path: '/operations/waste', icon: Trash2 }
@@ -118,6 +120,7 @@ export default function App() {
           <Route path="inventory/inward" element={<StockInwardPage />} />
           <Route path="inventory/ledger" element={<StockLedgerPage />} />
           <Route path="operations/production" element={<ProductionPage />} />
+          <Route path="operations/production-intelligence" element={<ProductionIntelligencePage />} />
           <Route path="operations/conversion" element={<ConversionPage />} />
           <Route path="operations/dispatch" element={<DispatchPage />} />
           <Route path="operations/waste" element={<WasteRegisterPage />} />

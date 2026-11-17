@@ -4,6 +4,7 @@ const FinishedBox = require('../models/FinishedBox.model');
 const StockMovement = require('../models/StockMovement.model');
 const Party = require('../models/Party.model');
 const ProductSpecification = require('../models/ProductSpecification.model');
+const ProductionPlan = require('../models/ProductionPlan.model');
 const Sequence = require('../models/Sequence.model');
 const writeAuditLog = require('../utils/writeAuditLog');
 const { calculateSheetConsumption } = require('../utils/sheetConversion');
@@ -20,6 +21,7 @@ exports.recordConversion = async (req, res) => {
     dimensions,
     boxesProduced: rawBoxesProduced,
     productSpecificationId,
+    productionPlanId,
     conversionDate: rawConversionDate
   } = req.body || {};
 
@@ -79,7 +81,17 @@ exports.recordConversion = async (req, res) => {
       }
 
       let productSpecification = null;
+      let productionPlan = null;
       let bomVariance = null;
+      if (productionPlanId) {
+        if (!mongoose.isValidObjectId(productionPlanId)) { const error = new Error('Select a valid production plan.'); error.statusCode = 400; throw error; }
+        productionPlan = await ProductionPlan.findOne({ _id: productionPlanId, status: { $in: ['planned', 'in_progress'] } }).session(session);
+        if (!productionPlan || String(productionPlan.customerId) !== String(customer._id)) { const error = new Error('Production plan is inactive or belongs to another customer.'); error.statusCode = 409; throw error; }
+        const remaining = productionPlan.plannedBoxes - productionPlan.completedBoxes;
+        if (boxesProduced > remaining) { const error = new Error('Conversion exceeds remaining planned quantity: ' + remaining + ' boxes.'); error.statusCode = 409; throw error; }
+        if (productionPlan.productSpecificationId && String(productionPlan.productSpecificationId) !== String(productSpecificationId || '')) { const error = new Error('Selected BOM does not match this production plan.'); error.statusCode = 409; throw error; }
+        if (productionPlan.itemName.toLowerCase() !== itemName.trim().toLowerCase()) { const error = new Error('Product name does not match the production plan.'); error.statusCode = 409; throw error; }
+      }
       if (productSpecificationId) {
         if (!mongoose.isValidObjectId(productSpecificationId)) {
           const error = new Error('Select a valid product specification.');
@@ -167,6 +179,7 @@ exports.recordConversion = async (req, res) => {
         },
         sourceSheetId: sheet._id,
         productSpecificationId: productSpecification ? productSpecification._id : null,
+        productionPlanId: productionPlan ? productionPlan._id : null,
         bomSnapshot: productSpecification ? { productName: productSpecification.productName, ply: productSpecification.ply, sheetsPerBox: productSpecification.sheetsPerBox, expectedKgPerBox: productSpecification.expectedKgPerBox, expectedSheets: bomVariance.expectedSheets, expectedWeightKg: bomVariance.expectedWeightKg } : undefined,
         actualConsumption: productSpecification ? { sheetsConsumed, weightConsumedKg: consumption.consumedWeightKg } : undefined,
         bomVariance: productSpecification ? bomVariance : undefined,
@@ -178,6 +191,12 @@ exports.recordConversion = async (req, res) => {
         costingStatus,
         recordedBy: req.user._id
       }], { session });
+
+      if (productionPlan) {
+        productionPlan.completedBoxes += boxesProduced;
+        productionPlan.status = productionPlan.completedBoxes >= productionPlan.plannedBoxes ? 'completed' : 'in_progress';
+        await productionPlan.save({ session });
+      }
 
       await StockMovement.create([
         {
@@ -222,6 +241,7 @@ exports.recordConversion = async (req, res) => {
           costPerBox,
           costingStatus,
           productSpecificationId: productSpecification ? String(productSpecification._id) : null,
+          productionPlanId: productionPlan ? String(productionPlan._id) : null,
           bomVariance
         }
       }, session);

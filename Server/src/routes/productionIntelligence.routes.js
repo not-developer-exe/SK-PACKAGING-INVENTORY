@@ -1,0 +1,1 @@
+const express=require('express');const router=express.Router();const {protect}=require('../middlewares/auth.middleware');const c=require('../controllers/productionIntelligence.controller');router.use(protect);router.get('/performance',c.performance);router.get('/trace',c.trace);module.exports=router;
