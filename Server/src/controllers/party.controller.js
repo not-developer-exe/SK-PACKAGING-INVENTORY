@@ -6,6 +6,11 @@ const { allocateInvoicePayment } = require('../utils/invoicePaymentAllocation');
 const { recalculatePartyLedger } = require('../utils/partyLedger');
 const { isValidDateOnly } = require('../utils/dateFilters');
 
+function transactionUnavailable(error) {
+  return error?.code === 20 ||
+    /Transaction numbers are only allowed|replica set member or mongos|does not support transactions/i.test(error?.message || '');
+}
+
 async function auditPartyChange(req, action, party, summary, metadata = {}) {
   await writeAuditLog(req, {
     action,
@@ -138,6 +143,7 @@ exports.restoreParty = async (req, res) => {
     return res.json({ message: 'Party restored successfully.', party: restoredParty });
   } catch (error) {
     console.error('[PARTIES] Restore failed:', error.message);
+    if (transactionUnavailable(error)) return res.status(503).json({ message: 'Party restore requires MongoDB transaction support. Configure MONGODB_URI to a replica set (MongoDB Atlas is recommended), then retry.' });
     return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Unable to restore party.' });
   } finally {
     await session.endSession();
@@ -180,6 +186,7 @@ exports.deleteParty = async (req, res) => {
     return res.json({ message: 'Party archived successfully. Historical transactions and linked records have been retained.', party: archivedParty });
   } catch (error) {
     console.error('[PARTIES] Archive failed:', error.message);
+    if (transactionUnavailable(error)) return res.status(503).json({ message: 'Party archive requires MongoDB transaction support. Configure MONGODB_URI to a replica set (MongoDB Atlas is recommended), then retry.' });
     return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Unable to archive party.' });
   } finally {
     await session.endSession();

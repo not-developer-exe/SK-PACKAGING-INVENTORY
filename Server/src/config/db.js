@@ -7,7 +7,11 @@ const connectDB = async () => {
   const conn = await mongoose.connect(process.env.MONGODB_URI, {
     serverSelectionTimeoutMS: 10000
   });
-  console.info(`MongoDB connected: ${conn.connection.host}`);
+  const topology = await mongoose.connection.db.admin().command({ hello: 1 });
+  if (!topology.setName && topology.msg !== 'isdbgrid') {
+    throw new Error('MongoDB replica set or sharded cluster required. Transactions are used for stock, invoices, payments and audit-safe workflows.');
+  }
+  console.info(`MongoDB connected: ${conn.connection.host} (transaction-capable topology)`);
 
   // ADMIN_EMAIL identifies the owner account. Inspect the raw collection so
   // legacy external-auth IDs cannot trigger Mongoose ObjectId/required-field

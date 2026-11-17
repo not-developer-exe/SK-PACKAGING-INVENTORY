@@ -124,13 +124,17 @@ export default function PartyMasterPage() {
 
   const deleteParty = async (party) => {
     if (!window.confirm('Archive ' + party.name + '? This hides the party from active selectors. Historical transactions and linked records will be retained. The outstanding balance and invoices must be settled first.')) return;
+    setSaving(true);
     setError('');
+    setSuccess('');
     try {
       await axiosClient.delete('/parties/' + party._id);
       setParties((current) => current.filter((item) => item._id !== party._id));
       setSuccess('Party archived. Historical records have been retained.');
     } catch (err) {
-      setError(err.response?.data?.message || 'Unable to delete party.');
+      setError(err.response?.data?.message || 'Unable to archive party.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -262,7 +266,7 @@ export default function PartyMasterPage() {
                     <td className="px-5 py-4 text-right font-semibold">{money(party.balance)} <span className="block text-xs font-normal text-slate-500">{balanceLabel(party.balance)}</span></td>
                     <td className="px-5 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                       <button onClick={() => openEdit(party)} className="mr-3 text-sm font-medium text-blue-700">Edit</button>
-                      {isAdmin && <button onClick={() => deleteParty(party)} className="text-sm font-medium text-red-600" >Archive</button>}
+                      {isAdmin && <button disabled={saving} onClick={() => deleteParty(party)} className="text-sm font-medium text-red-600 disabled:opacity-50" >{saving ? 'Archiving…' : 'Archive'}</button>}
                     </td>
                   </tr>)}
                   {!filteredParties.length && <tr><td colSpan="5" className="p-8 text-center text-slate-500">No party records found. Add your first customer or supplier.</td></tr>}
