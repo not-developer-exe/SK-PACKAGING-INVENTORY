@@ -150,6 +150,35 @@ test('admin console and expense register enforce roles and keep an audit trail',
   assert.equal((await Party.findById(historicalParty._id)).ledger.length, 2);
   assert.ok(await AuditLog.exists({ action: 'party.restored', entityId: historicalParty._id }));
 
+  const archivedSupplier = await Party.create({ name: 'Archived Inward Supplier', type: 'Supplier' });
+  const archivedSupplierDraft = await api('/api/inward', {
+    method: 'POST',
+    body: {
+      supplierId: String(archivedSupplier._id),
+      invoiceReference: 'ARCHIVED-SUPPLIER-INV',
+      receiptDate: '2026-11-14',
+      lines: [{ reelWidthInches: 36, bf: 18, gsm: 140, quality: 'Natural', reelCount: 1, totalWeightKg: 100, ratePerKg: 40 }]
+    }
+  });
+  assert.equal(archivedSupplierDraft.status, 201);
+  const archivedSupplierReceiptId = archivedSupplierDraft.data.receipt._id;
+  const archiveSupplierResponse = await api('/api/parties/' + archivedSupplier._id, { method: 'DELETE' });
+  assert.equal(archiveSupplierResponse.status, 200);
+  const blockedArchivedSupplierDraft = await api('/api/inward', {
+    method: 'POST',
+    body: {
+      supplierId: String(archivedSupplier._id),
+      invoiceReference: 'ARCHIVED-SUPPLIER-INV-2',
+      receiptDate: '2026-11-14',
+      lines: [{ reelWidthInches: 36, bf: 18, gsm: 140, quality: 'Natural', reelCount: 1, totalWeightKg: 100, ratePerKg: 40 }]
+    }
+  });
+  assert.equal(blockedArchivedSupplierDraft.status, 400);
+  const blockedArchivedSupplierPost = await api('/api/inward/' + archivedSupplierReceiptId + '/post', { method: 'POST' });
+  assert.equal(blockedArchivedSupplierPost.status, 409);
+  assert.equal(await ReelUnit.countDocuments({ inwardReceiptId: archivedSupplierReceiptId }), 0);
+  assert.equal((await require('../../src/models/InwardReceipt.model').findById(archivedSupplierReceiptId)).status, 'draft');
+
   const partyWithUnpaidInvoice = await Party.create({ name: 'Party With Outstanding Invoice', type: 'Customer', balance: 0 });
   await Invoice.create({
     invoiceNumber: 'INV-PARTY-ARCHIVE-BLOCK',
@@ -681,6 +710,20 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
     quantityChange: 100
   }));
   assert.ok(await AuditLog.exists({ action: 'dispatch.cancelled', entityId: secondDispatch._id }));
+  const cancelledChallanInvoice = await api('/api/invoices', {
+    method: 'POST',
+    body: {
+      invoiceDate: '2026-10-18',
+      customerId: String(party._id),
+      dispatchId: String(secondDispatch._id),
+      items: [{ boxId: String(finishedBox._id), quantity: 100, rate: 20 }],
+      gstPercent: 5
+    }
+  });
+  assert.equal(cancelledChallanInvoice.status, 409);
+  const unbilledDispatches = await api('/api/invoices/uninvoiced/' + party._id);
+  assert.equal(unbilledDispatches.status, 200);
+  assert.ok(!unbilledDispatches.data.some(item => String(item._id) === String(secondDispatch._id)));
 
   const invoice = await Invoice.findOne({ dispatchId: dispatch._id });
   assert.equal(invoice.subTotal, 12000);

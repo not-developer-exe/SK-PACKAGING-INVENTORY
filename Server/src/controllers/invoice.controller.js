@@ -75,7 +75,7 @@ exports.getUninvoicedDispatches = async (req, res) => {
     }
 
     const [dispatches, billed] = await Promise.all([
-      Dispatch.find({ customerId }).populate('boxes.boxId').sort({ createdAt: -1 }).lean(),
+      Dispatch.find({ customerId, status: { $ne: 'cancelled' } }).populate('boxes.boxId').sort({ createdAt: -1 }).lean(),
       Invoice.find({ customerId }).select('dispatchId').lean()
     ]);
     const billedIds = new Set(billed.map((invoice) => String(invoice.dispatchId)));
@@ -142,6 +142,11 @@ exports.createInvoice = async (req, res) => {
       if (!dispatch) {
         const error = new Error('Delivery challan does not belong to the selected customer');
         error.statusCode = 400;
+        throw error;
+      }
+      if (dispatch.status === 'cancelled') {
+        const error = new Error('A cancelled delivery challan cannot be invoiced.');
+        error.statusCode = 409;
         throw error;
       }
       if (existingInvoice) {

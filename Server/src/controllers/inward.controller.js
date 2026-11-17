@@ -77,7 +77,7 @@ exports.createDraftReceipt = async (req, res) => {
     }
 
     const supplier = await Party.findById(supplierId);
-    if (!supplier || !['Supplier', 'Both'].includes(supplier.type)) {
+    if (!supplier || supplier.isActive === false || !['Supplier', 'Both'].includes(supplier.type)) {
       return res.status(400).json({ message: 'Invalid or non-supplier party selected.' });
     }
 
@@ -150,6 +150,13 @@ exports.postReceipt = async (req, res) => {
 
       if (!receipt) {
         const error = new Error('Receipt not found or already posted.');
+        error.statusCode = 409;
+        throw error;
+      }
+
+      const supplier = await Party.findById(receipt.supplierId).session(session);
+      if (!supplier || supplier.isActive === false || !['Supplier', 'Both'].includes(supplier.type)) {
+        const error = new Error('The linked supplier is no longer active or is not a supplier. Restore or correct the supplier before posting this receipt.');
         error.statusCode = 409;
         throw error;
       }
