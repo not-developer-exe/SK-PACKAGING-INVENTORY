@@ -25,6 +25,7 @@ import ProfitLossPage from './pages/Reports/ProfitLossPage';
 import ExpensesPage from './pages/Reports/ExpensesPage';
 import PeriodActivityPage from './pages/Reports/PeriodActivityPage';
 import AdminRecordsPage from './pages/Reports/AdminRecordsPage';
+import ProductSpecificationPage from './pages/Products/ProductSpecificationPage';
 
 function RequireAuth() {
   const { user, loading } = useAuth();
@@ -57,7 +58,8 @@ function Sidebar() {
       { name: 'Opening Stock & Audit', path: '/admin/opening-stock', icon: ShieldCheck },
       { name: 'User Management', path: '/admin/users', icon: Users },
       { name: 'Stock Reconciliation', path: '/admin/stock-reconciliation', icon: ClipboardCheck },
-      { name: 'Data Console', path: '/admin/data', icon: Database }
+      { name: 'Data Console', path: '/admin/data', icon: Database },
+      { name: 'Product Specifications', path: '/admin/products', icon: ClipboardCheck }
     ] }] : []),
     { group: 'Factory Operations', items: [
       { name: 'Production', path: '/operations/production', icon: Factory },
@@ -123,6 +125,7 @@ export default function App() {
           <Route path="admin/users" element={user?.role === 'admin' ? <UserManagementPage /> : <Navigate to="/" replace />} />
           <Route path="admin/stock-reconciliation" element={user?.role === 'admin' ? <StockReconciliationPage /> : <Navigate to="/" replace />} />
           <Route path="admin/data" element={user?.role === 'admin' ? <AdminRecordsPage /> : <Navigate to="/" replace />} />
+          <Route path="admin/products" element={user?.role === 'admin' ? <ProductSpecificationPage /> : <Navigate to="/" replace />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to={user ? '/' : '/login'} replace />} />
