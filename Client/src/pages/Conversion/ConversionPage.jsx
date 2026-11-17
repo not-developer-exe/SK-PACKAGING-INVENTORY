@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { conversionService } from '../../services/conversionService';
 import { partiesService } from '../../services/partiesService';
+import { productSpecificationService } from '../../services/productSpecificationService';
 import DateRangeFilter from '../../components/DateRangeFilter';
 import { Package, Scissors, Loader2 } from 'lucide-react';
 
@@ -11,6 +12,7 @@ export default function ConversionPage() {
   const [to, setTo] = useState('');
   const [customerFilter, setCustomerFilter] = useState('');
   const [customers, setCustomers] = useState([]);
+  const [productSpecifications, setProductSpecifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -18,6 +20,7 @@ export default function ConversionPage() {
 
   // Form State
   const [sheetId, setSheetId] = useState('');
+  const [productSpecificationId, setProductSpecificationId] = useState('');
   const [conversionDate, setConversionDate] = useState(() => { const date = new Date(); return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10); });
   const [sheetsConsumed, setSheetsConsumed] = useState('');
   const [customerId, setCustomerId] = useState('');
@@ -28,14 +31,16 @@ export default function ConversionPage() {
   const fetchData = async (dateParams = {}) => {
     try {
       setLoading(true);
-      const [sheetData, customerData, finishedGoodsData] = await Promise.all([
+      const [sheetData, customerData, finishedGoodsData, productData] = await Promise.all([
         conversionService.getAvailableSheets(),
         partiesService.getCustomers(),
-        conversionService.getFinishedGoods(dateParams)
+        conversionService.getFinishedGoods(dateParams),
+        productSpecificationService.getAll()
       ]);
       setSheets(sheetData);
       setCustomers(customerData);
       setFinishedGoods(finishedGoodsData);
+      setProductSpecifications(productData);
     } catch (err) {
       console.error('Error fetching conversion data:', err);
     } finally {
@@ -61,6 +66,7 @@ export default function ConversionPage() {
 
       const res = await conversionService.recordConversion({
         sheetId,
+        productSpecificationId: productSpecificationId || undefined,
         conversionDate,
         sheetsConsumed: Number(sheetsConsumed),
         customerId,
@@ -73,10 +79,11 @@ export default function ConversionPage() {
         boxesProduced: Number(boxesProduced)
       });
 
-      setSuccess(`Success! Batch ${res.batchNumber} created with ${boxesProduced} boxes.`);
+      setSuccess(res.bomVariance ? `Batch ${res.batchNumber} created. Material variance: ${res.bomVariance.weightVarianceKg >= 0 ? '+' : ''}${res.bomVariance.weightVarianceKg.toFixed(2)} kg (${res.bomVariance.weightVariancePercent}%).` : `Success! Batch ${res.batchNumber} created with ${boxesProduced} boxes.`);
       
       // Reset form
       setSheetId('');
+      setProductSpecificationId('');
       setSheetsConsumed('');
       setCustomerId('');
       setItemName('');
@@ -130,6 +137,26 @@ export default function ConversionPage() {
           <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-emerald-900">
             <Package size={20} /> Finished Product
           </h2>
+          <div className="mb-4">
+            <label className="mb-1 block text-sm font-medium text-slate-700">Load saved product specification / BOM (optional)</label>
+            <select value={productSpecificationId} onChange={e => {
+              const id = e.target.value;
+              setProductSpecificationId(id);
+              const product = productSpecifications.find(row => row._id === id);
+              if (product) {
+                setCustomerId(product.customerId?._id || product.customerId);
+                setItemName(product.productName);
+                setDimensions({ length: String(product.dimensions.length), width: String(product.dimensions.width), height: String(product.dimensions.height) });
+              }
+            }} className="w-full rounded-xl border border-emerald-200 bg-white px-3 py-2.5 text-sm">
+              <option value="">Manual conversion (without BOM)</option>
+              {productSpecifications.map(product => <option key={product._id} value={product._id}>{product.customerId?.name || "Customer"} · {product.productName} · {product.ply} Ply · {product.sheetsPerBox} sheets / {Number(product.expectedKgPerBox?.$numberDecimal || product.expectedKgPerBox || 0).toFixed(3)} kg per box</option>)}
+            </select>
+            {productSpecificationId && (() => {
+              const product = productSpecifications.find(row => row._id === productSpecificationId);
+              return product ? <p className="mt-2 rounded-lg bg-blue-50 p-3 text-xs text-blue-800">BOM target: {product.sheetsPerBox} sheets and {Number(product.expectedKgPerBox?.$numberDecimal || product.expectedKgPerBox || 0).toFixed(3)} kg per box. Source sheet must match {product.ply} Ply · {product.sheetSpecification.lengthInches} × {product.sheetSpecification.widthInches} inches.</p> : null;
+            })()}
+          </div>
           
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
@@ -201,7 +228,7 @@ export default function ConversionPage() {
         <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
           <table className="w-full min-w-[950px] text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-              <tr><th className="px-4 py-3">Date</th><th className="px-4 py-3">Batch</th><th className="px-4 py-3">Customer</th><th className="px-4 py-3">Item</th><th className="px-4 py-3">Dimensions</th><th className="px-4 py-3 text-right">Produced</th><th className="px-4 py-3 text-right">Available</th><th className="px-4 py-3 text-right">Cost / box</th></tr>
+              <tr><th className="px-4 py-3">Date</th><th className="px-4 py-3">Batch</th><th className="px-4 py-3">Customer</th><th className="px-4 py-3">Item</th><th className="px-4 py-3">Dimensions</th><th className="px-4 py-3 text-right">Produced</th><th className="px-4 py-3 text-right">Available</th><th className="px-4 py-3 text-right">Cost / box</th><th className="px-4 py-3 text-right">BOM variance</th></tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {finishedGoods.map(box => <tr key={box._id}>
@@ -213,8 +240,9 @@ export default function ConversionPage() {
                 <td className="px-4 py-3 text-right">{Number(box.quantityProduced || 0).toLocaleString('en-IN')}</td>
                 <td className="px-4 py-3 text-right font-semibold">{Number(box.quantityAvailable || 0).toLocaleString('en-IN')}</td>
                 <td className="px-4 py-3 text-right">{box.costingStatus === 'available' ? '₹' + Number(box.costPerBox || 0).toFixed(2) : 'Pending'}</td>
+                <td className="px-4 py-3 text-right">{box.bomVariance ? <span className={Number(box.bomVariance.weightVarianceKg) > 0 ? 'font-semibold text-amber-700' : 'font-semibold text-emerald-700'}>{Number(box.bomVariance.weightVarianceKg) > 0 ? '+' : ''}{Number(box.bomVariance.weightVarianceKg).toFixed(2)} kg ({Number(box.bomVariance.weightVariancePercent).toFixed(2)}%)</span> : '—'}</td>
               </tr>)}
-              {!finishedGoods.length && <tr><td colSpan={8} className="p-8 text-center text-slate-500">No finished goods batches found for this period.</td></tr>}
+              {!finishedGoods.length && <tr><td colSpan={9} className="p-8 text-center text-slate-500">No finished goods batches found for this period.</td></tr>}
             </tbody>
           </table>
         </div>

@@ -15,6 +15,10 @@ const finishedBoxSchema = new mongoose.Schema({
   
   // Manufacturing details
   sourceSheetId: { type: mongoose.Schema.Types.ObjectId, ref: 'CorrugatedSheet', required: true },
+  productSpecificationId: { type: mongoose.Schema.Types.ObjectId, ref: 'ProductSpecification', default: null },
+  bomSnapshot: { productName: String, ply: Number, sheetsPerBox: Number, expectedKgPerBox: mongoose.Schema.Types.Decimal128, expectedSheets: Number, expectedWeightKg: Number },
+  actualConsumption: { sheetsConsumed: Number, weightConsumedKg: Number },
+  bomVariance: { sheetVariance: Number, weightVarianceKg: Number, weightVariancePercent: Number },
   quantityProduced: { type: Number, required: true },
   quantityAvailable: { type: Number, required: true },
   materialCost: { type: Number, default: 0, min: 0 },

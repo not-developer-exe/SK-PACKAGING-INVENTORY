@@ -3,10 +3,12 @@ const CorrugatedSheet = require('../models/CorrugatedSheet.model');
 const FinishedBox = require('../models/FinishedBox.model');
 const StockMovement = require('../models/StockMovement.model');
 const Party = require('../models/Party.model');
+const ProductSpecification = require('../models/ProductSpecification.model');
 const Sequence = require('../models/Sequence.model');
 const writeAuditLog = require('../utils/writeAuditLog');
 const { calculateSheetConsumption } = require('../utils/sheetConversion');
 const { calculateMaterialCost } = require('../utils/materialCosting');
+const { calculateBomVariance } = require('../utils/bomCalculations');
 const { buildDateRangeFilter, isValidDateOnly } = require('../utils/dateFilters');
 
 exports.recordConversion = async (req, res) => {
@@ -17,6 +19,7 @@ exports.recordConversion = async (req, res) => {
     itemName,
     dimensions,
     boxesProduced: rawBoxesProduced,
+    productSpecificationId,
     conversionDate: rawConversionDate
   } = req.body || {};
 
@@ -75,6 +78,29 @@ exports.recordConversion = async (req, res) => {
         throw error;
       }
 
+      let productSpecification = null;
+      let bomVariance = null;
+      if (productSpecificationId) {
+        if (!mongoose.isValidObjectId(productSpecificationId)) {
+          const error = new Error('Select a valid product specification.');
+          error.statusCode = 400;
+          throw error;
+        }
+        productSpecification = await ProductSpecification.findOne({ _id: productSpecificationId, isActive: true, customerId: customer._id }).session(session);
+        if (!productSpecification) {
+          const error = new Error('Selected product specification is inactive or does not belong to this customer.');
+          error.statusCode = 409;
+          throw error;
+        }
+        const sameDimensions = Number(dimensions.length) === Number(productSpecification.dimensions.length) && Number(dimensions.width) === Number(productSpecification.dimensions.width) && Number(dimensions.height) === Number(productSpecification.dimensions.height);
+        const sameSheet = Number(sheet.ply) === Number(productSpecification.ply) && Number(sheet.lengthInches) === Number(productSpecification.sheetSpecification.lengthInches) && Number(sheet.widthInches) === Number(productSpecification.sheetSpecification.widthInches);
+        if (!sameDimensions || !sameSheet || itemName.trim().toLowerCase() !== productSpecification.productName.toLowerCase()) {
+          const error = new Error('Selected product, box dimensions and source sheet specification must match the saved BOM.');
+          error.statusCode = 409;
+          throw error;
+        }
+      }
+
       let consumption;
       try {
         consumption = calculateSheetConsumption({
@@ -85,6 +111,16 @@ exports.recordConversion = async (req, res) => {
       } catch (error) {
         error.statusCode = 409;
         throw error;
+      }
+
+      if (productSpecification) {
+        bomVariance = calculateBomVariance({
+          boxesProduced,
+          sheetsPerBox: productSpecification.sheetsPerBox,
+          expectedKgPerBox: Number(productSpecification.expectedKgPerBox.toString()),
+          actualSheetsConsumed: sheetsConsumed,
+          actualWeightConsumedKg: consumption.consumedWeightKg
+        });
       }
 
       const existingCount = await FinishedBox.countDocuments().session(session);
@@ -130,6 +166,10 @@ exports.recordConversion = async (req, res) => {
           height: Number(dimensions.height)
         },
         sourceSheetId: sheet._id,
+        productSpecificationId: productSpecification ? productSpecification._id : null,
+        bomSnapshot: productSpecification ? { productName: productSpecification.productName, ply: productSpecification.ply, sheetsPerBox: productSpecification.sheetsPerBox, expectedKgPerBox: productSpecification.expectedKgPerBox, expectedSheets: bomVariance.expectedSheets, expectedWeightKg: bomVariance.expectedWeightKg } : undefined,
+        actualConsumption: productSpecification ? { sheetsConsumed, weightConsumedKg: consumption.consumedWeightKg } : undefined,
+        bomVariance: productSpecification ? bomVariance : undefined,
         manufacturedAt: conversionDate,
         quantityProduced: boxesProduced,
         quantityAvailable: boxesProduced,
@@ -180,7 +220,9 @@ exports.recordConversion = async (req, res) => {
           boxesProduced,
           materialCost,
           costPerBox,
-          costingStatus
+          costingStatus,
+          productSpecificationId: productSpecification ? String(productSpecification._id) : null,
+          bomVariance
         }
       }, session);
 
@@ -189,7 +231,8 @@ exports.recordConversion = async (req, res) => {
 
     return res.status(201).json({
       message: 'Sheet-to-box conversion recorded. Sheet stock, finished goods and stock ledger updated.',
-      ...response
+      ...response,
+      bomVariance
     });
   } catch (error) {
     if (session.inTransaction()) await session.abortTransaction();
