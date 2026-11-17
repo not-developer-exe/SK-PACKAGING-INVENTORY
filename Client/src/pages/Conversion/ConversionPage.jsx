@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { conversionService } from '../../services/conversionService';
 import { partiesService } from '../../services/partiesService';
 import { productSpecificationService } from '../../services/productSpecificationService';
+import { productionIntelligenceService } from '../../services/productionIntelligenceService';
 import DateRangeFilter from '../../components/DateRangeFilter';
 import { Package, Scissors, Loader2 } from 'lucide-react';
 
@@ -13,6 +14,7 @@ export default function ConversionPage() {
   const [customerFilter, setCustomerFilter] = useState('');
   const [customers, setCustomers] = useState([]);
   const [productSpecifications, setProductSpecifications] = useState([]);
+  const [productionPlans, setProductionPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -21,6 +23,7 @@ export default function ConversionPage() {
   // Form State
   const [sheetId, setSheetId] = useState('');
   const [productSpecificationId, setProductSpecificationId] = useState('');
+  const [productionPlanId, setProductionPlanId] = useState('');
   const [conversionDate, setConversionDate] = useState(() => { const date = new Date(); return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10); });
   const [sheetsConsumed, setSheetsConsumed] = useState('');
   const [customerId, setCustomerId] = useState('');
@@ -31,16 +34,18 @@ export default function ConversionPage() {
   const fetchData = async (dateParams = {}) => {
     try {
       setLoading(true);
-      const [sheetData, customerData, finishedGoodsData, productData] = await Promise.all([
+      const [sheetData, customerData, finishedGoodsData, productData, productionPlanData] = await Promise.all([
         conversionService.getAvailableSheets(),
         partiesService.getCustomers(),
         conversionService.getFinishedGoods(dateParams),
-        productSpecificationService.getAll()
+        productSpecificationService.getAll(),
+        productionIntelligenceService.getPlans()
       ]);
       setSheets(sheetData);
       setCustomers(customerData);
       setFinishedGoods(finishedGoodsData);
       setProductSpecifications(productData);
+      setProductionPlans(productionPlanData);
     } catch (err) {
       console.error('Error fetching conversion data:', err);
     } finally {
@@ -67,6 +72,7 @@ export default function ConversionPage() {
       const res = await conversionService.recordConversion({
         sheetId,
         productSpecificationId: productSpecificationId || undefined,
+        productionPlanId: productionPlanId || undefined,
         conversionDate,
         sheetsConsumed: Number(sheetsConsumed),
         customerId,
@@ -84,6 +90,7 @@ export default function ConversionPage() {
       // Reset form
       setSheetId('');
       setProductSpecificationId('');
+      setProductionPlanId('');
       setSheetsConsumed('');
       setCustomerId('');
       setItemName('');
@@ -137,6 +144,25 @@ export default function ConversionPage() {
           <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-emerald-900">
             <Package size={20} /> Finished Product
           </h2>
+          <div className="mb-4">
+            <label className="mb-1 block text-sm font-medium text-slate-700">Link to production job (optional)</label>
+            <select value={productionPlanId} onChange={e => {
+              const id = e.target.value;
+              setProductionPlanId(id);
+              const plan = productionPlans.find(row => row._id === id);
+              if (plan) {
+                setCustomerId(plan.customerId?._id || plan.customerId);
+                setItemName(plan.itemName);
+                setDimensions({ length: String(plan.dimensions.length), width: String(plan.dimensions.width), height: String(plan.dimensions.height) });
+                const specId = plan.productSpecificationId?._id || plan.productSpecificationId || '';
+                setProductSpecificationId(specId);
+              }
+            }} className="w-full rounded-xl border border-emerald-200 bg-white px-3 py-2.5 text-sm">
+              <option value="">No production job linked</option>
+              {productionPlans.filter(plan => ['planned', 'in_progress'].includes(plan.status)).map(plan => <option key={plan._id} value={plan._id}>{plan.planNumber} · {plan.customerId?.name || 'Customer'} · {plan.itemName} · {plan.completedBoxes}/{plan.plannedBoxes} boxes remaining</option>)}
+            </select>
+            <p className="mt-1 text-xs text-slate-500">When linked, this conversion updates the job progress and cannot exceed its remaining planned quantity.</p>
+          </div>
           <div className="mb-4">
             <label className="mb-1 block text-sm font-medium text-slate-700">Load saved product specification / BOM (optional)</label>
             <select value={productSpecificationId} onChange={e => {
