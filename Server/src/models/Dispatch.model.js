@@ -17,6 +17,9 @@ const dispatchSchema = new mongoose.Schema({
   cancelledAt: { type: Date },
   cancelledBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   cancellationReason: { type: String, trim: true, maxlength: 500 },
+  deliveredAt: { type: Date },
+  deliveredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  deliveryNotes: { type: String, trim: true, maxlength: 500 },
   recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
 

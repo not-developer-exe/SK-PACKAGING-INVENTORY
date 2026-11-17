@@ -114,6 +114,20 @@ export default function DispatchPage() {
     }
   };
 
+
+  const handleMarkDelivered = async (dispatch) => {
+    const notes = window.prompt('Enter delivery confirmation, receiver name or proof-of-delivery reference (minimum 3 characters):');
+    if (notes === null) return;
+    if (notes.trim().length < 3) { alert('Please enter a delivery confirmation or proof reference.'); return; }
+    if (!window.confirm('Mark ' + dispatch.challanNumber + ' as delivered? This will lock dispatch cancellation.')) return;
+    try {
+      await dispatchService.markDelivered(dispatch._id, notes.trim());
+      await fetchData({ from, to, customerId: customerFilter });
+      setSelectedChallan(null);
+      alert('Delivery marked as completed.');
+    } catch (err) { alert(err.response?.data?.message || 'Unable to mark delivery.'); }
+  };
+
   const handleDownloadPDF = async () => {
     const element = document.getElementById('challan-document');
     if (!element) return;
@@ -258,11 +272,11 @@ export default function DispatchPage() {
                   <td className="px-5 py-4 text-slate-600">
                     <div>{dispatch.vehicleNumber || '-'}</div>
                     <div className="text-xs text-slate-400">{dispatch.driverName || '-'}</div>
-                    {dispatch.status === 'cancelled' && <span className="mt-1 inline-block text-xs font-semibold text-red-600">Cancelled</span>}
+                    {dispatch.status === 'cancelled' && <span className="mt-1 inline-block text-xs font-semibold text-red-600">Cancelled</span>}{dispatch.status === 'delivered' && <span className="mt-1 inline-block text-xs font-semibold text-emerald-700">Delivered</span>}
                   </td>
                   {isAdmin && <td className="px-5 py-4" onClick={e => e.stopPropagation()}>
-                    {dispatch.status !== 'cancelled' && dispatch.status !== 'delivered'
-                      ? <button onClick={() => handleCancelDispatch(dispatch)} className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-800"><Ban size={14}/> Cancel</button>
+                    {dispatch.status === 'dispatched'
+                      ? <div className="flex flex-col items-start gap-2"><button onClick={() => handleMarkDelivered(dispatch)} className="text-xs font-semibold text-emerald-700 hover:text-emerald-900">Mark delivered</button><button onClick={() => handleCancelDispatch(dispatch)} className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-800"><Ban size={14}/> Cancel</button></div>
                       : <span className="text-xs text-slate-400">{dispatch.status === 'cancelled' ? 'Cancelled' : 'Delivered'}</span>}
                   </td>}
                 </tr>

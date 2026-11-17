@@ -9,6 +9,10 @@ export const dispatchService = {
     const { data } = await axiosClient.get("/dispatch", { params });
     return data.dispatches;
   },
+  async markDelivered(id, notes) {
+    const { data } = await axiosClient.patch(`/dispatch/${id}/delivered`, { notes });
+    return data;
+  },
   async cancelDispatch(id, reason) {
     const { data } = await axiosClient.patch(`/dispatch/${id}/cancel`, { reason });
     return data;

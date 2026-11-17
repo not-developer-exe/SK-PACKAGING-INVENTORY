@@ -189,6 +189,40 @@ exports.cancelDispatch = async (req, res) => {
   }
 };
 
+
+exports.markDelivered = async (req, res) => {
+  const notes = typeof req.body?.notes === 'string' ? req.body.notes.trim() : '';
+  if (notes.length < 3 || notes.length > 500) return res.status(400).json({ message: 'Enter delivery confirmation or proof reference (3–500 characters).' });
+  if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid dispatch ID.' });
+  const session = await mongoose.startSession();
+  try {
+    let delivered;
+    await session.withTransaction(async () => {
+      const dispatch = await Dispatch.findById(req.params.id).session(session);
+      if (!dispatch) throw Object.assign(new Error('Dispatch not found.'), { statusCode: 404 });
+      if (dispatch.status === 'cancelled') throw Object.assign(new Error('A cancelled dispatch cannot be marked delivered.'), { statusCode: 409 });
+      if (dispatch.status === 'delivered') throw Object.assign(new Error('This dispatch is already marked delivered.'), { statusCode: 409 });
+      dispatch.status = 'delivered';
+      dispatch.deliveredAt = new Date();
+      dispatch.deliveredBy = req.user._id;
+      dispatch.deliveryNotes = notes;
+      await dispatch.save({ session });
+      await writeAuditLog(req, {
+        action: 'dispatch.delivered',
+        entityType: 'Dispatch',
+        entityId: dispatch._id,
+        entityLabel: dispatch.challanNumber,
+        summary: 'Dispatch marked delivered: ' + dispatch.challanNumber,
+        metadata: { notes, deliveredAt: dispatch.deliveredAt }
+      }, session);
+      delivered = dispatch;
+    });
+    return res.json({ message: 'Delivery confirmed and audited.', dispatch: delivered });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Unable to confirm delivery.' });
+  } finally { await session.endSession(); }
+};
+
 exports.getAvailableBoxes = async (req, res) => {
   try {
     const boxes = await FinishedBox.find({ quantityAvailable: { $gt: 0 } })
