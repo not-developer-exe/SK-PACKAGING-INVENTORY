@@ -4,7 +4,7 @@ const corrugatedSheetSchema = new mongoose.Schema({
   productionRunId: { type: mongoose.Schema.Types.ObjectId, ref: 'ProductionRun', required: true },
   
   // Specifications
-  ply: { type: Number, required: true, enum: [3, 5, 7, 9] },
+  ply: { type: Number, required: true, enum: [2, 3, 5, 7, 9] },
   lengthInches: { type: Number, required: true },
   widthInches: { type: Number, required: true },
   
