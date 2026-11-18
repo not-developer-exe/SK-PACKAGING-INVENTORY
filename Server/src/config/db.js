@@ -13,39 +13,57 @@ const connectDB = async () => {
   }
   console.info(`MongoDB connected: ${conn.connection.host} (transaction-capable topology)`);
 
-  // ADMIN_EMAIL identifies the owner account. Inspect the raw collection so
-  // legacy external-auth IDs cannot trigger Mongoose ObjectId/required-field
-  // validation failures during API startup.
-  const email = (process.env.ADMIN_EMAIL || 'official.additya.singh@gmail.com').trim().toLowerCase();
-  const password = process.env.ADMIN_PASSWORD;
-  if (email) {
-    const ownerAccount = await User.collection.findOne({ email });
-    if (!ownerAccount && password) {
-      await User.create({
-        name: process.env.ADMIN_NAME?.trim() || 'System Administrator',
-        email,
-        password,
-        role: 'admin',
-        isActive: true
-      });
-      console.info('Initial administrator account created from environment configuration.');
-    } else if (ownerAccount) {
-      const hasMongoObjectId = ownerAccount._id instanceof mongoose.Types.ObjectId;
-      const hasPassword = typeof ownerAccount.password === 'string' && ownerAccount.password.length > 0;
+  // Keep the two designated accounts aligned with the deployment configuration.
+  // Use the raw collection so legacy external-auth records do not trigger Mongoose
+  // schema validation while roles are being synchronized.
+  const adminEmail = (process.env.ADMIN_EMAIL || 'official.additya.singh@gmail.com').trim().toLowerCase();
+  const accountantEmail = (process.env.ACCOUNTANT_EMAIL || 'admin@skpackaging.com').trim().toLowerCase();
+  if (adminEmail === accountantEmail) {
+    throw new Error('ADMIN_EMAIL and ACCOUNTANT_EMAIL must be different accounts.');
+  }
 
-      if (!hasMongoObjectId || !hasPassword) {
-        console.warn(
-          'Configured owner account uses an incompatible legacy user record. ' +
-          'API startup will continue; run "npm run seed:admin" to safely migrate the owner login.'
-        );
-      } else if (ownerAccount.role !== 'admin' || !ownerAccount.isActive) {
-        await User.collection.updateOne(
-          { _id: ownerAccount._id },
-          { $set: { role: 'admin', isActive: true } }
-        );
-        console.info('Configured owner account promoted to active administrator.');
-      }
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  const adminAccount = await User.collection.findOne({ email: adminEmail });
+  if (!adminAccount && adminPassword) {
+    await User.create({
+      name: process.env.ADMIN_NAME?.trim() || 'System Administrator',
+      email: adminEmail,
+      password: adminPassword,
+      role: 'admin',
+      isActive: true
+    });
+    console.info('Initial administrator account created from environment configuration.');
+  } else if (adminAccount) {
+    const hasMongoObjectId = adminAccount._id instanceof mongoose.Types.ObjectId;
+    const hasPassword = typeof adminAccount.password === 'string' && adminAccount.password.length > 0;
+
+    if (!hasMongoObjectId || !hasPassword) {
+      console.warn(
+        'Configured administrator account uses an incompatible legacy user record. ' +
+        'API startup will continue; run "npm run seed:admin" to safely migrate the owner login.'
+      );
+    } else if (adminAccount.role !== 'admin' || !adminAccount.isActive) {
+      await User.collection.updateOne(
+        { _id: adminAccount._id },
+        { $set: { role: 'admin', isActive: true } }
+      );
+      console.info('Configured owner account promoted to active administrator.');
     }
+  } else {
+    console.warn('Administrator account was not found and ADMIN_PASSWORD is not configured; no new login was created.');
+  }
+
+  const accountantAccount = await User.collection.findOne({ email: accountantEmail });
+  if (accountantAccount) {
+    if (accountantAccount.role !== 'accountant' || !accountantAccount.isActive) {
+      await User.collection.updateOne(
+        { _id: accountantAccount._id },
+        { $set: { role: 'accountant', isActive: true } }
+      );
+      console.info('Configured accountant account set to active accountant role.');
+    }
+  } else {
+    console.warn(`Configured accountant account was not found: ${accountantEmail}. Create it in User Management; no password or account was generated.`);
   }
 
   return conn;
