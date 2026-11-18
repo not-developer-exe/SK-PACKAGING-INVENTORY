@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 
+const companyScopePlugin = require('../utils/companyScope');
 const reconciliationLineSchema = new mongoose.Schema({
   reelId: { type: mongoose.Schema.Types.ObjectId, ref: 'ReelUnit', required: true },
   reelCode: { type: String, required: true },
@@ -21,5 +22,7 @@ const stockReconciliationSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 stockReconciliationSchema.index({ countedAt: -1 });
+
+reconciliationLineSchema.plugin(companyScopePlugin);
 
 module.exports = mongoose.model('StockReconciliation', stockReconciliationSchema);
