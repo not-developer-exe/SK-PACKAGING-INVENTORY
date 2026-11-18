@@ -64,8 +64,6 @@ exports.getWasteStats = async (req, res) => {
       totalWasteSold,
       totalWasteMaterialCost: Number(totalWasteMaterialCost.toFixed(2)),
       pendingWasteCostingRuns,
-      totalWasteMaterialCost: Number(totalWasteMaterialCost.toFixed(2)),
-      pendingWasteCostingRuns,
       allTimeWasteGenerated: allTimeGenerated,
       allTimeWasteSold: allTimeSold,
       legacyUnverifiedWasteKg,
