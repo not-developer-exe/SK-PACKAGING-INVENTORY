@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { Building2, Wallet, Package, Receipt, Users, ShieldCheck } from 'lucide-react';
 
 const metrics = [
@@ -31,7 +32,7 @@ export default function NSBOverviewPage() {
         {metrics.map(({ title, detail, icon: Icon }) => (
           <article key={title} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex items-center gap-3"><span className="rounded-lg bg-blue-50 p-2 text-blue-700"><Icon size={19} /></span><h3 className="font-semibold text-slate-900">{title}</h3></div>
-            <p className="mt-5 text-xl font-semibold text-slate-400">Not connected</p>
+            {title === 'Expenses' ? <Link to="/nsb/expenses" className="mt-5 inline-flex text-sm font-semibold text-blue-700 hover:underline">Open expense register</Link> : <p className="mt-5 text-xl font-semibold text-slate-400">Not connected</p>}
             <p className="mt-1 text-xs text-slate-500">{detail}</p>
           </article>
         ))}
