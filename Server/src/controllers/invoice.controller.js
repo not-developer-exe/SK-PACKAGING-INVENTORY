@@ -8,6 +8,7 @@ const writeAuditLog = require('../utils/writeAuditLog');
 const { buildDateRangeFilter, isValidDateOnly } = require('../utils/dateFilters');
 const { matchesDispatchQuantities } = require('../utils/dispatchInvoiceValidation');
 const { recalculatePartyLedger } = require('../utils/partyLedger');
+const { normalizeStateCode, getCompanyStateCode, calculateGstBreakdown } = require('../utils/gst');
 
 
 exports.cancelInvoice = async (req, res) => {
@@ -86,6 +87,14 @@ exports.getUninvoicedDispatches = async (req, res) => {
   }
 };
 
+exports.getTaxContext = async (req, res) => {
+  const companyStateCode = getCompanyStateCode();
+  return res.json({
+    companyStateCode: companyStateCode || null,
+    configured: Boolean(companyStateCode)
+  });
+};
+
 exports.createInvoice = async (req, res) => {
   const session = await mongoose.startSession();
   let createdInvoice;
@@ -111,6 +120,8 @@ exports.createInvoice = async (req, res) => {
     }
     const date = new Date(invoiceDate + 'T00:00:00+05:30');
     const gst = Number(gstPercent);
+    const companyStateCode = getCompanyStateCode();
+    if (!companyStateCode) return res.status(503).json({ message: 'Company GST state is not configured. Set GST_STATE_CODE (or GSTIN) before creating invoices.' });
     if (!Number.isFinite(gst) || gst < 0 || gst > 40) {
       return res.status(400).json({ message: 'Invoice date or GST rate is invalid' });
     }
@@ -137,6 +148,12 @@ exports.createInvoice = async (req, res) => {
       if (!customer || customer.isActive === false || !['Customer', 'Both'].includes(customer.type)) {
         const error = new Error('Selected customer was not found or is not a customer');
         error.statusCode = 400;
+        throw error;
+      }
+      const placeOfSupplyStateCode = normalizeStateCode(customer?.stateCode);
+      if (!placeOfSupplyStateCode) {
+        const error = new Error('Customer state code is missing or invalid. Edit the customer in Party Master and enter its two-digit GST state code before invoicing.');
+        error.statusCode = 422;
         throw error;
       }
       if (!dispatch) {
@@ -194,9 +211,9 @@ exports.createInvoice = async (req, res) => {
         ? Number((invoiceItems.reduce((sum, item) => sum + item.taxableAmount, 0) - totalCostOfGoods).toFixed(2))
         : null;
       const subTotal = Number(invoiceItems.reduce((sum, item) => sum + item.taxableAmount, 0).toFixed(2));
-      const cgstAmount = Number((subTotal * gst / 200).toFixed(2));
-      const sgstAmount = Number((subTotal * gst / 200).toFixed(2));
-      const grandTotal = Number((subTotal + cgstAmount + sgstAmount).toFixed(2));
+      const tax = calculateGstBreakdown({ taxableAmount: subTotal, gstPercent: gst, supplierStateCode: companyStateCode, placeOfSupplyStateCode });
+      const { cgstAmount, sgstAmount, igstAmount, taxType } = tax;
+      const grandTotal = Number((subTotal + cgstAmount + sgstAmount + igstAmount).toFixed(2));
       const dateKey = invoiceDate.slice(2).replace(/-/g, '');
       const invoiceNumber = `INV-${dateKey}-${Date.now()}-${crypto.randomInt(1000, 10000)}`;
 
@@ -210,6 +227,9 @@ exports.createInvoice = async (req, res) => {
         gstPercent: gst,
         cgstAmount,
         sgstAmount,
+        igstAmount,
+        taxType,
+        placeOfSupplyStateCode,
         grandTotal,
         balanceDue: grandTotal,
         costOfGoods: totalCostOfGoods,
@@ -227,7 +247,7 @@ exports.createInvoice = async (req, res) => {
       });
       customer.balance = recalculatePartyLedger(customer.ledger);
       await customer.save({ session });
-      await writeAuditLog(req, { action: 'invoice.created', entityType: 'Invoice', entityId: created._id, entityLabel: invoiceNumber, summary: 'Sales invoice created: ' + invoiceNumber, metadata: { customerId: String(customerId), dispatchId: String(dispatchId), subTotal, gstPercent: gst, grandTotal, costOfGoods: totalCostOfGoods, grossProfit, costingStatus: costingAvailable ? 'available' : 'unavailable' } }, session);
+      await writeAuditLog(req, { action: 'invoice.created', entityType: 'Invoice', entityId: created._id, entityLabel: invoiceNumber, summary: 'Sales invoice created: ' + invoiceNumber, metadata: { customerId: String(customerId), dispatchId: String(dispatchId), subTotal, gstPercent: gst, taxType, placeOfSupplyStateCode, grandTotal, costOfGoods: totalCostOfGoods, grossProfit, costingStatus: costingAvailable ? 'available' : 'unavailable' } }, session);
       createdInvoice = created;
     });
 
