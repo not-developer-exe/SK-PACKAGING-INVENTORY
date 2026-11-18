@@ -1,11 +1,30 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { ShieldCheck, ClipboardList, FilePlus2, PackageCheck, Users } from 'lucide-react';
 import { dashboardService } from '../services/dashboardService';
 import { Layers3, Factory, Package, ArrowRight, Loader2, Trash2, RefreshCw } from 'lucide-react';
 
 const number = (value, digits = 0) => Number(value ?? 0).toLocaleString('en-IN', { maximumFractionDigits: digits });
 
 export default function Overview() {
+  const { user } = useAuth();
+  const email = String(user?.email || '').trim().toLowerCase();
+  const displayName = email === 'official.additya.singh@gmail.com'
+    ? 'Aditya'
+    : email === 'admin@skpackaging.com'
+      ? 'Lakhan'
+      : (user?.name || 'there').split(' ')[0];
+  const isAdmin = user?.role === 'admin';
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const quickActions = [
+    { label: 'Record stock inward', description: 'Add incoming paper reels', to: '/inventory/inward', icon: PackageCheck },
+    { label: 'Record production', description: 'Log factory production', to: '/operations/production', icon: Factory },
+    { label: 'Create delivery challan', description: 'Dispatch finished boxes', to: '/operations/dispatch', icon: ClipboardList },
+    { label: 'Create GST invoice', description: 'Bill an unbilled challan', to: '/sales/new', icon: FilePlus2 },
+    ...(isAdmin ? [{ label: 'Manage users', description: 'Control team access', to: '/admin/users', icon: Users }] : [])
+  ];
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -56,15 +75,39 @@ export default function Overview() {
 
   return (
     <div className="space-y-6">
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-900 via-slate-800 to-blue-900 p-6 text-white shadow-sm sm:p-8">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-blue-200">{greeting}, {displayName}</p>
+            <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">Welcome to SK Packaging</h1>
+            <p className="mt-2 max-w-2xl text-sm text-slate-300">Your factory operations, inventory and business performance — all in one place.</p>
+          </div>
+          <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-blue-100">{isAdmin ? 'Owner · Administrator' : 'Accountant · Lakhan'}</span>
+        </div>
+      </section>
+
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Factory Overview</h1>
+          <h2 className="text-xl font-bold tracking-tight text-slate-900">Factory Overview</h2>
           <p className="mt-1 text-sm text-slate-500">Live metrics from your corrugation plant.</p>
         </div>
         <button onClick={fetchStats} disabled={loading} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-60"><RefreshCw size={15} className={loading ? 'animate-spin' : ''} /> Refresh</button>
       </div>
 
       {error && <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{error} Showing the last successfully loaded figures.</div>}
+
+      <section className="space-y-3">
+        <div><h2 className="text-lg font-semibold text-slate-900">Quick actions</h2><p className="text-sm text-slate-500">Jump straight into your daily work.</p></div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {quickActions.map(({ label, description, to, icon: Icon }) => (
+            <Link key={to} to={to} className="group flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md">
+              <span className="rounded-lg bg-blue-50 p-2.5 text-blue-600"><Icon size={19} /></span>
+              <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-slate-900">{label}</span><span className="mt-0.5 block text-xs text-slate-500">{description}</span></span>
+              <ArrowRight size={16} className="text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-blue-600" />
+            </Link>
+          ))}
+        </div>
+      </section>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map(({ title, value, unit, detail, label, to, icon: Icon, tone }) => (
