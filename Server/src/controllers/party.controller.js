@@ -5,6 +5,7 @@ const Invoice = require('../models/Invoice.model');
 const { allocateInvoicePayment } = require('../utils/invoicePaymentAllocation');
 const { recalculatePartyLedger } = require('../utils/partyLedger');
 const { isValidDateOnly } = require('../utils/dateFilters');
+const { normalizeStateCode } = require('../utils/gst');
 
 function transactionUnavailable(error) {
   return error?.code === 20 ||
@@ -33,10 +34,11 @@ exports.getParties = async (req, res) => {
 };
 
 exports.createParty = async (req, res) => {
-  const { name, type, phone = '', city = '', openingBalance = 0 } = req.body || {};
+  const { name, type, phone = '', city = '', stateCode = '', openingBalance = 0 } = req.body || {};
   const balance = Number(openingBalance);
   if (typeof name !== 'string' || name.trim().length < 2 ||
       !['Customer', 'Supplier', 'Both'].includes(type) ||
+      (stateCode && !normalizeStateCode(stateCode)) ||
       !Number.isFinite(balance)) {
     return res.status(400).json({ message: 'Enter a party name, valid party type and finite opening balance.' });
   }
@@ -50,6 +52,7 @@ exports.createParty = async (req, res) => {
       type,
       phone: typeof phone === 'string' ? phone.trim() : '',
       city: typeof city === 'string' ? city.trim() : '',
+      ...(stateCode ? { stateCode: normalizeStateCode(stateCode) } : {}),
       balance,
       ledger: balance !== 0 ? [{
         type: 'Opening Balance',
@@ -70,12 +73,13 @@ exports.createParty = async (req, res) => {
 };
 
 exports.updateParty = async (req, res) => {
-  const { name, phone, city, type } = req.body || {};
+  const { name, phone, city, type, stateCode } = req.body || {};
   if (name !== undefined && (typeof name !== 'string' || name.trim().length < 2)) {
     return res.status(400).json({ message: 'Party name must contain at least 2 characters.' });
   }
   if (phone !== undefined && typeof phone !== 'string') return res.status(400).json({ message: 'Phone must be text.' });
   if (city !== undefined && typeof city !== 'string') return res.status(400).json({ message: 'City must be text.' });
+  if (stateCode !== undefined && stateCode !== '' && !normalizeStateCode(stateCode)) return res.status(400).json({ message: 'Enter a valid two-digit GST state code.' });
   if (type !== undefined && !['Customer', 'Supplier', 'Both'].includes(type)) {
     return res.status(400).json({ message: 'Invalid party type.' });
   }
@@ -83,16 +87,17 @@ exports.updateParty = async (req, res) => {
   try {
     const party = await Party.findById(req.params.id);
     if (!party) return res.status(404).json({ message: 'Party not found.' });
-    const before = { name: party.name, type: party.type, phone: party.phone, city: party.city };
+    const before = { name: party.name, type: party.type, phone: party.phone, city: party.city, stateCode: party.stateCode };
     if (name !== undefined) party.name = name.trim();
     if (phone !== undefined) party.phone = phone.trim();
     if (city !== undefined) party.city = city.trim();
+    if (stateCode !== undefined) party.stateCode = stateCode ? normalizeStateCode(stateCode) : undefined;
     if (type !== undefined && type !== party.type && party.ledger.some((entry) => entry.type !== 'Opening Balance')) {
       return res.status(409).json({ message: 'Party type cannot be changed after financial transactions have been recorded.' });
     }
     if (type !== undefined) party.type = type;
     await party.save();
-    await auditPartyChange(req, 'party.updated', party, 'Party details updated: ' + party.name, { before, after: { name: party.name, type: party.type, phone: party.phone, city: party.city } });
+    await auditPartyChange(req, 'party.updated', party, 'Party details updated: ' + party.name, { before, after: { name: party.name, type: party.type, phone: party.phone, city: party.city, stateCode: party.stateCode } });
     return res.json(party);
   } catch (error) {
     console.error('[PARTIES] Update failed:', error.message);
