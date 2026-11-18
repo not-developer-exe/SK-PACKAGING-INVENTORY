@@ -47,6 +47,7 @@ exports.recordProduction = async (req, res) => {
     shift,
     operatorName,
     machineName: rawMachineName,
+    fluteProfile: rawFluteProfile = 'narrow',
     wasteBreakdown: rawWasteBreakdown = [],
     runDate: rawRunDate,
     inputReels,
@@ -74,6 +75,8 @@ exports.recordProduction = async (req, res) => {
   if (!Number.isFinite(recoverableWasteKg) || recoverableWasteKg < 0) {
     return res.status(400).json({ message: 'Measured recoverable scrap must be a non-negative number.' });
   }
+  if (!['narrow', 'broad'].includes(rawFluteProfile)) return res.status(400).json({ message: 'Select a valid flute profile: narrow or broad.' });
+  const fluteTakeUpFactor = rawFluteProfile === 'narrow' ? 1.5 : 1.6;
   const machineName = rawMachineName === undefined || rawMachineName === null ? '' : rawMachineName;
   if (typeof machineName !== 'string' || machineName.trim().length > 100) {
     return res.status(400).json({ message: 'Machine name must be text of at most 100 characters.' });
@@ -211,6 +214,17 @@ exports.recordProduction = async (req, res) => {
       }], { session, ordered: true });
     }
 
+    const plainInput = tracedInputs.find((item) => item.reelRole === 'plain_surface');
+    const fluteInput = tracedInputs.find((item) => item.reelRole === 'flute');
+    if (!plainInput || !fluteInput || Number(plainInput.gsm) <= 0 || Number(fluteInput.gsm) <= 0) {
+      const error = new Error('Both reel GSM specifications are required to calculate flute take-up.'); error.statusCode = 400; throw error;
+    }
+    // Flute paper usage is longer than the liner web: 1.50x for narrow and 1.60x for broad.
+    // Convert the web-length factor into expected kg using the actual reel GSM and width specs.
+    const expectedFluteWeightKg = Number((plainInput.weightConsumedKg * (Number(fluteInput.gsm) / Number(plainInput.gsm)) * (Number(fluteInput.actualWidthInches) / Number(plainInput.actualWidthInches)) * fluteTakeUpFactor).toFixed(3));
+    const actualFluteWeightKg = Number(fluteInput.weightConsumedKg);
+    const fluteWeightVarianceKg = Number((actualFluteWeightKg - expectedFluteWeightKg).toFixed(3));
+
     const totalMaterialCost = Number(tracedInputs.reduce((sum, item) => sum + item.materialCost, 0).toFixed(2));
     const materialCostPerOutputKg = calculateUnitMaterialCost(totalMaterialCost, totalOutputWeight);
 
@@ -220,6 +234,11 @@ exports.recordProduction = async (req, res) => {
       shift,
       operatorName: typeof operatorName === 'string' ? operatorName.trim() : '',
       machineName: machineName.trim(),
+      fluteProfile: rawFluteProfile,
+      fluteTakeUpFactor,
+      expectedFluteWeightKg,
+      actualFluteWeightKg,
+      fluteWeightVarianceKg,
       wasteBreakdown: wasteBreakdown.map((row) => ({ ...row, weightKg: mongoose.Types.Decimal128.fromString(String(row.weightKg)) })),
       inputReels: tracedInputs,
       totalInputWeightKg: totalInputWeight,
@@ -260,7 +279,7 @@ exports.recordProduction = async (req, res) => {
       }], { session, ordered: true });
     }
 
-    await writeAuditLog(req, { action: 'production.recorded', entityType: 'ProductionRun', entityId: run._id, entityLabel: runNumber, summary: 'Production run recorded: ' + runNumber, metadata: { totalInputWeightKg: totalInputWeight, totalOutputWeightKg: totalOutputWeight, totalMaterialCost, materialCostPerOutputKg, recoverableWasteKg, wasteBreakdown, machineName: machineName.trim(), shift, operatorName, processLossKg, inputReelCount: tracedInputs.length, outputLineCount: outputs.length, widthSubstitutions: tracedInputs.filter((item) => item.widthVarianceInches !== 0).map((item) => ({ reelCode: item.reelCode, requestedWidthInches: item.requestedWidthInches, actualWidthInches: item.actualWidthInches, varianceInches: item.widthVarianceInches })) } }, session);
+    await writeAuditLog(req, { action: 'production.recorded', entityType: 'ProductionRun', entityId: run._id, entityLabel: runNumber, summary: 'Production run recorded: ' + runNumber, metadata: { totalInputWeightKg: totalInputWeight, totalOutputWeightKg: totalOutputWeight, totalMaterialCost, materialCostPerOutputKg, recoverableWasteKg, wasteBreakdown, machineName: machineName.trim(), shift, operatorName, processLossKg, fluteProfile: rawFluteProfile, fluteTakeUpFactor, expectedFluteWeightKg, actualFluteWeightKg, fluteWeightVarianceKg, inputReelCount: tracedInputs.length, outputLineCount: outputs.length, widthSubstitutions: tracedInputs.filter((item) => item.widthVarianceInches !== 0).map((item) => ({ reelCode: item.reelCode, requestedWidthInches: item.requestedWidthInches, actualWidthInches: item.actualWidthInches, varianceInches: item.widthVarianceInches })) } }, session);
     await session.commitTransaction();
     return res.status(201).json({
       message: 'Production run recorded successfully',
