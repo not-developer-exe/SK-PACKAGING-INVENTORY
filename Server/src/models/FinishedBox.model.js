@@ -25,6 +25,21 @@ const finishedBoxSchema = new mongoose.Schema({
   quantityProduced: { type: Number, required: true },
   quantityAvailable: { type: Number, required: true },
   materialCost: { type: Number, default: 0, min: 0 },
+  costBreakdown: {
+    sheetMaterialCost: { type: Number, default: 0, min: 0 },
+    rawMaterialCost: { type: Number, default: 0, min: 0 },
+    rawMaterialConsumptions: [{
+      materialId: { type: mongoose.Schema.Types.ObjectId, ref: 'RawMaterial' },
+      code: String, name: String, uom: String,
+      quantity: { type: Number, min: 0 },
+      rate: { type: Number, min: 0 },
+      amount: { type: Number, min: 0 }
+    }],
+    labourCost: { type: Number, default: 0, min: 0 },
+    otherConversionCost: { type: Number, default: 0, min: 0 },
+    totalConversionCost: { type: Number, default: 0, min: 0 },
+    totalCost: { type: Number, default: 0, min: 0 }
+  },
   costPerBox: { type: Number, default: 0, min: 0 },
   costingStatus: { type: String, enum: ['available', 'unavailable'], default: 'unavailable' },
   
