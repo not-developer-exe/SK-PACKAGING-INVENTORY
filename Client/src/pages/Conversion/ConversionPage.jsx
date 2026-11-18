@@ -4,6 +4,7 @@ import { partiesService } from '../../services/partiesService';
 import { productSpecificationService } from '../../services/productSpecificationService';
 import { productionIntelligenceService } from '../../services/productionIntelligenceService';
 import DateRangeFilter from '../../components/DateRangeFilter';
+import axiosClient from '../../api/axiosClient';
 import { Package, Scissors, Loader2 } from 'lucide-react';
 
 export default function ConversionPage() {
@@ -15,6 +16,10 @@ export default function ConversionPage() {
   const [customers, setCustomers] = useState([]);
   const [productSpecifications, setProductSpecifications] = useState([]);
   const [productionPlans, setProductionPlans] = useState([]);
+  const [rawMaterials, setRawMaterials] = useState([]);
+  const [rawMaterialConsumptions, setRawMaterialConsumptions] = useState([]);
+  const [labourCost, setLabourCost] = useState('');
+  const [otherConversionCost, setOtherConversionCost] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -34,18 +39,20 @@ export default function ConversionPage() {
   const fetchData = async (dateParams = {}) => {
     try {
       setLoading(true);
-      const [sheetData, customerData, finishedGoodsData, productData, productionPlanData] = await Promise.all([
+      const [sheetData, customerData, finishedGoodsData, productData, productionPlanData, rawMaterialData] = await Promise.all([
         conversionService.getAvailableSheets(),
         partiesService.getCustomers(),
         conversionService.getFinishedGoods(dateParams),
         productSpecificationService.getAll(),
-        productionIntelligenceService.getPlans()
+        productionIntelligenceService.getPlans(),
+        axiosClient.get('/raw-materials?activeOnly=true')
       ]);
       setSheets(sheetData);
       setCustomers(customerData);
       setFinishedGoods(finishedGoodsData);
       setProductSpecifications(productData);
       setProductionPlans(productionPlanData);
+      setRawMaterials(rawMaterialData.data.materials || []);
     } catch (err) {
       console.error('Error fetching conversion data:', err);
     } finally {
@@ -82,7 +89,9 @@ export default function ConversionPage() {
           width: Number(dimensions.width),
           height: Number(dimensions.height)
         },
-        boxesProduced: Number(boxesProduced)
+        boxesProduced: Number(boxesProduced),
+        rawMaterialConsumptions: rawMaterialConsumptions.filter(x => x.materialId && Number(x.quantity) > 0).map(x => ({ materialId: x.materialId, quantity: Number(x.quantity) })),
+        conversionCharges: { labourCost: Number(labourCost || 0), otherCost: Number(otherConversionCost || 0) }
       });
 
       setSuccess(res.bomVariance ? `Batch ${res.batchNumber} created. Material variance: ${res.bomVariance.weightVarianceKg >= 0 ? '+' : ''}${res.bomVariance.weightVarianceKg.toFixed(2)} kg (${res.bomVariance.weightVariancePercent}%).` : `Success! Batch ${res.batchNumber} created with ${boxesProduced} boxes.`);
@@ -96,6 +105,9 @@ export default function ConversionPage() {
       setItemName('');
       setDimensions({ length: '', width: '', height: '' });
       setBoxesProduced('');
+      setRawMaterialConsumptions([]);
+      setLabourCost('');
+      setOtherConversionCost('');
       
       fetchData({ from, to, customerId: customerFilter }); // Refresh available sheets and filtered history
     } catch (err) {
@@ -224,6 +236,29 @@ export default function ConversionPage() {
           </div>
         </div>
 
+        <section className="rounded-2xl border border-amber-200 bg-amber-50/40 p-6 space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div><h2 className="text-lg font-semibold text-amber-900">Finishing materials & conversion costs</h2><p className="text-xs text-amber-800">Optional. Raw-material issues are deducted atomically with sheet stock and finished-goods creation.</p></div>
+            <button type="button" onClick={() => setRawMaterialConsumptions([...rawMaterialConsumptions, { materialId: '', quantity: '' }])} className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-900">+ Add material</button>
+          </div>
+          {rawMaterialConsumptions.map((line, index) => {
+            const selected = rawMaterials.find(m => m._id === line.materialId);
+            return <div key={index} className="grid grid-cols-12 gap-2">
+              <select value={line.materialId} onChange={e => { const next=[...rawMaterialConsumptions]; next[index]={...next[index],materialId:e.target.value}; setRawMaterialConsumptions(next); }} className="col-span-7 rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm">
+                <option value="">Select raw material</option>{rawMaterials.map(m=><option key={m._id} value={m._id}>{m.code} · {m.name} ({m.currentQty} {m.uom} available)</option>)}
+              </select>
+              <div className="col-span-4"><input type="number" min="0.000001" step="any" required value={line.quantity} onChange={e=>{const next=[...rawMaterialConsumptions];next[index]={...next[index],quantity:e.target.value};setRawMaterialConsumptions(next);}} placeholder={selected ? "Quantity ("+selected.uom+")" : "Quantity"} className="w-full rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm"/><p className="mt-1 text-[11px] text-amber-800">{selected ? "Rate ₹"+Number(selected.averageRate||0).toFixed(2)+" / "+selected.uom : "Choose a material first"}</p></div>
+              <button type="button" onClick={()=>setRawMaterialConsumptions(rawMaterialConsumptions.filter((_,i)=>i!==index))} className="col-span-1 text-red-600">×</button>
+            </div>;
+          })}
+          {!rawMaterials.length && <p className="text-xs text-amber-800">No active raw materials available. Add stock in Raw Material Stock first.</p>}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 border-t border-amber-200 pt-4">
+            <div><label className="mb-1 block text-sm font-medium text-slate-700">Direct labour / finishing charges (₹)</label><input type="number" min="0" step="0.01" value={labourCost} onChange={e=>setLabourCost(e.target.value)} placeholder="0.00" className="w-full rounded-xl border border-amber-200 bg-white px-3 py-2.5 text-sm"/></div>
+            <div><label className="mb-1 block text-sm font-medium text-slate-700">Other conversion charges (₹)</label><input type="number" min="0" step="0.01" value={otherConversionCost} onChange={e=>setOtherConversionCost(e.target.value)} placeholder="0.00" className="w-full rounded-xl border border-amber-200 bg-white px-3 py-2.5 text-sm"/></div>
+          </div>
+          <p className="text-xs text-slate-600">Enter batch-level charges only. Do not include the corrugated sheet cost again; it is calculated from the source batch automatically.</p>
+        </section>
+
         {error && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">{error}</div>}
         {success && <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-700">{success}</div>}
 
@@ -254,7 +289,7 @@ export default function ConversionPage() {
         <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
           <table className="w-full min-w-[950px] text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-              <tr><th className="px-4 py-3">Date</th><th className="px-4 py-3">Batch</th><th className="px-4 py-3">Customer</th><th className="px-4 py-3">Item</th><th className="px-4 py-3">Dimensions</th><th className="px-4 py-3 text-right">Produced</th><th className="px-4 py-3 text-right">Available</th><th className="px-4 py-3 text-right">Cost / box</th><th className="px-4 py-3 text-right">BOM variance</th></tr>
+              <tr><th className="px-4 py-3">Date</th><th className="px-4 py-3">Batch</th><th className="px-4 py-3">Customer</th><th className="px-4 py-3">Item</th><th className="px-4 py-3">Dimensions</th><th className="px-4 py-3 text-right">Produced</th><th className="px-4 py-3 text-right">Available</th><th className="px-4 py-3 text-right">Cost / box</th><th className="px-4 py-3 text-right">Batch cost</th><th className="px-4 py-3 text-right">BOM variance</th></tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {finishedGoods.map(box => <tr key={box._id}>
@@ -266,9 +301,10 @@ export default function ConversionPage() {
                 <td className="px-4 py-3 text-right">{Number(box.quantityProduced || 0).toLocaleString('en-IN')}</td>
                 <td className="px-4 py-3 text-right font-semibold">{Number(box.quantityAvailable || 0).toLocaleString('en-IN')}</td>
                 <td className="px-4 py-3 text-right">{box.costingStatus === 'available' ? '₹' + Number(box.costPerBox || 0).toFixed(2) : 'Pending'}</td>
+                <td className="px-4 py-3 text-right">{box.costingStatus === 'available' ? '₹' + Number(box.costBreakdown?.totalCost ?? box.materialCost ?? 0).toFixed(2) : 'Pending'}</td>
                 <td className="px-4 py-3 text-right">{box.bomVariance ? <span className={Number(box.bomVariance.weightVarianceKg) > 0 ? 'font-semibold text-amber-700' : 'font-semibold text-emerald-700'}>{Number(box.bomVariance.weightVarianceKg) > 0 ? '+' : ''}{Number(box.bomVariance.weightVarianceKg).toFixed(2)} kg ({Number(box.bomVariance.weightVariancePercent).toFixed(2)}%)</span> : '—'}</td>
               </tr>)}
-              {!finishedGoods.length && <tr><td colSpan={9} className="p-8 text-center text-slate-500">No finished goods batches found for this period.</td></tr>}
+              {!finishedGoods.length && <tr><td colSpan={10} className="p-8 text-center text-slate-500">No finished goods batches found for this period.</td></tr>}
             </tbody>
           </table>
         </div>
