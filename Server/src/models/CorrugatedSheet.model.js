@@ -1,7 +1,8 @@
 const mongoose = require('mongoose');
 
 const corrugatedSheetSchema = new mongoose.Schema({
-  productionRunId: { type: mongoose.Schema.Types.ObjectId, ref: 'ProductionRun', required: true },
+  productionRunId: { type: mongoose.Schema.Types.ObjectId, ref: 'ProductionRun' },
+  pastingRunId: { type: mongoose.Schema.Types.ObjectId, ref: 'PastingRun' },
   
   // Specifications
   ply: { type: Number, required: true, enum: [2, 3, 5, 7, 9] },
