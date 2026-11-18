@@ -59,7 +59,7 @@ app.use((req, res, next) => {
 });
 
 app.use('/api/auth', authRoutes);
-app.use('/api/parties', partyRoutes);
+app.use('/api/parties', (req, res, next) => { req.companyKey = 'sk-packaging'; next(); }, partyRoutes);
 app.use('/api/inward', inwardRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/controls', controlRoutes);
