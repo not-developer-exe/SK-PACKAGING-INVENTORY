@@ -10,6 +10,7 @@ const reconciliationLineSchema = new mongoose.Schema({
 });
 
 const stockReconciliationSchema = new mongoose.Schema({
+  companyKey: { type: String, enum: ['sk-packaging', 'nsb-industrial-solutions'], default: 'sk-packaging', index: true },
   reconciliationNumber: { type: String, required: true, unique: true, trim: true },
   countedAt: { type: Date, required: true, default: Date.now },
   reason: { type: String, required: true, trim: true },
