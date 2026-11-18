@@ -2,7 +2,7 @@ import React,{useEffect,useState} from 'react';
 import axiosClient from '../../api/axiosClient';
 
 const today=()=>new Date().toLocaleDateString('en-CA');
-const issueBlank={jobWorkerName:'',processType:'offset_printing',inputBatchModel:'FacingMaterialBatch',inputBatchId:'',issueDate:today(),expectedReturnDate:'',issuedSheets:'',notes:''};
+const issueBlank={jobWorkerName:'',processType:'offset_printing',inputBatchModel:'FacingMaterialBatch',inputMaterialType:'duplex',inputBatchId:'',issueDate:today(),expectedReturnDate:'',issuedSheets:'',notes:''};
 const returnBlank={orderId:'',returnDate:today(),sheetsReturned:'',weightReturnedKg:'',wastageSheets:'0',wastageWeightKg:'0',jobCharges:'0',outputMaterialType:'printed',notes:''};
 
 export default function JobWorkPage(){
@@ -20,6 +20,7 @@ export default function JobWorkPage(){
    <input required placeholder="Printer / job-worker name" value={issue.jobWorkerName} onChange={e=>setIssue({...issue,jobWorkerName:e.target.value})} className="rounded-lg border px-3 py-2 text-sm"/>
    <select value={issue.processType} onChange={e=>setIssue({...issue,processType:e.target.value})} className="rounded-lg border px-3 py-2 text-sm"><option value="offset_printing">Offset printing</option><option value="lamination">Lamination</option><option value="other">Other processing</option></select>
    <select value={issue.inputBatchModel} onChange={e=>setIssue({...issue,inputBatchModel:e.target.value,inputBatchId:''})} className="rounded-lg border px-3 py-2 text-sm"><option value="FacingMaterialBatch">Printed / facing stock</option><option value="CutSheetBatch">Cut-sheet stock</option></select>
+   {issue.inputBatchModel==='CutSheetBatch'&&<select value={issue.inputMaterialType} onChange={e=>setIssue({...issue,inputMaterialType:e.target.value})} className="rounded-lg border px-3 py-2 text-sm"><option value="printed">Plain paper for printing</option><option value="printed_laminated">Printed + laminated</option><option value="khaki">Khaki</option><option value="duplex">Duplex board</option></select>}
    <select required value={issue.inputBatchId} onChange={e=>setIssue({...issue,inputBatchId:e.target.value})} className="rounded-lg border px-3 py-2 text-sm"><option value="">Select stock batch</option>{(issue.inputBatchModel==='CutSheetBatch'?cutBatches:batches).filter(b=>b.remainingSheets>0).map(b=><option key={b._id} value={b._id}>{b.batchNumber} · {b.remainingSheets} sheets · {b.lengthInches}×{b.widthInches} in</option>)}</select>
    <input required type="number" min="1" step="1" placeholder="Sheets to issue" value={issue.issuedSheets} onChange={e=>setIssue({...issue,issuedSheets:e.target.value})} className="rounded-lg border px-3 py-2 text-sm"/>
    <label className="text-xs text-slate-600">Issue date<input required type="date" value={issue.issueDate} onChange={e=>setIssue({...issue,issueDate:e.target.value})} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"/></label>
