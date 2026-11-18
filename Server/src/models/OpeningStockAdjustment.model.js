@@ -11,6 +11,7 @@ const openingStockLineSchema = new mongoose.Schema({
 });
 
 const openingStockAdjustmentSchema = new mongoose.Schema({
+  companyKey: { type: String, enum: ['sk-packaging', 'nsb-industrial-solutions'], default: 'sk-packaging', index: true },
   adjustmentNumber: { type: String, required: true, unique: true, trim: true },
   adjustmentDate: { type: Date, required: true, default: Date.now },
   reason: { type: String, required: true, trim: true },

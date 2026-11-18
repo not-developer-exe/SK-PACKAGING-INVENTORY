@@ -6,6 +6,8 @@ const Sequence = require('../models/Sequence.model');
 const AuditLog = require('../models/AuditLog.model');
 const { buildDateRangeFilter } = require('../utils/dateFilters');
 
+const companyFilter = () => ({ $or: [{ companyKey: 'sk-packaging' }, { companyKey: { $exists: false } }] });
+
 const number = (value) => {
   if (value === '' || value === null || value === undefined) return NaN;
   return Number(value);
@@ -13,7 +15,7 @@ const number = (value) => {
 
 exports.getOpeningStockAdjustments = async (req, res) => {
   try {
-    const filter = buildDateRangeFilter(req.query.from, req.query.to, 'adjustmentDate');
+    const filter = { ...buildDateRangeFilter(req.query.from, req.query.to, 'adjustmentDate'), ...companyFilter() };
     const adjustments = await OpeningStockAdjustment.find(filter)
       .populate('createdBy', 'name email')
       .sort({ adjustmentDate: -1, createdAt: -1 })
@@ -61,7 +63,7 @@ exports.createOpeningStockAdjustment = async (req, res) => {
   try {
     let result;
     await session.withTransaction(async () => {
-      const existingCount = await ReelUnit.countDocuments().session(session);
+      const existingCount = await ReelUnit.countDocuments(companyFilter()).session(session);
       const totalReels = normalizedLines.reduce((sum, line) => sum + line.reelWeightsKg.length, 0);
       const totalWeight = normalizedLines.reduce((sum, line) => sum + line.reelWeightsKg.reduce((a,b) => a+b,0), 0);
       const sequence = await Sequence.findOneAndUpdate(
@@ -77,6 +79,7 @@ exports.createOpeningStockAdjustment = async (req, res) => {
       let reelCodeCounter = reelSequence.value - totalReels;
       const adjustmentNumber = 'OS-' + String(sequence.value).padStart(5, '0');
       const [adjustment] = await OpeningStockAdjustment.create([{
+        companyKey: 'sk-packaging',
         adjustmentNumber,
         adjustmentDate: parsedDate,
         reason: reason.trim(),
@@ -91,6 +94,7 @@ exports.createOpeningStockAdjustment = async (req, res) => {
         const reelDocs = line.reelWeightsKg.map((weight) => {
           reelCodeCounter += 1;
           return {
+            companyKey: 'sk-packaging',
             reelCode: 'RL-' + String(reelCodeCounter).padStart(6, '0'),
             reelWidthInches: line.reelWidthInches,
             bf: line.bf,
@@ -111,6 +115,7 @@ exports.createOpeningStockAdjustment = async (req, res) => {
         const createdReels = await ReelUnit.create(reelDocs, { session, ordered: true });
         adjustment.lines[index].reelIds = createdReels.map(reel => reel._id);
         await StockMovement.create([{
+          companyKey: 'sk-packaging',
           movementDate: parsedDate,
           movementType: 'adjustment',
           referenceId: adjustment._id,
