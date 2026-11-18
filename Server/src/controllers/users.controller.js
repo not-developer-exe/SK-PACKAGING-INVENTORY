@@ -98,8 +98,7 @@ exports.updateUser = async (req, res) => {
 
       const before = { name: user.name, role: user.role, isActive: user.isActive };
       if (name !== undefined) user.name = name.trim();
-      if (role !== undefined) user.role = isOwnerAccount ? 'admin' : 'accountant';
-      if (!isOwnerAccount) user.role = 'accountant';
+      user.role = isOwnerAccount ? 'admin' : 'accountant';
       if (isActive !== undefined) user.isActive = isActive;
       if (password !== undefined) user.password = password;
       await user.save({ session });
