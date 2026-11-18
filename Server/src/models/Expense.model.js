@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 
+const companyScopePlugin = require('../utils/companyScope');
 const expenseSchema = new mongoose.Schema({
   companyKey: { type: String, enum: ['sk-packaging', 'nsb-industrial-solutions'], default: 'sk-packaging', index: true },
   expenseDate: { type: Date, required: true, default: Date.now },
@@ -19,5 +20,7 @@ const expenseSchema = new mongoose.Schema({
 
 expenseSchema.index({ expenseDate: -1, category: 1 });
 expenseSchema.index({ expenseDate: -1, vendor: 1 });
+
+expenseSchema.plugin(companyScopePlugin);
 
 module.exports = mongoose.models.Expense || mongoose.model('Expense', expenseSchema);
