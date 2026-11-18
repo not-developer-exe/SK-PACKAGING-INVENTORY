@@ -42,6 +42,15 @@ exports.recordConversion = async (req, res) => {
       !Number.isInteger(boxesProduced) || boxesProduced <= 0) {
     return res.status(400).json({ message: 'Sheets consumed and boxes produced must be positive whole numbers.' });
   }
+  if (!Array.isArray(rawMaterialConsumptions) || rawMaterialConsumptions.length > 30 ||
+      !conversionCharges || typeof conversionCharges !== 'object' || Array.isArray(conversionCharges)) {
+    return res.status(400).json({ message: 'Provide up to 30 raw-material lines and a valid conversion-cost object.' });
+  }
+  const labourCostInput = Number(conversionCharges.labourCost ?? 0);
+  const otherCostInput = Number(conversionCharges.otherCost ?? 0);
+  if (![labourCostInput, otherCostInput].every(value => Number.isFinite(value) && value >= 0)) {
+    return res.status(400).json({ message: 'Labour and other conversion charges must be finite, non-negative amounts.' });
+  }
   if (typeof itemName !== 'string' || itemName.trim().length < 2 ||
       !dimensions || !['length', 'width', 'height'].every((key) =>
         Number.isFinite(Number(dimensions[key])) && Number(dimensions[key]) > 0)) {
@@ -179,7 +188,7 @@ exports.recordConversion = async (req, res) => {
         : 0;
       const rawMaterialResult = await consumeRawMaterials({
         req, session, consumptions: rawMaterialConsumptions, movementDate: conversionDate,
-        reference: 'Finished goods conversion', notes: 'Consumed for finished-goods batch'
+        reference: 'Finished goods ' + batchNumber, notes: 'Consumed for finished-goods batch ' + batchNumber
       });
       const labourCost = Number(conversionCharges?.labourCost ?? 0);
       const otherConversionCost = Number(conversionCharges?.otherCost ?? 0);
@@ -187,7 +196,8 @@ exports.recordConversion = async (req, res) => {
         sheetMaterialCost, rawMaterialCost: rawMaterialResult.totalCost,
         labourCost, otherConversionCost, quantityProduced: boxesProduced
       });
-      const costingStatus = sheetCostingAvailable ? 'available' : 'unavailable';
+      const rawMaterialCostingAvailable = rawMaterialResult.lines.every(line => line.rate > 0);
+      const costingStatus = sheetCostingAvailable && rawMaterialCostingAvailable ? 'available' : 'unavailable';
       const materialCost = sheetMaterialCost + rawMaterialResult.totalCost;
       const costPerBox = costingStatus === 'available' ? costBreakdown.costPerBox : 0;
 
