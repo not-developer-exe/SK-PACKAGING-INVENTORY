@@ -114,7 +114,7 @@ exports.recordProduction = async (req, res) => {
   if (outputs.some((item) => !Number.isFinite(item.totalWeightKg) || item.totalWeightKg <= 0 ||
       !Number.isInteger(item.sheetCount) || item.sheetCount <= 0 ||
       !Number.isFinite(item.lengthInches) || item.lengthInches <= 0 ||
-      !Number.isFinite(item.widthInches) || item.widthInches <= 0 || ![3, 5, 7, 9].includes(Number(item.ply)))) {
+      !Number.isFinite(item.widthInches) || item.widthInches <= 0 || Number(item.ply) !== 2)) {
     return res.status(400).json({ message: 'Every output line must have positive dimensions, weight and a whole-number sheet count.' });
   }
 
