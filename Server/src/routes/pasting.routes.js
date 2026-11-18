@@ -1,0 +1,10 @@
+const express = require('express');
+const router = express.Router();
+const { protect } = require('../middlewares/auth.middleware');
+const { receiveFacingMaterial, getFacingMaterial, recordPasting, getPastingRuns } = require('../controllers/pasting.controller');
+router.use(protect);
+router.get('/facing-material', getFacingMaterial);
+router.post('/facing-material', receiveFacingMaterial);
+router.get('/runs', getPastingRuns);
+router.post('/runs', recordPasting);
+module.exports = router;
