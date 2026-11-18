@@ -41,6 +41,17 @@ const productionRunSchema = new mongoose.Schema({
   totalInputWeightKg: { type: mongoose.Schema.Types.Decimal128, required: true },
   totalOutputWeightKg: { type: mongoose.Schema.Types.Decimal128, required: true },
   totalMaterialCost: { type: mongoose.Schema.Types.Decimal128, default: 0 },
+  reelMaterialCost: { type: mongoose.Schema.Types.Decimal128, default: 0 },
+  rawMaterialCost: { type: mongoose.Schema.Types.Decimal128, default: 0 },
+  rawMaterialConsumptions: [{
+    materialId: { type: mongoose.Schema.Types.ObjectId, ref: 'RawMaterial', required: true },
+    code: { type: String },
+    name: { type: String },
+    uom: { type: String },
+    quantity: { type: Number, required: true, min: 0.000001 },
+    rate: { type: Number, default: 0, min: 0 },
+    amount: { type: Number, default: 0, min: 0 }
+  }],
   materialCostPerOutputKg: { type: mongoose.Schema.Types.Decimal128, default: 0 },
   // Only physically measured, recoverable scrap is saleable waste inventory.
   recoverableWasteKg: { type: mongoose.Schema.Types.Decimal128, default: 0 },

@@ -10,6 +10,7 @@ const { calculateWidthSubstitution } = require('../utils/widthSubstitution');
 const { resolveLandedRatePerKg, calculateMaterialCost, calculateUnitMaterialCost } = require('../utils/materialCosting');
 const { buildDateRangeFilter, isValidDateOnly } = require('../utils/dateFilters');
 const { normalizeWasteBreakdown } = require('../utils/productionWaste');
+const consumeRawMaterials = require('../utils/consumeRawMaterials');
 
 exports.getProductionRuns = async (req, res) => {
   try {
@@ -52,6 +53,7 @@ exports.recordProduction = async (req, res) => {
     runDate: rawRunDate,
     inputReels,
     outputSheets,
+    rawMaterialConsumptions = [],
     recoverableWasteKg: rawRecoverableWasteKg
   } = req.body || {};
 
@@ -225,7 +227,13 @@ exports.recordProduction = async (req, res) => {
     const actualFluteWeightKg = Number(fluteInput.weightConsumedKg);
     const fluteWeightVarianceKg = Number((actualFluteWeightKg - expectedFluteWeightKg).toFixed(3));
 
-    const totalMaterialCost = Number(tracedInputs.reduce((sum, item) => sum + item.materialCost, 0).toFixed(2));
+    const reelMaterialCost = Number(tracedInputs.reduce((sum, item) => sum + item.materialCost, 0).toFixed(2));
+    const rawConsumption = await consumeRawMaterials({
+      req, session, consumptions: rawMaterialConsumptions, movementDate: runDate,
+      reference: runNumber, notes: 'Consumed during corrugation production ' + runNumber
+    });
+    const rawMaterialCost = rawConsumption.totalCost;
+    const totalMaterialCost = Number((reelMaterialCost + rawMaterialCost).toFixed(2));
     const materialCostPerOutputKg = calculateUnitMaterialCost(totalMaterialCost, totalOutputWeight);
 
     const [run] = await ProductionRun.create([{
@@ -244,6 +252,9 @@ exports.recordProduction = async (req, res) => {
       totalInputWeightKg: totalInputWeight,
       totalOutputWeightKg: totalOutputWeight,
       totalMaterialCost,
+      reelMaterialCost,
+      rawMaterialCost,
+      rawMaterialConsumptions: rawConsumption.lines,
       materialCostPerOutputKg,
       recoverableWasteKg,
       processLossKg,
@@ -279,7 +290,7 @@ exports.recordProduction = async (req, res) => {
       }], { session, ordered: true });
     }
 
-    await writeAuditLog(req, { action: 'production.recorded', entityType: 'ProductionRun', entityId: run._id, entityLabel: runNumber, summary: 'Production run recorded: ' + runNumber, metadata: { totalInputWeightKg: totalInputWeight, totalOutputWeightKg: totalOutputWeight, totalMaterialCost, materialCostPerOutputKg, recoverableWasteKg, wasteBreakdown, machineName: machineName.trim(), shift, operatorName, processLossKg, fluteProfile: rawFluteProfile, fluteTakeUpFactor, expectedFluteWeightKg, actualFluteWeightKg, fluteWeightVarianceKg, inputReelCount: tracedInputs.length, outputLineCount: outputs.length, widthSubstitutions: tracedInputs.filter((item) => item.widthVarianceInches !== 0).map((item) => ({ reelCode: item.reelCode, requestedWidthInches: item.requestedWidthInches, actualWidthInches: item.actualWidthInches, varianceInches: item.widthVarianceInches })) } }, session);
+    await writeAuditLog(req, { action: 'production.recorded', entityType: 'ProductionRun', entityId: run._id, entityLabel: runNumber, summary: 'Production run recorded: ' + runNumber, metadata: { totalInputWeightKg: totalInputWeight, totalOutputWeightKg: totalOutputWeight, totalMaterialCost, reelMaterialCost, rawMaterialCost, rawMaterialConsumptions: rawConsumption.lines, materialCostPerOutputKg, recoverableWasteKg, wasteBreakdown, machineName: machineName.trim(), shift, operatorName, processLossKg, fluteProfile: rawFluteProfile, fluteTakeUpFactor, expectedFluteWeightKg, actualFluteWeightKg, fluteWeightVarianceKg, inputReelCount: tracedInputs.length, outputLineCount: outputs.length, widthSubstitutions: tracedInputs.filter((item) => item.widthVarianceInches !== 0).map((item) => ({ reelCode: item.reelCode, requestedWidthInches: item.requestedWidthInches, actualWidthInches: item.actualWidthInches, varianceInches: item.widthVarianceInches })) } }, session);
     await session.commitTransaction();
     return res.status(201).json({
       message: 'Production run recorded successfully',

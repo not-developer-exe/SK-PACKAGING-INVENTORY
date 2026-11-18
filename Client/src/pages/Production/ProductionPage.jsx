@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import axiosClient from '../../api/axiosClient';
 import { inventoryService } from '../../services/inventoryService';
 import { productionService } from '../../services/productionService';
 import DateRangeFilter from '../../components/DateRangeFilter';
@@ -6,6 +7,8 @@ import { Factory, Plus, Loader2, Save, Trash2 } from 'lucide-react';
 
 export default function ProductionPage() {
   const [availableReels, setAvailableReels] = useState([]);
+  const [rawMaterials, setRawMaterials] = useState([]);
+  const [rawMaterialConsumptions, setRawMaterialConsumptions] = useState([]);
   const [productionRuns, setProductionRuns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -39,9 +42,10 @@ export default function ProductionPage() {
   const fetchReels = async (dateParams = {}) => {
     try {
       setLoading(true);
-      const [reels, runs] = await Promise.all([inventoryService.getPhysicalReels(), productionService.getRuns(dateParams)]);
+      const [reels, runs, materials] = await Promise.all([inventoryService.getPhysicalReels(), productionService.getRuns(dateParams), axiosClient.get('/raw-materials?activeOnly=true')]);
       setAvailableReels(reels);
       setProductionRuns(runs);
+      setRawMaterials(materials.data.materials || []);
     } catch (err) {
       console.error('Error fetching reels:', err);
     } finally {
@@ -98,6 +102,7 @@ export default function ProductionPage() {
         recoverableWasteKg: measuredScrap,
         wasteBreakdown: wasteBreakdown.filter(row => Number(row.weightKg) > 0).map(row => ({ ...row, weightKg: Number(row.weightKg) })),
         inputReels: inputReels.map(r => ({ ...r, requestedWidthInches: r.requestedWidthInches === '' ? undefined : Number(r.requestedWidthInches), weightConsumedKg: Number(r.weightConsumedKg) })),
+        rawMaterialConsumptions: rawMaterialConsumptions.filter(x => x.materialId && Number(x.quantity) > 0).map(x => ({ materialId: x.materialId, quantity: Number(x.quantity) })),
         outputSheets: outputSheets.map(s => ({
           ...s,
           ply: Number(s.ply),
@@ -118,6 +123,7 @@ export default function ProductionPage() {
       setWasteBreakdown([{ category: 'edge_trim', weightKg: '', notes: '' }]);
       setInputReels([{ reelRole: 'plain_surface', reelId: '', requestedWidthInches: '', weightConsumedKg: '' }, { reelRole: 'flute', reelId: '', requestedWidthInches: '', weightConsumedKg: '' }]);
       setOutputSheets([{ ply: 2, lengthInches: '', widthInches: '', sheetCount: '', totalWeightKg: '' }]);
+      setRawMaterialConsumptions([]);
       fetchReels(); // Refresh physical reels drop-down
 
     } catch (err) {
@@ -159,6 +165,24 @@ export default function ProductionPage() {
             <input type="text" maxLength="100" value={machineName} onChange={e => setMachineName(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400" placeholder="e.g. Corrugation Line 1" />
           </div>
         </div>
+
+        <section className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-5 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div><h2 className="text-lg font-semibold text-emerald-900">Raw materials consumed in this run</h2><p className="text-xs text-emerald-800">Optional · quantities are entered in each material's registered unit and deducted when this production run is saved.</p></div>
+            <button type="button" onClick={() => setRawMaterialConsumptions([...rawMaterialConsumptions, { materialId: '', quantity: '' }])} className="rounded-lg border border-emerald-300 bg-white px-3 py-2 text-xs font-semibold text-emerald-800">+ Add material</button>
+          </div>
+          {rawMaterialConsumptions.map((line, index) => {
+            const selected = rawMaterials.find(m => m._id === line.materialId);
+            return <div key={index} className="grid grid-cols-12 gap-2">
+              <select value={line.materialId} onChange={e => { const next=[...rawMaterialConsumptions]; next[index]={...next[index],materialId:e.target.value}; setRawMaterialConsumptions(next); }} className="col-span-7 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm">
+                <option value="">Select raw material</option>{rawMaterials.map(m=><option key={m._id} value={m._id}>{m.code} · {m.name} ({m.currentQty} {m.uom} available)</option>)}
+              </select>
+              <div className="col-span-4"><input type="number" min="0.000001" step="any" required value={line.quantity} onChange={e=>{const next=[...rawMaterialConsumptions];next[index]={...next[index],quantity:e.target.value};setRawMaterialConsumptions(next);}} placeholder={selected ? 'Quantity ('+selected.uom+')' : 'Quantity'} className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm"/><p className="mt-1 text-[11px] text-emerald-800">{selected ? 'Rate ₹'+Number(selected.averageRate||0).toFixed(2)+' / '+selected.uom : 'Choose a material first'}</p></div>
+              <button type="button" onClick={()=>setRawMaterialConsumptions(rawMaterialConsumptions.filter((_,i)=>i!==index))} className="col-span-1 text-red-600">×</button>
+            </div>;
+          })}
+          {!rawMaterials.length && <p className="text-xs text-amber-700">No active raw materials found. Add materials and record their inward stock in Raw Material Stock first.</p>}
+        </section>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           {/* Input Materials (Reels) */}
