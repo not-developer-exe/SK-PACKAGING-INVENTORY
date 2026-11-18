@@ -7,12 +7,11 @@ const {
   archiveProductSpecification
 } = require('../controllers/productSpecification.controller');
 const { protect } = require('../middlewares/auth.middleware');
-const { requireRole } = require('../middlewares/role.middleware');
 
-router.use(protect, requireRole('admin'));
+router.use(protect);
 router.get('/', getProductSpecifications);
-router.post('/', requireRole('admin'), createProductSpecification);
-router.patch('/:id', requireRole('admin'), updateProductSpecification);
-router.delete('/:id', requireRole('admin'), archiveProductSpecification);
+router.post('/', createProductSpecification);
+router.patch('/:id', updateProductSpecification);
+router.delete('/:id', archiveProductSpecification);
 
 module.exports = router;
