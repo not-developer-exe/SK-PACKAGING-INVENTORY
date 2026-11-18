@@ -2,6 +2,7 @@ const AuditLog = require('../models/AuditLog.model');
 
 async function writeAuditLog(req, event, session) {
   const payload = {
+    companyKey: req.companyKey || 'sk-packaging',
     action: event.action,
     entityType: event.entityType,
     entityId: event.entityId,
