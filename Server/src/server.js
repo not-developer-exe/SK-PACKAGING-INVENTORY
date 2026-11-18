@@ -25,6 +25,7 @@ const adminRecordsRoutes = require('./routes/adminRecords.routes');
 const productSpecificationRoutes = require('./routes/productSpecification.routes');
 const productionPlanRoutes = require('./routes/productionPlan.routes');
 const productionIntelligenceRoutes = require('./routes/productionIntelligence.routes');
+const nsbRoutes = require('./routes/nsb.routes');
 
 const app = express();
 const allowedOrigins = (process.env.CLIENT_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174')
@@ -72,7 +73,8 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/waste', wasteRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/reports', reportsRoutes);
-app.use('/api/expenses', expenseRoutes);
+app.use('/api/expenses', (req, res, next) => { req.companyKey = 'sk-packaging'; next(); }, expenseRoutes);
+app.use('/api/nsb', nsbRoutes);
 app.use('/api/admin-records', adminRecordsRoutes);
 app.use('/api/product-specifications', productSpecificationRoutes);
 app.use('/api/production-plans', productionPlanRoutes);
