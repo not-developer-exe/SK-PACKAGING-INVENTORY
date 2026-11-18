@@ -39,8 +39,6 @@ exports.getWasteStats = async (req, res) => {
     ]);
 
     const totalWasteGenerated = productionWaste.reduce((sum, run) => sum + asNumber(run.recoverableWasteKg), 0);
-    const totalWasteMaterialCost = verifiedRuns.reduce((sum, run) => sum + (run.wasteCostingStatus === 'available' ? run.recoverableWasteMaterialCost : 0), 0);
-    const pendingWasteCostingRuns = verifiedRuns.filter((run) => run.recoverableWasteKg > 0 && run.wasteCostingStatus !== 'available').length;
     const totalWasteSold = scrapSales.reduce((sum, sale) => sum + asNumber(sale.weightSoldKg), 0);
     const allTimeGenerated = asNumber(allTimeGeneratedRows[0] && allTimeGeneratedRows[0].total);
     const allTimeSold = asNumber(allTimeSoldRows[0] && allTimeSoldRows[0].total);
@@ -57,11 +55,15 @@ exports.getWasteStats = async (req, res) => {
       wasteCostingStatus: run.wasteCostingStatus || 'pending',
       wasteBreakdown: (run.wasteBreakdown || []).map((row) => ({ ...row, weightKg: asNumber(row.weightKg), materialCost: asNumber(row.materialCost) }))
     }));
+    const totalWasteMaterialCost = verifiedRuns.reduce((sum, run) => sum + (run.wasteCostingStatus === 'available' ? run.recoverableWasteMaterialCost : 0), 0);
+    const pendingWasteCostingRuns = verifiedRuns.filter((run) => run.recoverableWasteKg > 0 && run.wasteCostingStatus !== 'available').length;
 
     return res.json({
       currentWasteInventory,
       totalWasteGenerated,
       totalWasteSold,
+      totalWasteMaterialCost: Number(totalWasteMaterialCost.toFixed(2)),
+      pendingWasteCostingRuns,
       totalWasteMaterialCost: Number(totalWasteMaterialCost.toFixed(2)),
       pendingWasteCostingRuns,
       allTimeWasteGenerated: allTimeGenerated,
