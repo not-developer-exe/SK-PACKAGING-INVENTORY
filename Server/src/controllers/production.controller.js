@@ -59,9 +59,9 @@ exports.recordProduction = async (req, res) => {
   }
   const runDate = rawRunDate ? new Date(rawRunDate + 'T00:00:00+05:30') : new Date();
 
-  if (!Array.isArray(inputReels) || inputReels.length === 0 ||
+  if (!Array.isArray(inputReels) || inputReels.length !== 2 ||
       !Array.isArray(outputSheets) || outputSheets.length === 0) {
-    return res.status(400).json({ message: 'Both input reels and output sheets are required.' });
+    return res.status(400).json({ message: 'Exactly two input reels (one plain-surface reel and one flute reel) and output 2-ply sheets are required.' });
   }
   if (inputReels.some((item) => !item || typeof item !== 'object') ||
       outputSheets.some((item) => !item || typeof item !== 'object')) {
@@ -83,6 +83,10 @@ exports.recordProduction = async (req, res) => {
     wasteBreakdown = normalizeWasteBreakdown(rawWasteBreakdown, recoverableWasteKg);
   } catch (error) {
     return res.status(error.statusCode || 400).json({ message: error.message });
+  }
+
+  if (inputReels.filter((item) => item?.reelRole === 'plain_surface').length !== 1 || inputReels.filter((item) => item?.reelRole === 'flute').length !== 1) {
+    return res.status(400).json({ message: 'Select exactly one plain-surface reel and one flute reel. Their BF and GSM specifications may differ.' });
   }
 
   const inputs = inputReels.map((item) => ({
@@ -179,6 +183,7 @@ exports.recordProduction = async (req, res) => {
       const widthTrace = calculateWidthSubstitution(requestedWidthInches, actualWidthInches);
       tracedInputs.push({
         reelId: reel._id,
+        reelRole: input.reelRole,
         reelCode: reel.reelCode,
         requestedWidthInches,
         actualWidthInches,
@@ -247,10 +252,10 @@ exports.recordProduction = async (req, res) => {
         referenceId: sheet._id,
         referenceModel: 'CorrugatedSheet',
         itemType: 'sheet',
-        specificationSummary: output.ply + 'Ply | ' + output.lengthInches + 'x' + output.widthInches,
+        specificationSummary: '2Ply intermediate | ' + output.lengthInches + 'x' + output.widthInches,
         quantityChange: output.sheetCount,
         weightChangeKg: output.totalWeightKg,
-        notes: 'Produced from Run ' + runNumber,
+        notes: '2-ply corrugated intermediate produced from Corrugation Run ' + runNumber,
         performedBy: req.user._id
       }], { session, ordered: true });
     }
