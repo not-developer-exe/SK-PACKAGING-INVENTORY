@@ -23,7 +23,7 @@ exports.getWasteStats = async (req, res) => {
       ProductionRun.find(productionFilter)
         .sort({ runDate: -1, createdAt: -1 })
         .limit(1000)
-        .select('runNumber runDate createdAt recoverableWasteKg processLossKg operatorName')
+        .select('runNumber runDate createdAt recoverableWasteKg processLossKg operatorName totalMaterialCost totalInputWeightKg materialCostPerInputKg recoverableWasteMaterialCost processLossMaterialCost wasteCostingStatus wasteBreakdown')
         .lean(),
       ScrapSale.find(salesFilter).sort({ saleDate: -1, createdAt: -1 }).limit(1000).lean(),
       ProductionRun.aggregate([
@@ -48,13 +48,22 @@ exports.getWasteStats = async (req, res) => {
     const verifiedRuns = productionWaste.map((run) => ({
       ...run,
       recoverableWasteKg: asNumber(run.recoverableWasteKg),
-      processLossKg: asNumber(run.processLossKg)
+      processLossKg: asNumber(run.processLossKg),
+      materialCostPerInputKg: asNumber(run.materialCostPerInputKg),
+      recoverableWasteMaterialCost: asNumber(run.recoverableWasteMaterialCost),
+      processLossMaterialCost: asNumber(run.processLossMaterialCost),
+      wasteCostingStatus: run.wasteCostingStatus || 'pending',
+      wasteBreakdown: (run.wasteBreakdown || []).map((row) => ({ ...row, weightKg: asNumber(row.weightKg), materialCost: asNumber(row.materialCost) }))
     }));
+    const totalWasteMaterialCost = verifiedRuns.reduce((sum, run) => sum + (run.wasteCostingStatus === 'available' ? run.recoverableWasteMaterialCost : 0), 0);
+    const pendingWasteCostingRuns = verifiedRuns.filter((run) => run.recoverableWasteKg > 0 && run.wasteCostingStatus !== 'available').length;
 
     return res.json({
       currentWasteInventory,
       totalWasteGenerated,
       totalWasteSold,
+      totalWasteMaterialCost: Number(totalWasteMaterialCost.toFixed(2)),
+      pendingWasteCostingRuns,
       allTimeWasteGenerated: allTimeGenerated,
       allTimeWasteSold: allTimeSold,
       legacyUnverifiedWasteKg,
