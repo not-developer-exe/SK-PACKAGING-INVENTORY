@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Loader2, Receipt, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { partiesService } from '../../services/partiesService';
 import { invoiceService } from '../../services/invoiceService';
+import axiosClient from '../../api/axiosClient';
 import { toLocalDateInput } from '../../lib/date';
 
 export default function CreateInvoicePage() {
@@ -11,6 +12,8 @@ export default function CreateInvoicePage() {
   const [submitting, setSubmitting] = useState(false);
   
   const [customers, setCustomers] = useState([]);
+  const [companyStateCode, setCompanyStateCode] = useState('');
+  const [taxContextConfigured, setTaxContextConfigured] = useState(false);
   const [uninvoicedChallans, setUninvoicedChallans] = useState([]);
   
   const [invoiceDate, setInvoiceDate] = useState(toLocalDateInput());
@@ -31,6 +34,10 @@ export default function CreateInvoicePage() {
       }
     };
     fetchCustomers();
+    axiosClient.get('/invoices/tax-context').then(({ data }) => {
+      setCompanyStateCode(data.companyStateCode || '');
+      setTaxContextConfigured(Boolean(data.configured));
+    }).catch(() => setTaxContextConfigured(false));
   }, []);
 
   // Fetch Live Uninvoiced Challans from DB
@@ -84,9 +91,14 @@ export default function CreateInvoicePage() {
   // Match the server's per-line and per-tax-component two-decimal rounding exactly.
   const taxableAmounts = (items || []).map((item) => Number(((item.quantity || 0) * (item.rate || 0)).toFixed(2)));
   const subTotal = Number(taxableAmounts.reduce((sum, amount) => sum + amount, 0).toFixed(2));
-  const cgstAmount = Number((subTotal * gstPercent / 200).toFixed(2));
-  const sgstAmount = Number((subTotal * gstPercent / 200).toFixed(2));
-  const grandTotal = Number((subTotal + cgstAmount + sgstAmount).toFixed(2));
+  const selectedCustomer = customers.find((customer) => customer._id === customerId);
+  const placeOfSupplyStateCode = selectedCustomer?.stateCode || '';
+  const taxReady = taxContextConfigured && /^\\d{2}$/.test(companyStateCode) && /^\\d{2}$/.test(placeOfSupplyStateCode);
+  const isIntraState = taxReady && companyStateCode === placeOfSupplyStateCode;
+  const cgstAmount = isIntraState ? Number((subTotal * gstPercent / 200).toFixed(2)) : 0;
+  const sgstAmount = isIntraState ? Number((subTotal * gstPercent / 200).toFixed(2)) : 0;
+  const igstAmount = taxReady && !isIntraState ? Number((subTotal * gstPercent / 100).toFixed(2)) : 0;
+  const grandTotal = Number((subTotal + cgstAmount + sgstAmount + igstAmount).toFixed(2));
 
   // Execute Live Transaction
   const handleSubmit = async (e) => {
@@ -102,6 +114,8 @@ export default function CreateInvoicePage() {
         subTotal,
         cgstAmount,
         sgstAmount,
+        igstAmount,
+        placeOfSupplyStateCode,
         grandTotal
       });
       navigate('/sales');
@@ -163,6 +177,11 @@ export default function CreateInvoicePage() {
                   <p className="mt-1.5 text-xs font-medium text-amber-600">No pending challans found for this customer.</p>
                 )}
               </div>
+              <div className="sm:col-span-2 rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
+                Company GST state: <strong>{companyStateCode || 'Not configured'}</strong> · Customer place of supply: <strong>{placeOfSupplyStateCode || 'Not entered'}</strong>
+                {!taxContextConfigured && <p className="mt-1 text-amber-700">Set GST_STATE_CODE (or GSTIN) in the server environment before issuing invoices.</p>}
+                {taxContextConfigured && !placeOfSupplyStateCode && <p className="mt-1 text-amber-700">Enter the customer's two-digit GST state code in Party Master.</p>}
+              </div>
             </div>
           </div>
 
@@ -213,14 +232,15 @@ export default function CreateInvoicePage() {
                   className="rounded-lg border border-slate-700 bg-slate-800 px-2 py-1 text-xs outline-none focus:border-blue-500"
                 >
                   <option value={0}>0% (Nil)</option>
-                  <option value={5}>5% (2.5+2.5)</option>
-                  <option value={12}>12% (6+6)</option>
-                  <option value={18}>18% (9+9)</option>
-                  <option value={28}>28% (14+14)</option>
-                  <option value={40}>40% (20+20)</option>
+                  <option value={5}>5%</option>
+                  <option value={12}>12%</option>
+                  <option value={18}>18%</option>
+                  <option value={28}>28%</option>
+                  <option value={40}>40%</option>
                 </select>
               </div>
 
+              {isIntraState ? <>
               <div className="flex justify-between text-slate-400 text-xs">
                 <span>CGST ({(gstPercent/2)}%)</span>
                 <span>₹{cgstAmount.toLocaleString('en-IN', {minimumFractionDigits: 2})}</span>
@@ -229,6 +249,7 @@ export default function CreateInvoicePage() {
                 <span>SGST ({(gstPercent/2)}%)</span>
                 <span>₹{sgstAmount.toLocaleString('en-IN', {minimumFractionDigits: 2})}</span>
               </div>
+              </> : <div className="flex justify-between text-slate-400 text-xs"><span>IGST ({gstPercent}%)</span><span>₹{igstAmount.toLocaleString('en-IN', {minimumFractionDigits: 2})}</span></div>}
 
               <div className="flex justify-between border-t border-slate-700 pt-4 text-lg font-bold text-emerald-400">
                 <span>Grand Total</span>
@@ -238,7 +259,7 @@ export default function CreateInvoicePage() {
 
             <button 
               type="submit" 
-              disabled={submitting || !items || items.length === 0 || items.some(i => !i.rate)} 
+              disabled={submitting || !taxReady || !items || items.length === 0 || items.some(i => !i.rate)} 
               className="mt-8 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500"
             >
               {submitting ? <Loader2 className="animate-spin" size={18} /> : <><CheckCircle2 size={18} /> Generate Invoice</>}
