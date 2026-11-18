@@ -209,6 +209,25 @@ export default function PartyMasterPage() {
       .sort((a, b) => new Date(a.date) - new Date(b.date));
   }, [selectedParty, from, to]);
 
+  const supplierBills = useMemo(() => {
+    if (!selectedParty) return [];
+    const allocatedByBill = new Map();
+    for (const entry of selectedParty.ledger || []) {
+      if (entry.type !== 'Payment Sent') continue;
+      for (const allocation of entry.allocations || []) {
+        const key = String(allocation.billEntryId);
+        allocatedByBill.set(key, Number(((allocatedByBill.get(key) || 0) + Number(allocation.amount || 0)).toFixed(2)));
+      }
+    }
+    return (selectedParty.ledger || [])
+      .filter((entry) => entry.type === 'Purchase Bill')
+      .map((bill) => {
+        const paid = allocatedByBill.get(String(bill._id)) || 0;
+        return { ...bill, paid, outstanding: Math.max(0, Number((Number(bill.credit || 0) - paid).toFixed(2))) };
+      })
+      .sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+  }, [selectedParty]);
+
   const balanceLabel = (balance) => Number(balance) > 0 ? 'To receive' : Number(balance) < 0 ? 'To pay' : 'Settled';
 
   return (
@@ -244,6 +263,15 @@ export default function PartyMasterPage() {
             </div>
           </div>
 
+          {['Supplier', 'Both'].includes(selectedParty.type) && <section className="overflow-hidden rounded-2xl border bg-white">
+            <div className="border-b bg-slate-50 p-4"><h3 className="font-semibold text-slate-900">Supplier bill-wise outstanding</h3><p className="mt-1 text-xs text-slate-500">Payments recorded after this update are allocated to the oldest open bills first. Historical payments remain unallocated until reviewed.</p></div>
+            <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-sm">
+              <thead className="border-b text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Bill date</th><th className="px-4 py-3">Supplier bill</th><th className="px-4 py-3 text-right">Bill amount</th><th className="px-4 py-3 text-right">Allocated</th><th className="px-4 py-3 text-right">Outstanding</th></tr></thead>
+              <tbody className="divide-y">{supplierBills.map((bill) => <tr key={bill._id}><td className="px-4 py-3">{bill.date ? new Date(bill.date).toLocaleDateString('en-IN') : '—'}</td><td className="px-4 py-3 font-medium">{bill.ref || '—'}</td><td className="px-4 py-3 text-right">{money(bill.credit)}</td><td className="px-4 py-3 text-right">{money(bill.paid)}</td><td className="px-4 py-3 text-right font-semibold">{money(bill.outstanding)}</td></tr>)}
+              {!supplierBills.length && <tr><td colSpan="5" className="p-6 text-center text-slate-500">No supplier purchase bills recorded yet.</td></tr>}</tbody>
+            </table></div>
+          </section>}
+
           <div className="overflow-hidden rounded-2xl border bg-white">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-slate-50 p-4">
               <h3 className="font-semibold text-slate-900"><Receipt size={17} className="mr-2 inline" />Account Statement</h3>
@@ -261,7 +289,7 @@ export default function PartyMasterPage() {
                   {ledgerRows.map((txn) => <tr key={txn._id}>
                     <td className="px-4 py-3">{txn.date ? new Date(txn.date).toLocaleDateString('en-IN') : '—'}</td>
                     <td className="px-4 py-3 font-medium">{txn.type}</td>
-                    <td className="px-4 py-3 text-slate-500">{txn.ref || '—'}</td>
+                    <td className="px-4 py-3 text-slate-500">{txn.ref || '—'}{(txn.allocations || []).length > 0 && <p className="mt-1 text-xs text-emerald-700">Applied to: {(txn.allocations || []).map((allocation) => { const bill = (selectedParty.ledger || []).find((entry) => String(entry._id) === String(allocation.billEntryId)); return (bill?.ref || 'Purchase Bill') + ' (' + money(allocation.amount) + ')'; }).join(', ')}</p>}</td>
                     <td className="px-4 py-3 text-right">{txn.debit ? money(txn.debit) : '—'}</td>
                     <td className="px-4 py-3 text-right">{txn.credit ? money(txn.credit) : '—'}</td>
                     <td className="px-4 py-3 text-right font-semibold">{money(txn.balance)}</td>
@@ -335,7 +363,8 @@ export default function PartyMasterPage() {
           <label className="block text-sm">Payment date<input type="date" required value={payment.date} onChange={(e) => setPayment({ ...payment, date: e.target.value })} className="mt-1 w-full rounded-lg border px-3 py-2" /></label>
           <label className="block text-sm">Amount (₹)<input type="number" min="0.01" step="0.01" required value={payment.amount} onChange={(e) => setPayment({ ...payment, amount: e.target.value })} className="mt-1 w-full rounded-lg border px-3 py-2" /></label>
           <div className="grid grid-cols-2 gap-3"><label className="block text-sm">Mode<select value={payment.mode} onChange={(e) => setPayment({ ...payment, mode: e.target.value })} className="mt-1 w-full rounded-lg border bg-white px-3 py-2"><option>NEFT</option><option>RTGS</option><option>UPI</option><option>Cash</option><option>Cheque</option></select></label><label className="block text-sm">UTR / Reference<input value={payment.ref} onChange={(e) => setPayment({ ...payment, ref: e.target.value })} className="mt-1 w-full rounded-lg border px-3 py-2" /></label></div>
-          <div className="flex justify-end gap-2"><button type="button" onClick={() => setShowPaymentModal(false)} className="rounded-lg border px-4 py-2 text-sm">Cancel</button><button disabled={saving} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{saving ? 'Saving...' : 'Post payment'}</button></div>
+          {paymentDirection === 'out' && <p className="rounded-lg bg-blue-50 p-3 text-xs text-blue-800">Supplier payments are automatically applied to the oldest outstanding Purchase Bills first. Any excess is retained as an unallocated supplier advance.</p>}
+          <div className="flex justify-end gap-2"><button type="button" onClick={() => setShowPaymentModal(false) className="rounded-lg border px-4 py-2 text-sm">Cancel</button><button disabled={saving} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{saving ? 'Saving...' : 'Post payment'}</button></div>
         </form>
       </div>}
       {showPurchaseBillModal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => setShowPurchaseBillModal(false)}>
