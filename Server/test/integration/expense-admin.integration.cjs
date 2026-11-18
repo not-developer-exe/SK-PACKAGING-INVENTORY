@@ -198,6 +198,18 @@ test('admin console and expense register enforce roles and keep an audit trail',
   });
   assert.equal(supplierPayment.status, 200);
   assert.equal(supplierPayment.data.balance, -6000);
+  const supplierPaymentEntry = supplierPayment.data.ledger.find((entry) => entry.type === 'Payment Sent');
+  const supplierBillEntry = supplierPayment.data.ledger.find((entry) => entry.type === 'Purchase Bill');
+  assert.equal(supplierPaymentEntry.allocations.length, 1);
+  assert.equal(String(supplierPaymentEntry.allocations[0].billEntryId), String(supplierBillEntry._id));
+  assert.equal(supplierPaymentEntry.allocations[0].amount, 4000.5);
+  const invalidSupplierAllocation = await api('/api/parties/' + supplierBillParty._id + '/transaction', {
+    method: 'POST',
+    body: { amount: 7000, mode: 'NEFT', ref: 'SUP-UTR-OVERALLOC', direction: 'out', date: '2026-11-15',
+      allocations: [{ billEntryId: String(supplierBillEntry._id), amount: 7000 }] }
+  });
+  assert.equal(invalidSupplierAllocation.status, 409);
+  assert.equal((await Party.findById(supplierBillParty._id)).balance, -6000);
   const supplierFinancials = await api('/api/reports/financial-health?from=2026-11-01&to=2026-11-30');
   assert.equal(supplierFinancials.status, 200);
   assert.equal(supplierFinancials.data.payables.total, 6000);
