@@ -9,6 +9,68 @@ const num = v => Number(v?.toString?.() ?? v ?? 0);
 const dec = v => mongoose.Types.Decimal128.fromString(Number(v).toFixed(3));
 const dateOnly = v => /^\d{4}-\d{2}-\d{2}$/.test(v || '') && !Number.isNaN(new Date(v + 'T00:00:00+05:30').getTime());
 
+
+exports.getProcessorReconciliation = async (req,res) => {
+  try {
+    const filter = {};
+    if (req.query.from || req.query.to) {
+      if ((req.query.from && !dateOnly(req.query.from)) || (req.query.to && !dateOnly(req.query.to))) {
+        return res.status(400).json({message:'Date filters must use YYYY-MM-DD.'});
+      }
+      filter.issueDate = {};
+      if (req.query.from) filter.issueDate.$gte = new Date(req.query.from+'T00:00:00+05:30');
+      if (req.query.to) filter.issueDate.$lte = new Date(req.query.to+'T23:59:59.999+05:30');
+    }
+    const orders = await JobWorkOrder.find(filter).sort({issueDate:-1}).lean();
+    const byWorker = new Map();
+    for (const order of orders) {
+      const key = String(order.jobWorkerName || '').trim().toLowerCase();
+      const row = byWorker.get(key) || {
+        jobWorkerName: order.jobWorkerName, orders: 0, openOrders: 0,
+        issuedSheets: 0, returnedSheets: 0, wastageSheets: 0, outstandingSheets: 0,
+        issuedWeightKg: 0, returnedWeightKg: 0, wastageWeightKg: 0,
+        jobCharges: 0, inputMaterialCost: 0, allocatedInputMaterialCost: 0,
+        allocatedWastageMaterialCost: 0
+      };
+      row.orders += 1;
+      if (!['completed','cancelled'].includes(order.status)) row.openOrders += 1;
+      row.issuedSheets += num(order.issuedSheets);
+      row.returnedSheets += num(order.returnedSheets);
+      row.wastageSheets += num(order.wastageSheets);
+      row.outstandingSheets += Math.max(0,num(order.issuedSheets)-num(order.returnedSheets)-num(order.wastageSheets));
+      row.issuedWeightKg += num(order.issuedWeightKg);
+      row.returnedWeightKg += num(order.returnedWeightKg);
+      row.wastageWeightKg += num(order.wastageWeightKg);
+      row.jobCharges += num(order.jobCharges);
+      row.inputMaterialCost += num(order.inputMaterialCost);
+      row.allocatedInputMaterialCost += num(order.allocatedInputMaterialCost);
+      row.allocatedWastageMaterialCost += num(order.allocatedWastageMaterialCost);
+      byWorker.set(key,row);
+    }
+    const processors = [...byWorker.values()].map(row => ({
+      ...row,
+      issuedWeightKg: Number(row.issuedWeightKg.toFixed(3)),
+      returnedWeightKg: Number(row.returnedWeightKg.toFixed(3)),
+      wastageWeightKg: Number(row.wastageWeightKg.toFixed(3)),
+      jobCharges: Number(row.jobCharges.toFixed(2)),
+      inputMaterialCost: Number(row.inputMaterialCost.toFixed(2)),
+      allocatedInputMaterialCost: Number(row.allocatedInputMaterialCost.toFixed(2)),
+      allocatedWastageMaterialCost: Number(row.allocatedWastageMaterialCost.toFixed(2))
+    })).sort((a,b)=>a.jobWorkerName.localeCompare(b.jobWorkerName));
+    const totals = processors.reduce((t,p)=>({
+      orders:t.orders+p.orders, openOrders:t.openOrders+p.openOrders,
+      issuedSheets:t.issuedSheets+p.issuedSheets, returnedSheets:t.returnedSheets+p.returnedSheets,
+      wastageSheets:t.wastageSheets+p.wastageSheets, outstandingSheets:t.outstandingSheets+p.outstandingSheets,
+      jobCharges:Number((t.jobCharges+p.jobCharges).toFixed(2)),
+      allocatedInputMaterialCost:Number((t.allocatedInputMaterialCost+p.allocatedInputMaterialCost).toFixed(2)),
+      allocatedWastageMaterialCost:Number((t.allocatedWastageMaterialCost+p.allocatedWastageMaterialCost).toFixed(2))
+    }),{orders:0,openOrders:0,issuedSheets:0,returnedSheets:0,wastageSheets:0,outstandingSheets:0,jobCharges:0,allocatedInputMaterialCost:0,allocatedWastageMaterialCost:0});
+    return res.json({processors,totals});
+  } catch(e) {
+    return res.status(500).json({message:'Unable to build processor reconciliation.'});
+  }
+};
+
 exports.listOrders = async (req,res) => {
   try {
     const orders = await JobWorkOrder.find().populate('inputBatchId','batchNumber materialType').populate('returns.outputBatchId','batchNumber').sort({issueDate:-1,createdAt:-1}).limit(1000).lean();
@@ -83,6 +145,7 @@ exports.receiveFromJobWorker = async(req,res)=>{
       if(!order||['completed','cancelled'].includes(order.status)){const e=new Error('Job-work order is not open for returns.');e.statusCode=409;throw e;}
       if(order.returnedSheets+sheets+wSheets>order.issuedSheets || order.returnedWeightKg+weight+wWeight>order.issuedWeightKg+0.01){const e=new Error('Return plus wastage exceeds the material quantity issued.');e.statusCode=409;throw e;}
       const allocatedMaterialCost=Number((order.inputMaterialCost*weight/order.issuedWeightKg).toFixed(2));
+      const allocatedWastageMaterialCost=Number((order.inputMaterialCost*wWeight/order.issuedWeightKg).toFixed(2));
       const allocatedJobCharges=charges;
       const batchRate=Number(((allocatedMaterialCost+allocatedJobCharges)/weight).toFixed(4));
       const [batch]=await FacingMaterialBatch.create([{
@@ -94,12 +157,14 @@ exports.receiveFromJobWorker = async(req,res)=>{
         inwardDate:new Date(returnDate+'T00:00:00+05:30'),notes:'Returned from '+order.jobWorkerName+'; '+String(notes).slice(0,400),recordedBy:req.user?._id
       }],{session});
       order.returnedSheets+=sheets;order.returnedWeightKg=Number((order.returnedWeightKg+weight).toFixed(3));
+      order.allocatedInputMaterialCost=Number((num(order.allocatedInputMaterialCost)+allocatedMaterialCost).toFixed(2));
+      order.allocatedWastageMaterialCost=Number((num(order.allocatedWastageMaterialCost)+allocatedWastageMaterialCost).toFixed(2));
       order.wastageSheets+=wSheets;order.wastageWeightKg=Number((order.wastageWeightKg+wWeight).toFixed(3));order.jobCharges+=charges;
-      order.returns.push({returnDate:new Date(returnDate+'T00:00:00+05:30'),sheets,weightKg:weight,wastageSheets:wSheets,wastageWeightKg:wWeight,charges,allocatedMaterialCost,allocatedJobCharges,outputBatchId:batch._id,notes:String(notes).slice(0,500)});
+      order.returns.push({returnDate:new Date(returnDate+'T00:00:00+05:30'),sheets,weightKg:weight,wastageSheets:wSheets,wastageWeightKg:wWeight,charges,allocatedMaterialCost,allocatedJobCharges,allocatedWastageMaterialCost,outputBatchId:batch._id,notes:String(notes).slice(0,500)});
       order.status=order.returnedSheets+order.wastageSheets===order.issuedSheets?'completed':'partial_return';
       await order.save({session});
       await StockMovement.create([{companyKey:req.companyKey||'sk-packaging',movementDate:new Date(returnDate+'T00:00:00+05:30'),movementType:'job_work_return',referenceId:order._id,referenceModel:'JobWorkOrder',itemType:'facing_material',specificationSummary:outputMaterialType+' '+order.lengthInches+'x'+order.widthInches,quantityChange:sheets,weightChangeKg:dec(weight),notes:'Returned by '+order.jobWorkerName+' as '+batch.batchNumber,performedBy:req.user?._id}],{session});
-      await writeAuditLog(req,{action:'job_work.returned',entityType:'JobWorkOrder',entityId:order._id,entityLabel:order.orderNumber,summary:'Received '+sheets+' processed sheets from '+order.jobWorkerName,metadata:{sheets,weight,wSheets,wWeight,charges,allocatedMaterialCost,allocatedJobCharges,batchNumber:batch.batchNumber,batchRate}},session);
+      await writeAuditLog(req,{action:'job_work.returned',entityType:'JobWorkOrder',entityId:order._id,entityLabel:order.orderNumber,summary:'Received '+sheets+' processed sheets from '+order.jobWorkerName,metadata:{sheets,weight,wSheets,wWeight,charges,allocatedMaterialCost,allocatedJobCharges,allocatedWastageMaterialCost,batchNumber:batch.batchNumber,batchRate}},session);
       result={order,batch};
     });
     return res.status(201).json(result);
