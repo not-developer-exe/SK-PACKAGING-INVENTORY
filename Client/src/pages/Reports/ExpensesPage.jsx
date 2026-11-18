@@ -10,7 +10,8 @@ const categories = ['electricity', 'labour', 'rent', 'freight', 'repairs', 'admi
 const money = value => '₹' + Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
 const title = value => value.replaceAll('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
 
-export default function ExpensesPage() {
+export default function ExpensesPage({ company = 'sk' }) {
+  const apiBase = company === 'nsb' ? '/nsb/expenses' : '/expenses';
   const { user } = useAuth();
   const [form, setForm] = useState(blank);
   const [expenses, setExpenses] = useState([]);
@@ -24,7 +25,7 @@ export default function ExpensesPage() {
 
   const load = async (dateParams = {}) => {
     setLoading(true);
-    try { const { data } = await axiosClient.get('/expenses', { params: dateParams }); setExpenses(data.expenses || []); setError(''); }
+    try { const { data } = await axiosClient.get(apiBase, { params: dateParams }); setExpenses(data.expenses || []); setError(''); }
     catch (e) { setError(e.response?.data?.message || 'Unable to load expenses.'); }
     finally { setLoading(false); }
   };
@@ -35,11 +36,11 @@ export default function ExpensesPage() {
     try {
       const payload = { ...form, amount: Number(form.amount) };
       if (editing) {
-        const { data } = await axiosClient.patch('/expenses/' + editing, payload);
+        const { data } = await axiosClient.patch(apiBase + '/' + editing, payload);
         setExpenses(current => current.map(item => item._id === editing ? data.expense : item));
         setSuccess('Expense updated.');
       } else {
-        const { data } = await axiosClient.post('/expenses', payload);
+        const { data } = await axiosClient.post(apiBase, payload);
         setExpenses(current => [data.expense, ...current]);
         setSuccess('Expense recorded.');
       }
@@ -54,13 +55,13 @@ export default function ExpensesPage() {
   };
   const remove = async item => {
     if (!window.confirm('Delete this expense? The action will be written to the audit log.')) return;
-    try { await axiosClient.delete('/expenses/' + item._id); setExpenses(current => current.filter(row => row._id !== item._id)); setSuccess('Expense deleted.'); }
+    try { await axiosClient.delete(apiBase + '/' + item._id); setExpenses(current => current.filter(row => row._id !== item._id)); setSuccess('Expense deleted.'); }
     catch (e) { setError(e.response?.data?.message || 'Unable to delete expense.'); }
   };
   const total = expenses.reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
   return <div className="mx-auto max-w-7xl space-y-6">
-    <header><h1 className="text-2xl font-bold text-slate-900">Factory Expenses</h1><p className="mt-1 text-sm text-slate-500">Record operating costs, finance charges and freight treatment for accurate profitability.</p></header>
+    <header><h1 className="text-2xl font-bold text-slate-900">{company === 'nsb' ? 'NSB Business Expenses' : 'Factory Expenses'}</h1><p className="mt-1 text-sm text-slate-500">Record and review expenses for {company === 'nsb' ? 'NSB Industrial Solutions' : 'S.K Packaging'} only.</p></header>
     {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     {success && <p role="status" className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700">{success}</p>}
     <form onSubmit={submit} className="grid gap-3 rounded-2xl border bg-white p-5 sm:grid-cols-2 lg:grid-cols-4">

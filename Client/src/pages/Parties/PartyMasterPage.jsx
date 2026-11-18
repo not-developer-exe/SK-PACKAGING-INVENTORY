@@ -8,7 +8,8 @@ import { toLocalDateInput } from '../../lib/date';
 const emptyForm = { name: '', type: 'Customer', phone: '', city: '', stateCode: '', openingBalance: '0' };
 const money = (value) => '₹' + Math.abs(Number(value || 0)).toLocaleString('en-IN', { maximumFractionDigits: 2 });
 
-export default function PartyMasterPage() {
+export default function PartyMasterPage({ company = 'sk' }) {
+  const apiBase = company === 'nsb' ? '/nsb/parties' : '/parties';
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const [parties, setParties] = useState([]);
@@ -36,7 +37,7 @@ export default function PartyMasterPage() {
     setLoading(true);
     setError('');
     try {
-      const { data } = await axiosClient.get('/parties');
+      const { data } = await axiosClient.get(apiBase);
       setParties(Array.isArray(data) ? data : []);
       if (selectedParty) {
         const fresh = (Array.isArray(data) ? data : []).find((item) => item._id === selectedParty._id);
@@ -53,7 +54,7 @@ export default function PartyMasterPage() {
 
   const loadArchivedParties = async () => {
     try {
-      const { data } = await axiosClient.get('/parties/archived');
+      const { data } = await axiosClient.get(apiBase + '/archived');
       setArchivedParties(data.parties || []);
     } catch (err) {
       setError(err.response?.data?.message || 'Unable to load archived parties.');
@@ -65,7 +66,7 @@ export default function PartyMasterPage() {
     setSaving(true);
     setError('');
     try {
-      const { data } = await axiosClient.patch('/parties/' + party._id + '/restore');
+      const { data } = await axiosClient.patch(apiBase + '/' + party._id + '/restore');
       setArchivedParties((current) => current.filter((item) => item._id !== party._id));
       setParties((current) => [...current, data.party].sort((a, b) => a.name.localeCompare(b.name)));
       setSuccess('Party restored successfully.');
@@ -102,14 +103,14 @@ export default function PartyMasterPage() {
     setError('');
     try {
       if (editingParty) {
-        const { data } = await axiosClient.patch('/parties/' + editingParty._id, {
+        const { data } = await axiosClient.patch(apiBase + '/' + editingParty._id, {
           name: partyForm.name, type: partyForm.type, phone: partyForm.phone, city: partyForm.city, stateCode: partyForm.stateCode
         });
         setParties((current) => current.map((item) => item._id === data._id ? data : item));
         if (selectedParty?._id === data._id) setSelectedParty(data);
         setSuccess('Party details updated.');
       } else {
-        const { data } = await axiosClient.post('/parties', {
+        const { data } = await axiosClient.post(apiBase, {
           name: partyForm.name, type: partyForm.type, phone: partyForm.phone, city: partyForm.city, stateCode: partyForm.stateCode,
           openingBalance: Number(partyForm.openingBalance)
         });
@@ -130,7 +131,7 @@ export default function PartyMasterPage() {
     setError('');
     setSuccess('');
     try {
-      await axiosClient.delete('/parties/' + party._id);
+      await axiosClient.delete(apiBase + '/' + party._id);
       setParties((current) => current.filter((item) => item._id !== party._id));
       setSuccess('Party archived. Historical records have been retained.');
     } catch (err) {
@@ -146,7 +147,7 @@ export default function PartyMasterPage() {
     setSaving(true);
     setError('');
     try {
-      const { data } = await axiosClient.post('/parties/' + selectedParty._id + '/transaction', {
+      const { data } = await axiosClient.post(apiBase + '/' + selectedParty._id + '/transaction', {
         amount: Number(payment.amount), mode: payment.mode, ref: payment.ref, direction: paymentDirection, date: payment.date
       });
       setParties((current) => current.map((item) => item._id === data._id ? data : item));
@@ -167,7 +168,7 @@ export default function PartyMasterPage() {
     setSaving(true);
     setError('');
     try {
-      const { data } = await axiosClient.post('/parties/' + selectedParty._id + '/purchase-bill', {
+      const { data } = await axiosClient.post(apiBase + '/' + selectedParty._id + '/purchase-bill', {
         invoiceReference: purchaseBill.invoiceReference,
         amount: Number(purchaseBill.amount),
         date: purchaseBill.date
@@ -189,7 +190,7 @@ export default function PartyMasterPage() {
     if (!window.confirm('Delete ledger entry ' + (txn.ref || txn.type) + '?')) return;
     setError('');
     try {
-      const { data } = await axiosClient.delete('/parties/' + selectedParty._id + '/transaction/' + txn._id);
+      const { data } = await axiosClient.delete(apiBase + '/' + selectedParty._id + '/transaction/' + txn._id);
       setParties((current) => current.map((item) => item._id === data._id ? data : item));
       setSelectedParty(data);
       setSuccess('Ledger entry deleted and balance recalculated.');
