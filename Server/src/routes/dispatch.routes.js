@@ -4,7 +4,7 @@ const { recordDispatch, getAvailableBoxes, getDispatches, cancelDispatch, markDe
 const { protect } = require('../middlewares/auth.middleware');
 const { requireRole } = require('../middlewares/role.middleware');
 
-router.use(protect);
+router.use(protect, requireRole('admin'));
 
 router.get('/boxes', getAvailableBoxes);
 router.get('/', getDispatches)
