@@ -1,6 +1,8 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User.model');
 
+const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
+
 exports.protect = async (req, res, next) => {
   try {
     const token = req.cookies?.jwt;
@@ -12,6 +14,18 @@ exports.protect = async (req, res, next) => {
     const user = await User.findById(decoded.id).select('-password');
     if (!user || !user.isActive) {
       return res.status(401).json({ message: 'Session is no longer valid' });
+    }
+
+    // The owner identity is the sole source of administrator privilege.
+    // A stale or incorrectly assigned database role cannot grant admin access.
+    const ownerEmail = normalizeEmail(process.env.ADMIN_EMAIL || 'official.additya.singh@gmail.com');
+    const accountantEmail = normalizeEmail(process.env.ACCOUNTANT_EMAIL || 'admin@skpackaging.com');
+    const email = normalizeEmail(user.email);
+    if (email === ownerEmail) {
+      user.role = 'admin';
+    } else {
+      user.role = 'accountant';
+      if (email === accountantEmail && user.role !== 'accountant') user.role = 'accountant';
     }
 
     req.user = user;
