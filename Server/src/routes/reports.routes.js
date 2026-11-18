@@ -4,11 +4,10 @@ const { getProfitLoss } = require('../controllers/profitLoss.controller');
 const { getActivityReport } = require('../controllers/activityReport.controller');
 const { getFinancialHealth } = require('../controllers/financialHealth.controller');
 const { protect } = require('../middlewares/auth.middleware');
-const { requireRole } = require('../middlewares/role.middleware');
 
 router.use(protect);
 router.get('/profit-loss', getProfitLoss);
-router.get('/activity', requireRole('admin'), getActivityReport);
+router.get('/activity', getActivityReport);
 router.get('/financial-health', getFinancialHealth);
 
 module.exports = router;
