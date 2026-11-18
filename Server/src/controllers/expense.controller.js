@@ -7,6 +7,11 @@ const categories = ['electricity', 'labour', 'rent', 'freight', 'repairs', 'admi
 const treatments = ['operating_expense', 'finance_cost', 'stock_landed_cost'];
 const modes = ['cash', 'upi', 'bank_transfer', 'cheque', 'card', 'other'];
 
+function companyFilter(req) {
+  if (req.companyKey === 'nsb-industrial-solutions') return { companyKey: 'nsb-industrial-solutions' };
+  return { $or: [{ companyKey: 'sk-packaging' }, { companyKey: { $exists: false } }] };
+}
+
 function validateExpense(body, partial = false) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return 'Invalid expense data.';
   if (!partial || body.expenseDate !== undefined) {
@@ -27,7 +32,7 @@ function validateExpense(body, partial = false) {
 
 exports.listExpenses = async (req, res) => {
   try {
-    const filter = buildDateRangeFilter(req.query.from, req.query.to, 'expenseDate');
+    const filter = { ...buildDateRangeFilter(req.query.from, req.query.to, 'expenseDate'), ...companyFilter(req) };
     const expenses = await Expense.find(filter).populate('recordedBy', 'name').sort({ expenseDate: -1, createdAt: -1 }).limit(1000).lean();
     return res.json({ expenses });
   } catch (error) {
@@ -44,6 +49,7 @@ exports.createExpense = async (req, res) => {
     let created;
     await session.withTransaction(async () => {
       [created] = await Expense.create([{
+        companyKey: req.companyKey || 'sk-packaging',
         expenseDate: new Date(req.body.expenseDate + 'T00:00:00+05:30'),
         category: req.body.category,
         amount: Number(Number(req.body.amount).toFixed(2)),
@@ -73,7 +79,7 @@ exports.updateExpense = async (req, res) => {
   try {
     let updated;
     await session.withTransaction(async () => {
-      const expense = await Expense.findById(req.params.id).session(session);
+      const expense = await Expense.findOne({ _id: req.params.id, ...companyFilter(req) }).session(session);
       if (!expense) throw Object.assign(new Error('Expense not found.'), { statusCode: 404 });
       const before = expense.toObject();
       for (const key of ['expenseDate', 'category', 'amount', 'vendor', 'paymentMode', 'reference', 'description', 'costTreatment']) {
@@ -108,7 +114,7 @@ exports.deleteExpense = async (req, res) => {
   const session = await mongoose.startSession();
   try {
     await session.withTransaction(async () => {
-      const expense = await Expense.findById(req.params.id).session(session);
+      const expense = await Expense.findOne({ _id: req.params.id, ...companyFilter(req) }).session(session);
       if (!expense) throw Object.assign(new Error('Expense not found.'), { statusCode: 404 });
       await writeAuditLog(req, { action: 'expense.deleted', entityType: 'Expense', entityId: expense._id, entityLabel: expense.category, summary: 'Expense deleted: ₹' + expense.amount, metadata: { expense: expense.toObject() } }, session);
       await expense.deleteOne({ session });
