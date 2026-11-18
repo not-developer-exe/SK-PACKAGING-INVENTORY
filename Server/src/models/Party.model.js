@@ -6,7 +6,11 @@ const ledgerSchema = new mongoose.Schema({
   ref: { type: String },
   debit: { type: Number, default: 0 },
   credit: { type: Number, default: 0 },
-  balance: { type: Number, required: true } // Snapshot of the balance at this moment
+  balance: { type: Number, required: true }, // Snapshot of the balance at this moment
+  allocations: [{
+    billEntryId: { type: mongoose.Schema.Types.ObjectId, required: true },
+    amount: { type: Number, required: true, min: 0.01 }
+  }]
 });
 
 const partySchema = new mongoose.Schema({
