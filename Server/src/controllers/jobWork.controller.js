@@ -21,11 +21,11 @@ exports.listOrders = async (req,res) => {
 };
 
 exports.issueToJobWorker = async (req,res) => {
-  const {jobWorkerName,processType,inputBatchId,inputBatchModel='FacingMaterialBatch',issueDate,expectedReturnDate,issuedSheets,notes=''}=req.body||{};
+  const {jobWorkerName,processType,inputBatchId,inputBatchModel='FacingMaterialBatch',inputMaterialType='duplex',issueDate,expectedReturnDate,issuedSheets,notes=''}=req.body||{};
   const sheets=Number(issuedSheets);
   if(!String(jobWorkerName||'').trim() || String(jobWorkerName).trim().length>160 ||
     !['offset_printing','lamination','other'].includes(processType) ||
-    !['FacingMaterialBatch','CutSheetBatch'].includes(inputBatchModel) || !mongoose.isValidObjectId(inputBatchId) ||
+    !['FacingMaterialBatch','CutSheetBatch'].includes(inputBatchModel) || (inputBatchModel==='CutSheetBatch' && !['printed','printed_laminated','khaki','duplex'].includes(inputMaterialType)) || !mongoose.isValidObjectId(inputBatchId) ||
     !dateOnly(issueDate) || !Number.isInteger(sheets) || sheets<=0 ||
     (expectedReturnDate && !dateOnly(expectedReturnDate))) return res.status(400).json({message:'Enter job-worker, process, valid source batch, issue date and positive whole sheet quantity.'});
   const Model=inputBatchModel==='CutSheetBatch'?CutSheetBatch:FacingMaterialBatch;
@@ -53,7 +53,7 @@ exports.issueToJobWorker = async (req,res) => {
         companyKey:req.companyKey||'sk-packaging',orderNumber,jobWorkerName:String(jobWorkerName).trim(),processType,
         inputBatchModel,inputItemType:inputBatchModel==='CutSheetBatch'?'cut_sheet':'facing_material',
         inputBatchId:batch._id,inputMaterialCost,
-        materialType:inputBatchModel==='CutSheetBatch'?'khaki':batch.materialType,
+        materialType:inputBatchModel==='CutSheetBatch'?inputMaterialType:batch.materialType,
         lengthInches:batch.lengthInches,widthInches:batch.widthInches,
         issuedSheets:sheets,issuedWeightKg:Number(weight.toFixed(3)),issueDate:new Date(issueDate+'T00:00:00+05:30'),
         expectedReturnDate:expectedReturnDate?new Date(expectedReturnDate+'T00:00:00+05:30'):undefined,
