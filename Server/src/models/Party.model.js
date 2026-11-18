@@ -14,6 +14,7 @@ const ledgerSchema = new mongoose.Schema({
 });
 
 const partySchema = new mongoose.Schema({
+  companyKey: { type: String, enum: ['sk-packaging', 'nsb-industrial-solutions'], default: 'sk-packaging', index: true },
   name: { type: String, required: true, trim: true },
   type: { type: String, enum: ['Customer', 'Supplier', 'Both'], required: true },
   phone: { type: String },
