@@ -2,6 +2,7 @@
 const mongoose = require('mongoose');
 const FacingMaterialBatch = require('../models/FacingMaterialBatch.model');
 const PastingRun = require('../models/PastingRun.model');
+const StockMovement = require('../models/StockMovement.model');
 const CorrugatedSheet = require('../models/CorrugatedSheet.model');
 const StockMovement = require('../models/StockMovement.model');
 const Sequence = require('../models/Sequence.model');
@@ -33,6 +34,7 @@ exports.receiveFacingMaterial = async (req, res) => {
       ratePerKg: dec(rate), totalValue: dec(totalValue), supplierName: String(supplierName).trim(),
       inwardDate: new Date(inwardDate + 'T00:00:00+05:30'), notes: String(notes).trim(), recordedBy: req.user._id
     }], { session });
+    await StockMovement.create([{ movementDate: new Date(inwardDate + 'T00:00:00+05:30'), movementType: 'inward_receipt', referenceId: batch._id, referenceModel: 'FacingMaterialBatch', itemType: 'facing_material', specificationSummary: materialType + ' ' + length + 'x' + width, quantityChange: count, weightChangeKg: dec(weight), notes: 'Facing material inward ' + batchNumber, performedBy: req.user._id }], { session });
     await writeAuditLog(req, { action: 'facing_material.received', entityType: 'FacingMaterialBatch', entityId: batch._id, entityLabel: batchNumber, summary: 'Received ' + count + ' pre-cut facing sheets (' + weight + ' kg).', metadata: { materialType, weight, rate, totalValue } }, session);
     await session.commitTransaction();
     return res.status(201).json({ batch });
@@ -68,6 +70,12 @@ exports.recordPasting = async (req, res) => {
     }
     if (!facing || !['available', 'partial'].includes(facing.status) || facing.remainingSheets < facingUsed) {
       const e = new Error('Selected facing-material batch is unavailable or has insufficient sheets.'); e.statusCode = 409; throw e;
+    }
+    if (Number(source.lengthInches) !== Number(facing.lengthInches) || Number(source.widthInches) !== Number(facing.widthInches)) {
+      const e = new Error('Facing material dimensions must exactly match the selected 2-ply sheet batch.'); e.statusCode = 409; throw e;
+    }
+    if (used !== facingUsed || used !== outCount) {
+      const e = new Error('For this 3-ply pasting workflow, 2-ply sheets consumed, facing sheets consumed and output sheets must match one-to-one.'); e.statusCode = 400; throw e;
     }
     const sourceWeight = num(source.totalWeightKg);
     const sourceUsedKg = Number((sourceWeight * used / source.sheetCount).toFixed(3));
