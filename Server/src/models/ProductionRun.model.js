@@ -21,6 +21,11 @@ const productionRunSchema = new mongoose.Schema({
   shift: { type: String, enum: ['Day', 'Night'], default: 'Day' },
   operatorName: { type: String, trim: true },
   machineName: { type: String, trim: true, maxlength: 100 },
+  fluteProfile: { type: String, enum: ['narrow', 'broad'], default: 'narrow' },
+  fluteTakeUpFactor: { type: Number, enum: [1.5, 1.6], default: 1.5 },
+  expectedFluteWeightKg: { type: mongoose.Schema.Types.Decimal128, default: 0 },
+  actualFluteWeightKg: { type: mongoose.Schema.Types.Decimal128, default: 0 },
+  fluteWeightVarianceKg: { type: mongoose.Schema.Types.Decimal128, default: 0 },
   wasteBreakdown: [{
     category: {
       type: String,
