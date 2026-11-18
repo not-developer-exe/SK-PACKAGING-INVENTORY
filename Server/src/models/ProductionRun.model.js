@@ -35,6 +35,7 @@ const productionRunSchema = new mongoose.Schema({
       required: true
     },
     weightKg: { type: mongoose.Schema.Types.Decimal128, required: true, min: 0.001 },
+    materialCost: { type: mongoose.Schema.Types.Decimal128, default: 0 },
     notes: { type: String, trim: true, maxlength: 250 }
   }],
   inputReels: [consumedReelSchema],
@@ -53,6 +54,10 @@ const productionRunSchema = new mongoose.Schema({
     amount: { type: Number, default: 0, min: 0 }
   }],
   materialCostPerOutputKg: { type: mongoose.Schema.Types.Decimal128, default: 0 },
+  materialCostPerInputKg: { type: mongoose.Schema.Types.Decimal128, default: 0 },
+  recoverableWasteMaterialCost: { type: mongoose.Schema.Types.Decimal128, default: 0 },
+  processLossMaterialCost: { type: mongoose.Schema.Types.Decimal128, default: 0 },
+  wasteCostingStatus: { type: String, enum: ['available', 'pending'], default: 'pending' },
   // Only physically measured, recoverable scrap is saleable waste inventory.
   recoverableWasteKg: { type: mongoose.Schema.Types.Decimal128, default: 0 },
   // Input/output variance not accounted for by sheets or measured recoverable scrap.
