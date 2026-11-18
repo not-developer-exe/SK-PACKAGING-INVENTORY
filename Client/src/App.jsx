@@ -78,7 +78,9 @@ function Sidebar() {
       { name: 'Scrap Register', path: '/operations/waste', icon: Trash2 }
     ] },
     ...(user?.role === 'admin' ? [{ group: 'NSB Industrial Solutions', items: [
-      { name: 'NSB Overview', path: '/nsb', icon: Building2 }
+      { name: 'NSB Overview', path: '/nsb', icon: Building2 },
+      { name: 'NSB Customers & Suppliers', path: '/nsb/parties', icon: Users },
+      { name: 'NSB Expenses', path: '/nsb/expenses', icon: Receipt }
     ] }] : [])
   ];
 
@@ -133,6 +135,7 @@ export default function App() {
           <Route index element={<Overview />} />
           <Route path="nsb" element={user?.role === 'admin' ? <NSBOverviewPage /> : <Navigate to="/" replace />} />
           <Route path="nsb/expenses" element={user?.role === 'admin' ? <ExpensesPage company="nsb" /> : <Navigate to="/" replace />} />
+          <Route path="nsb/parties" element={user?.role === 'admin' ? <PartyMasterPage company="nsb" /> : <Navigate to="/" replace />} />
           <Route path="parties" element={<PartyMasterPage />} />
           <Route path="sales" element={<SalesInvoicesPage />} />
           <Route path="sales/new" element={<CreateInvoicePage />} />
