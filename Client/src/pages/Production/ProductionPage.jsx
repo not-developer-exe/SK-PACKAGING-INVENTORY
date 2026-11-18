@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { inventoryService } from '../../services/inventoryService';
 import { productionService } from '../../services/productionService';
 import DateRangeFilter from '../../components/DateRangeFilter';
-import { Factory, Plus, Loader2, Save } from 'lucide-react';
+import { Factory, Plus, Loader2, Save, Trash2 } from 'lucide-react';
 
 export default function ProductionPage() {
   const [availableReels, setAvailableReels] = useState([]);
