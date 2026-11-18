@@ -7,6 +7,8 @@ const AuditLog = require('../models/AuditLog.model');
 const { calculateReelReconciliation } = require('../utils/reelReconciliation');
 const { buildDateRangeFilter, isValidDateOnly } = require('../utils/dateFilters');
 
+const companyFilter = () => ({ $or: [{ companyKey: 'sk-packaging' }, { companyKey: { $exists: false } }] });
+
 const asNumber = (value) => {
   if (value === '' || value === null || value === undefined) return NaN;
   return Number(value);
@@ -14,7 +16,7 @@ const asNumber = (value) => {
 
 exports.getReconciliationCandidates = async (req, res) => {
   try {
-    const reels = await ReelUnit.find({ status: { $in: ['available', 'partial'] } })
+    const reels = await ReelUnit.find({ status: { $in: ['available', 'partial'] }, ...companyFilter() })
       .select('reelCode reelWidthInches bf gsm quality originalWeightKg remainingWeightKg ratePerKg status')
       .sort({ reelCode: 1 })
       .lean();
@@ -34,7 +36,7 @@ exports.getReconciliationCandidates = async (req, res) => {
 
 exports.getStockReconciliations = async (req, res) => {
   try {
-    const filter = buildDateRangeFilter(req.query.from, req.query.to, 'countedAt');
+    const filter = { ...buildDateRangeFilter(req.query.from, req.query.to, 'countedAt'), ...companyFilter() };
     const reconciliations = await StockReconciliation.find(filter)
       .populate('createdBy', 'name email')
       .sort({ countedAt: -1, createdAt: -1 })
@@ -79,7 +81,7 @@ exports.postStockReconciliation = async (req, res) => {
     let result;
     await session.withTransaction(async () => {
       const reelIds = normalized.map((line) => new mongoose.Types.ObjectId(line.reelId));
-      const reels = await ReelUnit.find({ _id: { $in: reelIds }, status: { $in: ['available', 'partial'] } }).session(session);
+      const reels = await ReelUnit.find({ _id: { $in: reelIds }, status: { $in: ['available', 'partial'] }, ...companyFilter() }).session(session);
       if (reels.length !== normalized.length) {
         throw new Error('One or more reels are no longer active. Refresh the count sheet and try again.');
       }
@@ -116,6 +118,7 @@ exports.postStockReconciliation = async (req, res) => {
       );
       const reconciliationNumber = 'RC-' + String(sequence.value).padStart(5, '0');
       const [reconciliation] = await StockReconciliation.create([{
+        companyKey: 'sk-packaging',
         reconciliationNumber,
         countedAt: parsedDate,
         reason: reason.trim(),
@@ -131,7 +134,7 @@ exports.postStockReconciliation = async (req, res) => {
         const delta = newWeight - oldWeight;
         if (delta !== 0) {
           const updated = await ReelUnit.updateOne(
-            { _id: reel._id, remainingWeightKg: reel.remainingWeightKg, status: reel.status },
+            { _id: reel._id, remainingWeightKg: reel.remainingWeightKg, status: reel.status, ...companyFilter() },
             {
               $set: {
                 remainingWeightKg: newWeight,
@@ -143,6 +146,7 @@ exports.postStockReconciliation = async (req, res) => {
           if (updated.modifiedCount !== 1) throw new Error('Stock changed while this count was being posted. Refresh and retry.');
 
           await StockMovement.create([{
+            companyKey: 'sk-packaging',
             movementDate: parsedDate,
             movementType: 'adjustment',
             referenceId: reconciliation._id,
