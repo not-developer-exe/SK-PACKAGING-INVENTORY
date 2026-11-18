@@ -68,7 +68,7 @@ export default function WasteRegisterPage() {
       <div className="flex flex-wrap items-end gap-3"><div className="min-w-56"><label className="mb-1 block text-xs font-medium text-slate-600">Scrap buyer</label><input value={buyerFilter} onChange={e => setBuyerFilter(e.target.value)} placeholder="All buyers" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" /></div><div className="flex-1"><DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => fetchData({ from, to, buyerName: buyerFilter })} onReset={() => { setFrom(''); setTo(''); setBuyerFilter(''); fetchData({}); }} loading={loading} label="Waste / scrap date range" /></div></div>
 
       {/* Top Metrics */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-amber-800">Current Scrap Inventory</h2>
           <p className="mt-2 text-3xl font-bold text-amber-900">{Number(data.currentWasteInventory || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })} <span className="text-base font-medium">kg</span></p>
@@ -86,6 +86,19 @@ export default function WasteRegisterPage() {
           <p className="mt-2 text-3xl font-bold text-slate-900">{Number(data.legacyUnverifiedWasteKg || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })} <span className="text-base font-medium">kg</span></p>
         </div>
       </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="text-sm font-semibold text-slate-600">Recoverable Scrap Material Cost</h2>
+          <p className="mt-2 text-3xl font-bold text-slate-900">₹{Number(data.totalWasteMaterialCost || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</p>
+          <p className="mt-1 text-xs text-slate-500">{Number(data.pendingWasteCostingRuns || 0)} run(s) awaiting verified rates</p>
+        </div>
+      </div>
+
+      {Number(data.pendingWasteCostingRuns || 0) > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          Costing is pending for {data.pendingWasteCostingRuns} run(s) because one or more input material rates are missing or zero. Their scrap weight remains in stock, but no material value is assumed.
+        </div>
+      )}
 
       {Number(data.legacyUnverifiedWasteKg || 0) > 0 && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
@@ -139,6 +152,9 @@ export default function WasteRegisterPage() {
                 <th className="px-5 py-3 font-semibold">Date</th>
                 <th className="px-5 py-3 font-semibold">Source</th>
                 <th className="px-5 py-3 text-right font-semibold">Recoverable Scrap (kg)</th>
+                <th className="px-5 py-3 text-right font-semibold">Material Rate (₹/input kg)</th>
+                <th className="px-5 py-3 text-right font-semibold">Scrap Material Cost</th>
+                <th className="px-5 py-3 font-semibold">Costing</th>
                 <th className="px-5 py-3 font-semibold">Operator</th>
               </tr>
             </thead>
@@ -148,10 +164,13 @@ export default function WasteRegisterPage() {
                   <td className="px-5 py-4 text-slate-600">{new Date(run.runDate || run.createdAt).toLocaleString('en-IN')}</td>
                   <td className="px-5 py-4 font-medium text-slate-900">Run {run.runNumber}</td>
                   <td className="px-5 py-4 text-right font-medium text-amber-600">+{Number(run.recoverableWasteKg || 0).toFixed(2)}</td>
+                  <td className="px-5 py-4 text-right text-slate-700">{run.wasteCostingStatus === "available" ? `₹${Number(run.materialCostPerInputKg || 0).toFixed(2)}` : "—"}</td>
+                  <td className="px-5 py-4 text-right font-medium text-slate-900">{run.wasteCostingStatus === "available" ? `₹${Number(run.recoverableWasteMaterialCost || 0).toFixed(2)}` : "Pending"}</td>
+                  <td className="px-5 py-4 text-xs">{run.wasteCostingStatus === "available" ? <span className="text-emerald-700">Available</span> : <span className="text-amber-700">Pending rates</span>}</td>
                   <td className="px-5 py-4 text-slate-700">{run.operatorName}</td>
                 </tr>
               ))}
-              {data.productionWaste.length === 0 && (<tr><td colSpan={4} className="p-6 text-center text-slate-500">No measured recoverable scrap recorded yet.</td></tr>)}
+              {data.productionWaste.length === 0 && (<tr><td colSpan={7} className="p-6 text-center text-slate-500">No measured recoverable scrap recorded yet.</td></tr>)}
             </tbody>
           </table>
         ) : (
