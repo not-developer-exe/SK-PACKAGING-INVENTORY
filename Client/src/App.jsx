@@ -49,7 +49,7 @@ function Sidebar() {
       { name: 'Sales Invoices', path: '/sales', icon: FileText },
       { name: 'Profit & Loss', path: '/reports/profit-loss', icon: ChartNoAxesCombined },
       { name: 'Cash Flow & Dues', path: '/reports/financial-health', icon: Wallet },
-      { name: 'Factory Activity', path: '/reports/activity', icon: ChartNoAxesCombined },
+      ...(user?.role === 'admin' ? [{ name: 'Factory Activity', path: '/reports/activity', icon: ChartNoAxesCombined }] : []),
       { name: 'Expenses', path: '/expenses', icon: Receipt },
       { name: 'New GST Invoice', path: '/sales/new', icon: FilePlus2 }
     ] },
@@ -128,7 +128,7 @@ export default function App() {
           <Route path="sales/new" element={<CreateInvoicePage />} />
           <Route path="reports/profit-loss" element={<ProfitLossPage />} />
           <Route path="reports/financial-health" element={<FinancialHealthPage />} />
-          <Route path="reports/activity" element={<PeriodActivityPage />} />
+          <Route path="reports/activity" element={user?.role === 'admin' ? <PeriodActivityPage /> : <Navigate to="/" replace />} />
           <Route path="expenses" element={<ExpensesPage />} />
           <Route path="inventory/reels" element={user?.role === 'admin' ? <ReelStockPage /> : <Navigate to="/" replace />} />
           <Route path="inventory/inward" element={user?.role === 'admin' ? <StockInwardPage /> : <Navigate to="/" replace />} />
