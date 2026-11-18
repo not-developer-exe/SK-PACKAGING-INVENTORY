@@ -698,6 +698,9 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
   assert.equal(incompleteInvoice.status, 400);
   assert.equal(await Invoice.countDocuments({ dispatchId: dispatch._id }), 0);
 
+  const taxContext = await api('/api/invoices/tax-context');
+  assert.equal(taxContext.status, 200);
+  assert.equal(taxContext.data.companyStateCode, '23');
   const invoiceResponse = await api('/api/invoices', {
     method: 'POST',
     body: {
@@ -709,6 +712,11 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
     }
   });
   assert.equal(invoiceResponse.status, 201);
+  assert.equal(invoiceResponse.data.taxType, 'CGST_SGST');
+  assert.equal(invoiceResponse.data.cgstAmount, 300);
+  assert.equal(invoiceResponse.data.sgstAmount, 300);
+  assert.equal(invoiceResponse.data.igstAmount, 0);
+  assert.equal(invoiceResponse.data.placeOfSupplyStateCode, '23');
   const blockedDispatchCancel = await api('/api/dispatch/' + dispatch._id + '/cancel', {
     method: 'PATCH',
     body: { reason: 'Testing cancellation while invoice is active.' }
