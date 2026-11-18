@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 
+const companyScopePlugin = require('../utils/companyScope');
 const scrapSaleSchema = new mongoose.Schema({
+  companyKey: { type: String, enum: ['sk-packaging', 'nsb-industrial-solutions'], default: 'sk-packaging', index: true },
   saleDate: { type: Date, default: Date.now },
   buyerName: { type: String, required: true, trim: true },
   // Scrap may be weighed fractionally; keep this aligned with controller validation.
@@ -11,5 +13,7 @@ const scrapSaleSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 scrapSaleSchema.index({ saleDate: -1, buyerName: 1 });
+
+scrapSaleSchema.plugin(companyScopePlugin);
 
 module.exports = mongoose.model('ScrapSale', scrapSaleSchema);
