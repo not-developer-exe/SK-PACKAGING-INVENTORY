@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const consumedReelSchema = new mongoose.Schema({
   reelId: { type: mongoose.Schema.Types.ObjectId, ref: 'ReelUnit', required: true },
   reelCode: { type: String, trim: true },
+  reelRole: { type: String, enum: ['plain_surface', 'flute'], required: true },
   requestedWidthInches: { type: Number, min: 0 },
   actualWidthInches: { type: Number, min: 0 },
   widthVarianceInches: { type: Number },
@@ -20,6 +21,11 @@ const productionRunSchema = new mongoose.Schema({
   shift: { type: String, enum: ['Day', 'Night'], default: 'Day' },
   operatorName: { type: String, trim: true },
   machineName: { type: String, trim: true, maxlength: 100 },
+  fluteProfile: { type: String, enum: ['narrow', 'broad'], default: 'narrow' },
+  fluteTakeUpFactor: { type: Number, enum: [1.5, 1.6], default: 1.5 },
+  expectedFluteWeightKg: { type: mongoose.Schema.Types.Decimal128, default: 0 },
+  actualFluteWeightKg: { type: mongoose.Schema.Types.Decimal128, default: 0 },
+  fluteWeightVarianceKg: { type: mongoose.Schema.Types.Decimal128, default: 0 },
   wasteBreakdown: [{
     category: {
       type: String,
