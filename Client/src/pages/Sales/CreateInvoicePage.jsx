@@ -68,8 +68,9 @@ export default function CreateInvoicePage() {
   }, [customerId]);
 
   useEffect(() => {
-    setPlaceOfSupplyStateCode(selectedCustomer?.stateCode || '');
-  }, [customerId, selectedCustomer?.stateCode]);
+    const customer = customers.find((item) => item._id === customerId);
+    setPlaceOfSupplyStateCode(customer?.stateCode || '');
+  }, [customerId, customers]);
 
   const handleChallanSelect = (selectedId) => {
     setDispatchId(selectedId);
@@ -97,7 +98,6 @@ export default function CreateInvoicePage() {
   // Match the server's per-line and per-tax-component two-decimal rounding exactly.
   const taxableAmounts = (items || []).map((item) => Number(((item.quantity || 0) * (item.rate || 0)).toFixed(2)));
   const subTotal = Number(taxableAmounts.reduce((sum, amount) => sum + amount, 0).toFixed(2));
-  const selectedCustomer = customers.find((customer) => customer._id === customerId);
   const taxReady = taxContextConfigured && /^\d{2}$/.test(companyStateCode) && /^\d{2}$/.test(placeOfSupplyStateCode);
   const isIntraState = taxReady && companyStateCode === placeOfSupplyStateCode;
   const cgstAmount = isIntraState ? Number((subTotal * gstPercent / 200).toFixed(2)) : 0;
