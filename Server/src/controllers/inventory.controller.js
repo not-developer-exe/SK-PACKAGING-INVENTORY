@@ -1,10 +1,14 @@
 const ReelUnit = require("../models/ReelUnit.model");
 
+const companyFilter = (req) => req.companyKey === 'nsb-industrial-solutions'
+  ? { companyKey: 'nsb-industrial-solutions' }
+  : { $or: [{ companyKey: 'sk-packaging' }, { companyKey: { $exists: false } }] };
+
 exports.getLiveReelStock = async (req, res) => {
   try {
     const stockAggregation = await ReelUnit.aggregate([
       // 1. Only count reels that are not fully consumed
-      { $match: { status: { $in: ["available", "partial"] } } },
+      { $match: { status: { $in: ["available", "partial"] }, ...companyFilter(req) } },
       // Use the source document's business date, not the time the reel record was created.
       { $lookup: { from: "inwardreceipts", localField: "inwardReceiptId", foreignField: "_id", as: "inwardReceipt" } },
       { $lookup: { from: "openingstockadjustments", localField: "openingStockAdjustmentId", foreignField: "_id", as: "openingAdjustment" } },
@@ -77,7 +81,7 @@ exports.getLiveReelStock = async (req, res) => {
 exports.getPhysicalReels = async (req, res) => {
   try {
     const reels = await require("../models/ReelUnit.model")
-      .find({ status: { $in: ["available", "partial"] } })
+      .find({ status: { $in: ["available", "partial"] }, ...companyFilter(req) })
       .populate("supplierId", "name")
       .populate("inwardReceiptId", "receiptDate")
       .populate("openingStockAdjustmentId", "adjustmentDate")

@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
 const reelUnitSchema = new mongoose.Schema({
+  companyKey: { type: String, enum: ['sk-packaging', 'nsb-industrial-solutions'], default: 'sk-packaging', index: true },
   reelCode: { type: String, required: true, unique: true, trim: true },
   reelWidthInches: { type: Number, required: true },
   bf: { type: Number, required: true },

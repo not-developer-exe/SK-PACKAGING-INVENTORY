@@ -9,6 +9,10 @@ const { calculateLandedRatePerKg } = require('../utils/materialCosting');
 const { normalizeInwardReelWeights } = require('../utils/inwardReelWeights');
 const { buildDateRangeFilter, isValidDateOnly } = require('../utils/dateFilters');
 
+const companyFilter = (req) => req.companyKey === 'nsb-industrial-solutions'
+  ? { companyKey: 'nsb-industrial-solutions' }
+  : { $or: [{ companyKey: 'sk-packaging' }, { companyKey: { $exists: false } }] };
+
 const toFiniteNumber = (value) => {
   if (value === null || value === undefined || value === '') return NaN;
   return Number(value);
@@ -76,13 +80,13 @@ exports.createDraftReceipt = async (req, res) => {
       return res.status(400).json({ message: error.message });
     }
 
-    const supplier = await Party.findById(supplierId);
+    const supplier = await Party.findOne({ _id: supplierId, ...companyFilter(req) });
     if (!supplier || supplier.isActive === false || !['Supplier', 'Both'].includes(supplier.type)) {
       return res.status(400).json({ message: 'Invalid or non-supplier party selected.' });
     }
 
     // Allocate receipt numbers through the shared atomic sequence, not count + 1.
-    const existingCount = await InwardReceipt.countDocuments();
+    const existingCount = await InwardReceipt.countDocuments(companyFilter(req));
     const sequence = await Sequence.findOneAndUpdate(
       { _id: 'inward-receipt' },
       [{ $set: { value: { $add: [{ $max: [{ $ifNull: ['$value', existingCount] }, existingCount] }, 1] } } }],
@@ -91,6 +95,7 @@ exports.createDraftReceipt = async (req, res) => {
     const receiptNumber = `IR-${String(sequence.value).padStart(5, '0')}`;
 
     const receipt = await InwardReceipt.create({
+      companyKey: req.companyKey || 'sk-packaging',
       receiptNumber,
       receiptDate: parsedReceiptDate,
       supplierId,
@@ -117,7 +122,7 @@ exports.createDraftReceipt = async (req, res) => {
 // Get all receipts
 exports.getReceipts = async (req, res) => {
   try {
-    const filter = buildDateRangeFilter(req.query.from, req.query.to, 'receiptDate');
+    const filter = { ...buildDateRangeFilter(req.query.from, req.query.to, 'receiptDate'), ...companyFilter(req) };
     if (req.query.supplierId) {
       if (!mongoose.isValidObjectId(req.query.supplierId)) return res.status(400).json({ message: 'Invalid supplier ID.' });
       filter.supplierId = req.query.supplierId;
@@ -143,7 +148,7 @@ exports.postReceipt = async (req, res) => {
     let postedReceipt;
     await session.withTransaction(async () => {
       const receipt = await InwardReceipt.findOneAndUpdate(
-        { _id: req.params.id, status: 'draft' },
+        { _id: req.params.id, status: 'draft', ...companyFilter(req) },
         { $set: { status: 'posted', postedAt: new Date(), postedBy: req.user._id } },
         { new: true, session }
       );
@@ -154,7 +159,7 @@ exports.postReceipt = async (req, res) => {
         throw error;
       }
 
-      const supplier = await Party.findById(receipt.supplierId).session(session);
+      const supplier = await Party.findOne({ _id: receipt.supplierId, ...companyFilter(req) }).session(session);
       if (!supplier || supplier.isActive === false || !['Supplier', 'Both'].includes(supplier.type)) {
         const error = new Error('The linked supplier is no longer active or is not a supplier. Restore or correct the supplier before posting this receipt.');
         error.statusCode = 409;
@@ -192,7 +197,7 @@ exports.postReceipt = async (req, res) => {
         }
       }
 
-      const existingReelCount = await ReelUnit.countDocuments().session(session);
+      const existingReelCount = await ReelUnit.countDocuments(companyFilter(req)).session(session);
       const totalReelsToCreate = receipt.lines.reduce((sum, line) => sum + Number(line.reelCount), 0);
       const reelSequence = await Sequence.findOneAndUpdate(
         { _id: 'reel-unit' },
@@ -220,6 +225,7 @@ exports.postReceipt = async (req, res) => {
           reelCounter += 1;
           const reelCode = `RL-${String(reelCounter).padStart(6, '0')}`;
           await ReelUnit.create([{
+            companyKey: req.companyKey || 'sk-packaging',
             reelCode,
             reelWidthInches: line.reelWidthInches,
             bf: line.bf,
@@ -237,6 +243,7 @@ exports.postReceipt = async (req, res) => {
         }
 
         await StockMovement.create([{
+          companyKey: req.companyKey || 'sk-packaging',
           movementDate: receipt.receiptDate,
           movementType: 'inward_receipt',
           referenceId: receipt._id,

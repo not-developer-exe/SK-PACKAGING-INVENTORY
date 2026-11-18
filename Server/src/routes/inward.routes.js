@@ -4,6 +4,7 @@ const { createDraftReceipt, getReceipts, postReceipt } = require('../controllers
 const { protect } = require('../middlewares/auth.middleware');
 
 router.use(protect);
+router.use((req, res, next) => { req.companyKey = 'sk-packaging'; next(); });
 
 router.get('/', getReceipts);
 router.post('/', createDraftReceipt);

@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
 const stockMovementSchema = new mongoose.Schema({
+  companyKey: { type: String, enum: ['sk-packaging', 'nsb-industrial-solutions'], default: 'sk-packaging', index: true },
   movementDate: { type: Date, default: Date.now },
   movementType: {
     type: String,

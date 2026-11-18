@@ -16,6 +16,7 @@ const inwardReceiptLineSchema = new mongoose.Schema({
 });
 
 const inwardReceiptSchema = new mongoose.Schema({
+  companyKey: { type: String, enum: ['sk-packaging', 'nsb-industrial-solutions'], default: 'sk-packaging', index: true },
   receiptNumber: { type: String, required: true, unique: true, trim: true },
   receiptDate: { type: Date, required: true, default: Date.now },
   supplierId: { type: mongoose.Schema.Types.ObjectId, ref: 'Party', required: true },
