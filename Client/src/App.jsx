@@ -53,11 +53,11 @@ function Sidebar() {
       { name: 'Expenses', path: '/expenses', icon: Receipt },
       { name: 'New GST Invoice', path: '/sales/new', icon: FilePlus2 }
     ] },
-    { group: 'Inventory', items: [
+    ...(user?.role === 'admin' ? [{ group: 'Inventory', items: [
       { name: 'Reel Stock', path: '/inventory/reels', icon: Package },
       { name: 'Stock Inward', path: '/inventory/inward', icon: ArrowDownToLine },
       { name: 'Stock Ledger', path: '/inventory/ledger', icon: BookOpen }
-    ] },
+    ] }] : []),
     ...(user?.role === 'admin' ? [{ group: 'Administration', items: [
       { name: 'Opening Stock & Audit', path: '/admin/opening-stock', icon: ShieldCheck },
       { name: 'User Management', path: '/admin/users', icon: Users },
@@ -65,13 +65,13 @@ function Sidebar() {
       { name: 'Data Console', path: '/admin/data', icon: Database },
       { name: 'Product Specifications', path: '/admin/products', icon: ClipboardCheck }
     ] }] : []),
-    { group: 'Factory Operations', items: [
+    ...(user?.role === 'admin' ? [{ group: 'Factory Operations', items: [
       { name: 'Production', path: '/operations/production', icon: Factory },
       { name: 'Production Planning & Reports', path: '/operations/production-intelligence', icon: ChartNoAxesCombined },
       { name: 'Conversion', path: '/operations/conversion', icon: Scissors },
       { name: 'Box Dispatch', path: '/operations/dispatch', icon: Truck },
       { name: 'Waste Register', path: '/operations/waste', icon: Trash2 }
-    ] }
+    ] }] : [])
   ];
 
   const handleLogout = async () => {
@@ -130,15 +130,15 @@ export default function App() {
           <Route path="reports/financial-health" element={<FinancialHealthPage />} />
           <Route path="reports/activity" element={<PeriodActivityPage />} />
           <Route path="expenses" element={<ExpensesPage />} />
-          <Route path="inventory/reels" element={<ReelStockPage />} />
-          <Route path="inventory/inward" element={<StockInwardPage />} />
+          <Route path="inventory/reels" element={user?.role === 'admin' ? <ReelStockPage /> : <Navigate to="/" replace />} />
+          <Route path="inventory/inward" element={user?.role === 'admin' ? <StockInwardPage /> : <Navigate to="/" replace />} />
           <Route path="inventory/inwards" element={<Navigate to="/inventory/inward" replace />} />
-          <Route path="inventory/ledger" element={<StockLedgerPage />} />
-          <Route path="operations/production" element={<ProductionPage />} />
-          <Route path="operations/production-intelligence" element={<ProductionIntelligencePage />} />
-          <Route path="operations/conversion" element={<ConversionPage />} />
-          <Route path="operations/dispatch" element={<DispatchPage />} />
-          <Route path="operations/waste" element={<WasteRegisterPage />} />
+          <Route path="inventory/ledger" element={user?.role === 'admin' ? <StockLedgerPage /> : <Navigate to="/" replace />} />
+          <Route path="operations/production" element={user?.role === 'admin' ? <ProductionPage /> : <Navigate to="/" replace />} />
+          <Route path="operations/production-intelligence" element={user?.role === 'admin' ? <ProductionIntelligencePage /> : <Navigate to="/" replace />} />
+          <Route path="operations/conversion" element={user?.role === 'admin' ? <ConversionPage /> : <Navigate to="/" replace />} />
+          <Route path="operations/dispatch" element={user?.role === 'admin' ? <DispatchPage /> : <Navigate to="/" replace />} />
+          <Route path="operations/waste" element={user?.role === 'admin' ? <WasteRegisterPage /> : <Navigate to="/" replace />} />
           <Route path="admin/opening-stock" element={user?.role === 'admin' ? <OpeningStockPage /> : <Navigate to="/" replace />} />
           <Route path="admin/users" element={user?.role === 'admin' ? <UserManagementPage /> : <Navigate to="/" replace />} />
           <Route path="admin/stock-reconciliation" element={user?.role === 'admin' ? <StockReconciliationPage /> : <Navigate to="/" replace />} />
