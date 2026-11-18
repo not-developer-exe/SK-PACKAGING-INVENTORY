@@ -42,7 +42,7 @@ const connectDB = async () => {
         'Configured administrator account uses an incompatible legacy user record. ' +
         'API startup will continue; run "npm run seed:admin" to safely migrate the owner login.'
       );
-    } else if (adminAccount.role !== 'admin' || !adminAccount.isActive) {
+    } else if (adminAccount.role !== 'admin' || !adminAccount.isActive || adminAccount.name !== (process.env.ADMIN_NAME?.trim() || 'Aditya')) {
       await User.collection.updateOne(
         { _id: adminAccount._id },
         { $set: { role: 'admin', isActive: true, name: process.env.ADMIN_NAME?.trim() || 'Aditya' } }
@@ -62,7 +62,7 @@ const connectDB = async () => {
 
   const accountantAccount = await User.collection.findOne({ email: accountantEmail });
   if (accountantAccount) {
-    if (accountantAccount.role !== 'accountant' || !accountantAccount.isActive) {
+    if (accountantAccount.role !== 'accountant' || !accountantAccount.isActive || accountantAccount.name !== (process.env.ACCOUNTANT_NAME?.trim() || 'Lakhan')) {
       await User.collection.updateOne(
         { _id: accountantAccount._id },
         { $set: { role: 'accountant', isActive: true, name: process.env.ACCOUNTANT_NAME?.trim() || 'Lakhan' } }
