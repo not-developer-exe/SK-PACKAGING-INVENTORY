@@ -49,6 +49,9 @@ exports.recordConversion = async (req, res) => {
   const preflightSheet = await CorrugatedSheet.findById(sheetId)
     .select('status sheetCount totalWeightKg')
     .lean();
+  if (preflightSheet?.ply === 2) {
+    return res.status(409).json({ message: '2-ply corrugated sheets are intermediate stock. Complete Sheet Cutting & Pasting before box conversion.' });
+  }
   if (!preflightSheet || preflightSheet.status !== 'available') {
     return res.status(409).json({ message: 'Source sheet batch is unavailable or has already been consumed.' });
   }
@@ -69,6 +72,11 @@ exports.recordConversion = async (req, res) => {
     // MongoDB transactions must not run parallel operations on the same session.
     const sheet = await CorrugatedSheet.findById(sheetId).session(session);
     const customer = await Party.findById(customerId).session(session);
+      if (sheet?.ply === 2) {
+        const error = new Error('2-ply corrugated sheets are intermediate stock. Complete Sheet Cutting & Pasting before box conversion.');
+        error.statusCode = 409;
+        throw error;
+      }
       if (!sheet || sheet.status !== 'available') {
         const error = new Error('Source sheet batch is unavailable or has already been consumed.');
         error.statusCode = 409;
