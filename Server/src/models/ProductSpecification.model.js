@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 
+const companyScopePlugin = require('../utils/companyScope');
 const productSpecificationSchema = new mongoose.Schema({
+  companyKey: { type: String, enum: ['sk-packaging', 'nsb-industrial-solutions'], default: 'sk-packaging', index: true },
   customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Party', required: true, index: true },
   productName: { type: String, required: true, trim: true, maxlength: 120 },
   ply: { type: Number, required: true, enum: [3, 5, 7, 9] },
@@ -25,5 +27,7 @@ productSpecificationSchema.index(
   { customerId: 1, productName: 1, isActive: 1 },
   { unique: true, partialFilterExpression: { isActive: true }, collation: { locale: 'en', strength: 2 } }
 );
+
+productSpecificationSchema.plugin(companyScopePlugin);
 
 module.exports = mongoose.models.ProductSpecification || mongoose.model('ProductSpecification', productSpecificationSchema);
