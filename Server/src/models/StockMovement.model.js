@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 
+const companyScopePlugin = require('../utils/companyScope');
 const stockMovementSchema = new mongoose.Schema({
   companyKey: { type: String, enum: ['sk-packaging', 'nsb-industrial-solutions'], default: 'sk-packaging', index: true },
   movementDate: { type: Date, default: Date.now },
@@ -30,5 +31,7 @@ const stockMovementSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 stockMovementSchema.index({ movementDate: -1, createdAt: -1 });
+
+stockMovementSchema.plugin(companyScopePlugin);
 
 module.exports = mongoose.model('StockMovement', stockMovementSchema);

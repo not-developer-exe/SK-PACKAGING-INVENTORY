@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 
+const companyScopePlugin = require('../utils/companyScope');
 const dispatchSchema = new mongoose.Schema({
+  companyKey: { type: String, enum: ['sk-packaging', 'nsb-industrial-solutions'], default: 'sk-packaging', index: true },
   challanNumber: { type: String, required: true, unique: true, trim: true },
   customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Party', required: true },
   dispatchDate: { type: Date, required: true, default: Date.now },
@@ -24,5 +26,7 @@ const dispatchSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 dispatchSchema.index({ dispatchDate: -1, customerId: 1 });
+
+dispatchSchema.plugin(companyScopePlugin);
 
 module.exports = mongoose.model('Dispatch', dispatchSchema);

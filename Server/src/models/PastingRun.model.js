@@ -1,6 +1,8 @@
 
 const mongoose = require('mongoose');
+const companyScopePlugin = require('../utils/companyScope');
 const pastingRunSchema = new mongoose.Schema({
+  companyKey: { type: String, enum: ['sk-packaging', 'nsb-industrial-solutions'], default: 'sk-packaging', index: true },
   runNumber: { type: String, required: true, unique: true },
   runDate: { type: Date, required: true },
   operatorName: { type: String, trim: true, required: true },
@@ -21,4 +23,6 @@ const pastingRunSchema = new mongoose.Schema({
   recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
 pastingRunSchema.index({ runDate: -1 });
+pastingRunSchema.plugin(companyScopePlugin);
+
 module.exports = mongoose.model('PastingRun', pastingRunSchema);

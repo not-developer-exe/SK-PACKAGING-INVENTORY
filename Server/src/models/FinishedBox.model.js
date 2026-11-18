@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 
+const companyScopePlugin = require('../utils/companyScope');
 const finishedBoxSchema = new mongoose.Schema({
+  companyKey: { type: String, enum: ['sk-packaging', 'nsb-industrial-solutions'], default: 'sk-packaging', index: true },
   batchNumber: { type: String, required: true, unique: true, trim: true },
   customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Party', required: true },
   
@@ -32,5 +34,7 @@ const finishedBoxSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 finishedBoxSchema.index({ manufacturedAt: -1, customerId: 1 });
+
+finishedBoxSchema.plugin(companyScopePlugin);
 
 module.exports = mongoose.model('FinishedBox', finishedBoxSchema);

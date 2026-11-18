@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
+const companyScopePlugin = require('../utils/companyScope');
 
 const auditLogSchema = new mongoose.Schema({
+  companyKey: { type: String, enum: ['sk-packaging', 'nsb-industrial-solutions'], default: 'sk-packaging', index: true },
   action: { type: String, required: true, trim: true },
   entityType: { type: String, required: true, trim: true },
   entityId: { type: mongoose.Schema.Types.ObjectId, required: true },
@@ -13,4 +15,5 @@ const auditLogSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 auditLogSchema.index({ createdAt: -1, entityType: 1 });
+auditLogSchema.plugin(companyScopePlugin);
 module.exports = mongoose.model('AuditLog', auditLogSchema);

@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 
+const companyScopePlugin = require('../utils/companyScope');
 const reelUnitSchema = new mongoose.Schema({
   companyKey: { type: String, enum: ['sk-packaging', 'nsb-industrial-solutions'], default: 'sk-packaging', index: true },
   reelCode: { type: String, required: true, unique: true, trim: true },
@@ -18,5 +19,7 @@ const reelUnitSchema = new mongoose.Schema({
   landedRatePerKg: { type: mongoose.Schema.Types.Decimal128, default: 0 },
   status: { type: String, enum: ['available', 'partial', 'consumed'], default: 'available' }
 }, { timestamps: true });
+
+reelUnitSchema.plugin(companyScopePlugin);
 
 module.exports = mongoose.model('ReelUnit', reelUnitSchema);

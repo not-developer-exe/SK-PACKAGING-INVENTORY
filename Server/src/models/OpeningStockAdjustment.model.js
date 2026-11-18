@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 
+const companyScopePlugin = require('../utils/companyScope');
 const openingStockLineSchema = new mongoose.Schema({
   reelWidthInches: { type: Number, required: true },
   bf: { type: Number, required: true },
@@ -22,5 +23,7 @@ const openingStockAdjustmentSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 openingStockAdjustmentSchema.index({ adjustmentDate: -1 });
+
+openingStockLineSchema.plugin(companyScopePlugin);
 
 module.exports = mongoose.model('OpeningStockAdjustment', openingStockAdjustmentSchema);

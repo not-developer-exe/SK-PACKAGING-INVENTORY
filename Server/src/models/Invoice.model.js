@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 
+const companyScopePlugin = require('../utils/companyScope');
 const invoicePaymentSchema = new mongoose.Schema({
+  companyKey: { type: String, enum: ['sk-packaging', 'nsb-industrial-solutions'], default: 'sk-packaging', index: true },
   date: { type: Date, default: Date.now },
   amount: { type: Number, required: true, min: 0.01 },
   mode: { type: String, required: true, trim: true },
@@ -44,5 +46,7 @@ const invoiceSchema = new mongoose.Schema({
 
 invoiceSchema.index({ invoiceDate: -1, customerId: 1 });
 invoiceSchema.index({ dispatchId: 1 }, { unique: true });
+
+invoicePaymentSchema.plugin(companyScopePlugin);
 
 module.exports = mongoose.model('Invoice', invoiceSchema);

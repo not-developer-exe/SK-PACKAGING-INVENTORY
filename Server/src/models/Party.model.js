@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 
+const companyScopePlugin = require('../utils/companyScope');
 const ledgerSchema = new mongoose.Schema({
   date: { type: Date, default: Date.now },
   type: { type: String, required: true }, // e.g., 'Tax Invoice', 'Payment Received'
@@ -25,5 +26,7 @@ const partySchema = new mongoose.Schema({
   ledger: [ledgerSchema]
 }, { timestamps: true });
 
-// module.exports = mongoose.model('Party', partySchema);
+// ledgerSchema.plugin(companyScopePlugin);
+
+module.exports = mongoose.model('Party', partySchema);
 module.exports = mongoose.models.Party || mongoose.model('Party', partySchema);

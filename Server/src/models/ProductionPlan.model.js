@@ -1,5 +1,7 @@
 const mongoose = require('mongoose');
+const companyScopePlugin = require('../utils/companyScope');
 const productionPlanSchema = new mongoose.Schema({
+  companyKey: { type: String, enum: ['sk-packaging', 'nsb-industrial-solutions'], default: 'sk-packaging', index: true },
  planNumber:{type:String,required:true,unique:true,trim:true},
  customerId:{type:mongoose.Schema.Types.ObjectId,ref:'Party',required:true,index:true},
  productSpecificationId:{type:mongoose.Schema.Types.ObjectId,ref:'ProductSpecification',default:null},
@@ -17,4 +19,5 @@ const productionPlanSchema = new mongoose.Schema({
  updatedBy:{type:mongoose.Schema.Types.ObjectId,ref:'User'}
 },{timestamps:true});
 productionPlanSchema.index({dueDate:1,status:1});
+productionPlanSchema.plugin(companyScopePlugin);
 module.exports=mongoose.model('ProductionPlan',productionPlanSchema);
