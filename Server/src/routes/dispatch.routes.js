@@ -8,8 +8,8 @@ router.use(protect);
 router.get('/boxes', getAvailableBoxes);
 router.get('/', getDispatches)
 router.post('/', recordDispatch);
-router.patch('/:id/cancel', requireRole('admin'), cancelDispatch);
-router.patch('/:id/delivered', requireRole('admin'), markDelivered);
+router.patch('/:id/cancel', cancelDispatch);
+router.patch('/:id/delivered', markDelivered);
 
 module.exports = router;
 
