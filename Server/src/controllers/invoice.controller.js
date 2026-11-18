@@ -150,7 +150,7 @@ exports.createInvoice = async (req, res) => {
         error.statusCode = 400;
         throw error;
       }
-      const placeOfSupplyStateCode = normalizeStateCode(customer?.stateCode);
+      const placeOfSupplyStateCode = normalizeStateCode(req.body?.placeOfSupplyStateCode || customer?.stateCode);
       if (!placeOfSupplyStateCode) {
         const error = new Error('Customer state code is missing or invalid. Edit the customer in Party Master and enter its two-digit GST state code before invoicing.');
         error.statusCode = 422;
