@@ -81,7 +81,7 @@ function Sidebar() {
   };
 
   return (
-    <aside className="flex h-screen w-64 shrink-0 flex-col border-r border-slate-200 bg-slate-900 text-slate-300">
+    <aside className="flex h-dvh w-64 shrink-0 flex-col border-r border-slate-200 bg-slate-900 text-slate-300">
       <div className="flex h-16 items-center border-b border-slate-800 px-6"><h1 className="text-lg font-bold tracking-wide text-white">SK PACKAGING</h1></div>
       <nav className="flex-1 overflow-y-auto py-4">
         {navigation.map((section) => <div key={section.group} className="mb-6">
@@ -132,6 +132,7 @@ export default function App() {
           <Route path="expenses" element={<ExpensesPage />} />
           <Route path="inventory/reels" element={<ReelStockPage />} />
           <Route path="inventory/inward" element={<StockInwardPage />} />
+          <Route path="inventory/inwards" element={<Navigate to="/inventory/inward" replace />} />
           <Route path="inventory/ledger" element={<StockLedgerPage />} />
           <Route path="operations/production" element={<ProductionPage />} />
           <Route path="operations/production-intelligence" element={<ProductionIntelligencePage />} />
