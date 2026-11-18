@@ -22,7 +22,6 @@ export default function Overview() {
     { label: 'Record stock inward', description: 'Add incoming paper reels', to: '/inventory/inward', icon: PackageCheck },
     { label: 'Record production', description: 'Log factory production', to: '/operations/production', icon: Factory },
     { label: 'Create delivery challan', description: 'Dispatch finished boxes', to: '/operations/dispatch', icon: ClipboardList },
-    { label: 'Create GST invoice', description: 'Bill an unbilled challan', to: '/sales/new', icon: FilePlus2 },
     { label: 'Sales invoices', description: 'Review issued tax invoices', to: '/sales', icon: FileText },
     { label: 'Create GST invoice', description: 'Bill an unbilled challan', to: '/sales/new', icon: FilePlus2 },
     { label: 'Party Master', description: 'Manage customer and supplier accounts', to: '/parties', icon: Users },
