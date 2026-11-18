@@ -132,6 +132,7 @@ export default function App() {
         <Route element={<AppLayout />}>
           <Route index element={<Overview />} />
           <Route path="nsb" element={user?.role === 'admin' ? <NSBOverviewPage /> : <Navigate to="/" replace />} />
+          <Route path="nsb/expenses" element={user?.role === 'admin' ? <ExpensesPage company="nsb" /> : <Navigate to="/" replace />} />
           <Route path="parties" element={<PartyMasterPage />} />
           <Route path="sales" element={<SalesInvoicesPage />} />
           <Route path="sales/new" element={<CreateInvoicePage />} />
