@@ -233,7 +233,7 @@ export default function ProductionPage() {
           <div className="rounded-2xl border border-blue-200 bg-blue-50/30 p-5">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-blue-900">Output Sheets</h2>
-              <button type="button" onClick={() => setOutputSheets([...outputSheets, { ply: 3, lengthInches: '', widthInches: '', sheetCount: '', totalWeightKg: '' }])} className="flex items-center gap-1 text-sm font-medium text-blue-700 hover:text-blue-900">
+              <button type="button" onClick={() => setOutputSheets([...outputSheets, { ply: 2, lengthInches: '', widthInches: '', sheetCount: '', totalWeightKg: '' }])} className="flex items-center gap-1 text-sm font-medium text-blue-700 hover:text-blue-900">
                 <Plus size={16} /> Add Cut Size
               </button>
             </div>
