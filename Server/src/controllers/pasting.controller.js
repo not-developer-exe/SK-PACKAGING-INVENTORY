@@ -2,7 +2,6 @@
 const mongoose = require('mongoose');
 const FacingMaterialBatch = require('../models/FacingMaterialBatch.model');
 const PastingRun = require('../models/PastingRun.model');
-const StockMovement = require('../models/StockMovement.model');
 const CorrugatedSheet = require('../models/CorrugatedSheet.model');
 const StockMovement = require('../models/StockMovement.model');
 const Sequence = require('../models/Sequence.model');
