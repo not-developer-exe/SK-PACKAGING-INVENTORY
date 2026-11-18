@@ -10,6 +10,7 @@ const { calculateWidthSubstitution } = require('../utils/widthSubstitution');
 const { resolveLandedRatePerKg, calculateMaterialCost, calculateUnitMaterialCost } = require('../utils/materialCosting');
 const { buildDateRangeFilter, isValidDateOnly } = require('../utils/dateFilters');
 const { normalizeWasteBreakdown } = require('../utils/productionWaste');
+const { calculateWasteMaterialCost } = require('../utils/wasteCosting');
 const consumeRawMaterials = require('../utils/consumeRawMaterials');
 
 exports.getProductionRuns = async (req, res) => {
@@ -235,6 +236,12 @@ exports.recordProduction = async (req, res) => {
     const rawMaterialCost = rawConsumption.totalCost;
     const totalMaterialCost = Number((reelMaterialCost + rawMaterialCost).toFixed(2));
     const materialCostPerOutputKg = calculateUnitMaterialCost(totalMaterialCost, totalOutputWeight);
+    const wasteCostingStatus = tracedInputs.every((item) => Number(item.landedRatePerKg) > 0) &&
+      rawConsumption.lines.every((line) => Number(line.rate) > 0) ? 'available' : 'pending';
+    const wasteCost = calculateWasteMaterialCost({
+      totalMaterialCost, totalInputWeightKg: totalInputWeight,
+      recoverableWasteKg, processLossKg
+    });
 
     const [run] = await ProductionRun.create([{
       runNumber,
@@ -247,7 +254,11 @@ exports.recordProduction = async (req, res) => {
       expectedFluteWeightKg,
       actualFluteWeightKg,
       fluteWeightVarianceKg,
-      wasteBreakdown: wasteBreakdown.map((row) => ({ ...row, weightKg: mongoose.Types.Decimal128.fromString(String(row.weightKg)) })),
+      wasteBreakdown: wasteBreakdown.map((row) => ({
+        ...row,
+        weightKg: mongoose.Types.Decimal128.fromString(String(row.weightKg)),
+        materialCost: mongoose.Types.Decimal128.fromString(String(wasteCostingStatus === 'available' ? Number((row.weightKg * wasteCost.materialCostPerInputKg).toFixed(2)) : 0))
+      })),
       inputReels: tracedInputs,
       totalInputWeightKg: totalInputWeight,
       totalOutputWeightKg: totalOutputWeight,
@@ -256,6 +267,10 @@ exports.recordProduction = async (req, res) => {
       rawMaterialCost,
       rawMaterialConsumptions: rawConsumption.lines,
       materialCostPerOutputKg,
+      materialCostPerInputKg: wasteCost.materialCostPerInputKg,
+      recoverableWasteMaterialCost: wasteCostingStatus === 'available' ? wasteCost.recoverableWasteMaterialCost : 0,
+      processLossMaterialCost: wasteCostingStatus === 'available' ? wasteCost.processLossMaterialCost : 0,
+      wasteCostingStatus,
       recoverableWasteKg,
       processLossKg,
       wasteGeneratedKg: recoverableWasteKg,
@@ -290,7 +305,7 @@ exports.recordProduction = async (req, res) => {
       }], { session, ordered: true });
     }
 
-    await writeAuditLog(req, { action: 'production.recorded', entityType: 'ProductionRun', entityId: run._id, entityLabel: runNumber, summary: 'Production run recorded: ' + runNumber, metadata: { totalInputWeightKg: totalInputWeight, totalOutputWeightKg: totalOutputWeight, totalMaterialCost, reelMaterialCost, rawMaterialCost, rawMaterialConsumptions: rawConsumption.lines, materialCostPerOutputKg, recoverableWasteKg, wasteBreakdown, machineName: machineName.trim(), shift, operatorName, processLossKg, fluteProfile: rawFluteProfile, fluteTakeUpFactor, expectedFluteWeightKg, actualFluteWeightKg, fluteWeightVarianceKg, inputReelCount: tracedInputs.length, outputLineCount: outputs.length, widthSubstitutions: tracedInputs.filter((item) => item.widthVarianceInches !== 0).map((item) => ({ reelCode: item.reelCode, requestedWidthInches: item.requestedWidthInches, actualWidthInches: item.actualWidthInches, varianceInches: item.widthVarianceInches })) } }, session);
+    await writeAuditLog(req, { action: 'production.recorded', entityType: 'ProductionRun', entityId: run._id, entityLabel: runNumber, summary: 'Production run recorded: ' + runNumber, metadata: { totalInputWeightKg: totalInputWeight, totalOutputWeightKg: totalOutputWeight, totalMaterialCost, reelMaterialCost, rawMaterialCost, rawMaterialConsumptions: rawConsumption.lines, materialCostPerOutputKg, materialCostPerInputKg: wasteCost.materialCostPerInputKg, recoverableWasteMaterialCost: wasteCost.recoverableWasteMaterialCost, processLossMaterialCost: wasteCost.processLossMaterialCost, wasteCostingStatus, recoverableWasteKg, wasteBreakdown, machineName: machineName.trim(), shift, operatorName, processLossKg, fluteProfile: rawFluteProfile, fluteTakeUpFactor, expectedFluteWeightKg, actualFluteWeightKg, fluteWeightVarianceKg, inputReelCount: tracedInputs.length, outputLineCount: outputs.length, widthSubstitutions: tracedInputs.filter((item) => item.widthVarianceInches !== 0).map((item) => ({ reelCode: item.reelCode, requestedWidthInches: item.requestedWidthInches, actualWidthInches: item.actualWidthInches, varianceInches: item.widthVarianceInches })) } }, session);
     await session.commitTransaction();
     return res.status(201).json({
       message: 'Production run recorded successfully',
