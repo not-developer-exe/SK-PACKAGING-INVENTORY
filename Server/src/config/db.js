@@ -53,6 +53,13 @@ const connectDB = async () => {
     console.warn('Administrator account was not found and ADMIN_PASSWORD is not configured; no new login was created.');
   }
 
+  // No other account may retain administrator privileges, even if it was
+  // previously promoted manually before the owner-only policy was introduced.
+  await User.collection.updateMany(
+    { email: { $ne: adminEmail }, role: { $ne: 'accountant' } },
+    { $set: { role: 'accountant' } }
+  );
+
   const accountantAccount = await User.collection.findOne({ email: accountantEmail });
   if (accountantAccount) {
     if (accountantAccount.role !== 'accountant' || !accountantAccount.isActive) {
