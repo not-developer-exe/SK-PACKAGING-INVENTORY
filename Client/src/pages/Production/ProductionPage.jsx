@@ -19,6 +19,7 @@ export default function ProductionPage() {
   const [runDate, setRunDate] = useState(() => { const date = new Date(); return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10); });
   const [operatorName, setOperatorName] = useState('');
   const [machineName, setMachineName] = useState('');
+  const [fluteProfile, setFluteProfile] = useState('narrow');
   const [recoverableWasteKg, setRecoverableWasteKg] = useState('');
   const [wasteBreakdown, setWasteBreakdown] = useState([{ category: 'edge_trim', weightKg: '', notes: '' }]);
   
@@ -93,6 +94,7 @@ export default function ProductionPage() {
         runDate,
         operatorName,
         machineName,
+        fluteProfile,
         recoverableWasteKg: measuredScrap,
         wasteBreakdown: wasteBreakdown.filter(row => Number(row.weightKg) > 0).map(row => ({ ...row, weightKg: Number(row.weightKg) })),
         inputReels: inputReels.map(r => ({ ...r, requestedWidthInches: r.requestedWidthInches === '' ? undefined : Number(r.requestedWidthInches), weightConsumedKg: Number(r.weightConsumedKg) })),
@@ -111,6 +113,7 @@ export default function ProductionPage() {
       // Reset form
       setOperatorName('');
       setMachineName('');
+      setFluteProfile('narrow');
       setRecoverableWasteKg('');
       setWasteBreakdown([{ category: 'edge_trim', weightKg: '', notes: '' }]);
       setInputReels([{ reelRole: 'plain_surface', reelId: '', requestedWidthInches: '', weightConsumedKg: '' }, { reelRole: 'flute', reelId: '', requestedWidthInches: '', weightConsumedKg: '' }]);
@@ -209,6 +212,14 @@ export default function ProductionPage() {
                   </div>
                 </div>
               ))}
+              <div className="rounded-lg border border-amber-200 bg-white p-3">
+                <label className="mb-1 block text-xs font-semibold text-amber-900">Flute profile</label>
+                <select required value={fluteProfile} onChange={e => setFluteProfile(e.target.value)} className="w-full rounded-lg border border-amber-200 px-3 py-2 text-sm bg-white">
+                  <option value="narrow">Narrow flute · 50% extra paper (1.50×)</option>
+                  <option value="broad">Broad flute · 60% extra paper (1.60×)</option>
+                </select>
+                <p className="mt-1 text-xs text-amber-800">Expected flute reel consumption is estimated from plain-reel kg, both reels' GSM and actual widths. Actual consumed kg remains recorded from the worker's measurement; any variance is retained for review.</p>
+              </div>
               <div className="rounded-lg bg-amber-100/70 p-3 text-xs text-amber-900">
                 Each reel keeps its own BF, GSM, quality and landed rate from Reel Stock. Plain-surface and flute specifications may be identical or different. Enter required width and consumed kg separately for each reel.
               </div>
