@@ -14,6 +14,8 @@ const facingMaterialBatchSchema = new mongoose.Schema({
   ratePerKg: { type: mongoose.Schema.Types.Decimal128, required: true },
   totalValue: { type: mongoose.Schema.Types.Decimal128, required: true },
   supplierName: { type: String, trim: true, default: '' },
+  jobWorkerName: { type: String, trim: true, default: '' },
+  jobWorkOrderId: { type: mongoose.Schema.Types.ObjectId, ref: 'JobWorkOrder' },
   inwardDate: { type: Date, required: true },
   notes: { type: String, trim: true, maxlength: 500 },
   status: { type: String, enum: ['available', 'partial', 'consumed'], default: 'available' },
