@@ -2,7 +2,7 @@ import React from 'react';
 import { Routes, Route, Link, useLocation, Navigate, Outlet, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, FileText, Package, ArrowDownToLine, Factory, ClipboardCheck,
-  Scissors, Truck, LogOut, FilePlus2, BookOpen, Trash2, ShieldCheck, ChartNoAxesCombined, Receipt, Database, Wallet
+  Scissors, Truck, LogOut, FilePlus2, BookOpen, Trash2, ShieldCheck, ChartNoAxesCombined, Receipt, Database, Wallet, Building2
 } from 'lucide-react';
 
 import { useAuth } from './context/AuthContext';
@@ -29,6 +29,7 @@ import AdminRecordsPage from './pages/Reports/AdminRecordsPage';
 import ProductSpecificationPage from './pages/Products/ProductSpecificationPage';
 import ProductionIntelligencePage from './pages/Production/ProductionIntelligencePage';
 import FinancialHealthPage from './pages/Reports/FinancialHealthPage';
+import NSBOverviewPage from './pages/NSB/NSBOverviewPage';
 import RouteErrorBoundary from './components/RouteErrorBoundary';
 
 function RequireAuth() {
@@ -45,35 +46,40 @@ function Sidebar() {
   const [signingOut, setSigningOut] = React.useState(false);
   const navigation = [
     { group: 'Overview', items: [{ name: 'Dashboard', path: '/', icon: LayoutDashboard }] },
-    { group: 'Finance & Sales', items: [
-      { name: 'Party Master', path: '/parties', icon: Users },
+    { group: 'Accounts & Sales', items: [
+      { name: 'Customers & Suppliers', path: '/parties', icon: Users },
       { name: 'Sales Invoices', path: '/sales', icon: FileText },
-      { name: 'Profit & Loss', path: '/reports/profit-loss', icon: ChartNoAxesCombined },
-      { name: 'Cash Flow & Dues', path: '/reports/financial-health', icon: Wallet },
-      { name: 'Factory Activity', path: '/reports/activity', icon: ChartNoAxesCombined },
+      { name: 'Purchase & Stock Inward', path: '/inventory/inward', icon: ArrowDownToLine },
       { name: 'Expenses', path: '/expenses', icon: Receipt },
+      { name: 'Customer & Supplier Dues', path: '/reports/financial-health', icon: Wallet },
+      { name: 'Profit & Loss', path: '/reports/profit-loss', icon: ChartNoAxesCombined },
+      { name: 'Daily & Monthly Reports', path: '/reports/activity', icon: ChartNoAxesCombined },
       { name: 'New GST Invoice', path: '/sales/new', icon: FilePlus2 }
     ] },
-    { group: 'Inventory', items: [
+    { group: 'Stock', items: [
       { name: 'Reel Stock', path: '/inventory/reels', icon: Package },
-      { name: 'Stock Inward', path: '/inventory/inward', icon: ArrowDownToLine },
-      { name: 'Stock Ledger', path: '/inventory/ledger', icon: BookOpen }
+      { name: 'Raw Material Stock', path: '/inventory/inward', icon: ArrowDownToLine },
+      { name: 'Stock Register', path: '/inventory/ledger', icon: BookOpen },
+      { name: 'Finished Goods Stock', path: '/operations/dispatch', icon: Package }
     ] },
-    { group: 'Administration', items: [
-      { name: 'Opening Stock & Audit', path: '/admin/opening-stock', icon: ShieldCheck },
+    { group: 'Reports & Administration', items: [
+      { name: 'Opening Stock', path: '/admin/opening-stock', icon: ShieldCheck },
       ...(user?.role === 'admin' ? [{ name: 'User Management', path: '/admin/users', icon: Users }] : []),
       { name: 'Stock Reconciliation', path: '/admin/stock-reconciliation', icon: ClipboardCheck },
       ...(user?.role === 'admin' ? [{ name: 'Data Console', path: '/admin/data', icon: Database }] : []),
-      { name: 'Product Specifications', path: '/admin/products', icon: ClipboardCheck }
+      { name: 'Product Details', path: '/admin/products', icon: ClipboardCheck }
     ] },
-    { group: 'Factory Operations', items: [
-      { name: 'Production', path: '/operations/production', icon: Factory },
+    { group: 'Factory Work', items: [
+      { name: 'Corrugation Production', path: '/operations/production', icon: Factory },
       { name: 'Sheet Cutting & Pasting', path: '/operations/pasting', icon: Scissors },
-      { name: 'Production Planning & Reports', path: '/operations/production-intelligence', icon: ChartNoAxesCombined },
-      { name: 'Conversion', path: '/operations/conversion', icon: Scissors },
-      { name: 'Box Dispatch', path: '/operations/dispatch', icon: Truck },
-      { name: 'Waste Register', path: '/operations/waste', icon: Trash2 }
-    ] }
+      { name: 'Box Manufacturing', path: '/operations/conversion', icon: Scissors },
+      { name: 'Production Plan & Reports', path: '/operations/production-intelligence', icon: ChartNoAxesCombined },
+      { name: 'Dispatch', path: '/operations/dispatch', icon: Truck },
+      { name: 'Scrap Register', path: '/operations/waste', icon: Trash2 }
+    ] },
+    ...(user?.role === 'admin' ? [{ group: 'NSB Industrial Solutions', items: [
+      { name: 'NSB Overview', path: '/nsb', icon: Building2 }
+    ] }] : [])
   ];
 
   const handleLogout = async () => {
@@ -125,6 +131,7 @@ export default function App() {
       <Route element={<RequireAuth />}>
         <Route element={<AppLayout />}>
           <Route index element={<Overview />} />
+          <Route path="nsb" element={user?.role === 'admin' ? <NSBOverviewPage /> : <Navigate to="/" replace />} />
           <Route path="parties" element={<PartyMasterPage />} />
           <Route path="sales" element={<SalesInvoicesPage />} />
           <Route path="sales/new" element={<CreateInvoicePage />} />
