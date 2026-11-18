@@ -26,7 +26,7 @@ const connectDB = async () => {
   const adminAccount = await User.collection.findOne({ email: adminEmail });
   if (!adminAccount && adminPassword) {
     await User.create({
-      name: process.env.ADMIN_NAME?.trim() || 'System Administrator',
+      name: process.env.ADMIN_NAME?.trim() || 'Aditya',
       email: adminEmail,
       password: adminPassword,
       role: 'admin',
@@ -45,7 +45,7 @@ const connectDB = async () => {
     } else if (adminAccount.role !== 'admin' || !adminAccount.isActive) {
       await User.collection.updateOne(
         { _id: adminAccount._id },
-        { $set: { role: 'admin', isActive: true } }
+        { $set: { role: 'admin', isActive: true, name: process.env.ADMIN_NAME?.trim() || 'Aditya' } }
       );
       console.info('Configured owner account promoted to active administrator.');
     }
@@ -65,7 +65,7 @@ const connectDB = async () => {
     if (accountantAccount.role !== 'accountant' || !accountantAccount.isActive) {
       await User.collection.updateOne(
         { _id: accountantAccount._id },
-        { $set: { role: 'accountant', isActive: true } }
+        { $set: { role: 'accountant', isActive: true, name: process.env.ACCOUNTANT_NAME?.trim() || 'Lakhan' } }
       );
       console.info('Configured accountant account set to active accountant role.');
     }
