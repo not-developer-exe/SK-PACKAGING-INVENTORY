@@ -1,5 +1,7 @@
 const mongoose = require('mongoose');
+const companyScopePlugin = require('../utils/companyScope');
 const productionPlanSchema = new mongoose.Schema({
+  companyKey: { type: String, enum: ['sk-packaging', 'nsb-industrial-solutions'], default: 'sk-packaging', index: true },
  planNumber:{type:String,required:true,unique:true,trim:true},
  customerId:{type:mongoose.Schema.Types.ObjectId,ref:'Party',required:true,index:true},
  productSpecificationId:{type:mongoose.Schema.Types.ObjectId,ref:'ProductSpecification',default:null},
