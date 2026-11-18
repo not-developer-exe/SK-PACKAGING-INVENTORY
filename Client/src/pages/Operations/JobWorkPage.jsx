@@ -2,24 +2,26 @@ import React,{useEffect,useState} from 'react';
 import axiosClient from '../../api/axiosClient';
 
 const today=()=>new Date().toLocaleDateString('en-CA');
-const issueBlank={jobWorkerName:'',processType:'offset_printing',inputBatchId:'',issueDate:today(),expectedReturnDate:'',issuedSheets:'',notes:''};
+const issueBlank={jobWorkerName:'',processType:'offset_printing',inputBatchModel:'FacingMaterialBatch',inputMaterialType:'duplex',inputBatchId:'',issueDate:today(),expectedReturnDate:'',issuedSheets:'',notes:''};
 const returnBlank={orderId:'',returnDate:today(),sheetsReturned:'',weightReturnedKg:'',wastageSheets:'0',wastageWeightKg:'0',jobCharges:'0',outputMaterialType:'printed',notes:''};
 
 export default function JobWorkPage(){
- const [batches,setBatches]=useState([]),[orders,setOrders]=useState([]),[issue,setIssue]=useState(issueBlank),[ret,setRet]=useState(returnBlank),[error,setError]=useState(''),[busy,setBusy]=useState(false);
- const load=async()=>{const [a,b]=await Promise.all([axiosClient.get('/pasting/facing-material'),axiosClient.get('/job-work')]);setBatches(a.data.batches||[]);setOrders(b.data.orders||[]);};
+ const [batches,setBatches]=useState([]),[cutBatches,setCutBatches]=useState([]),[orders,setOrders]=useState([]),[issue,setIssue]=useState(issueBlank),[ret,setRet]=useState(returnBlank),[error,setError]=useState(''),[busy,setBusy]=useState(false);
+ const load=async()=>{const [a,b]=await Promise.all([axiosClient.get('/pasting/facing-material'),axiosClient.get('/job-work')]);setBatches(a.data.batches||[]);setCutBatches(b.data.cutSheetBatches||[]);setOrders(b.data.orders||[]);};
  useEffect(()=>{load().catch(e=>setError(e.message));},[]);
  const submitIssue=async e=>{e.preventDefault();setBusy(true);setError('');try{await axiosClient.post('/job-work/issue',issue);setIssue(issueBlank);await load();}catch(e){setError(e.response?.data?.message||e.message);}finally{setBusy(false);}};
  const submitReturn=async e=>{e.preventDefault();setBusy(true);setError('');try{await axiosClient.post('/job-work/return',ret);setRet({...returnBlank,orderId:ret.orderId});await load();}catch(e){setError(e.response?.data?.message||e.message);}finally{setBusy(false);}};
  const openOrders=orders.filter(o=>['issued','partial_return'].includes(o.status));
  return <div className="space-y-6">
-  <div><h1 className="text-2xl font-bold text-slate-900">External Job Work</h1><p className="mt-1 text-sm text-slate-500">Issue sheet material to printers/processors, receive processed stock, and record wastage and job charges. Job-workers are maintained separately from suppliers.</p></div>
+  <div><h1 className="text-2xl font-bold text-slate-900">External Job Work</h1><p className="mt-1 text-sm text-slate-500">Issue cut-sheet or pre-cut facing batches to printers/processors, receive processed stock, and allocate material cost plus job charges to returned batches. Job-workers are maintained separately from suppliers.</p></div>
   {error&&<div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
   <form onSubmit={submitIssue} className="grid gap-3 rounded-xl border bg-white p-4 sm:grid-cols-3">
    <h2 className="font-semibold sm:col-span-3">Issue material to job-worker</h2>
    <input required placeholder="Printer / job-worker name" value={issue.jobWorkerName} onChange={e=>setIssue({...issue,jobWorkerName:e.target.value})} className="rounded-lg border px-3 py-2 text-sm"/>
    <select value={issue.processType} onChange={e=>setIssue({...issue,processType:e.target.value})} className="rounded-lg border px-3 py-2 text-sm"><option value="offset_printing">Offset printing</option><option value="lamination">Lamination</option><option value="other">Other processing</option></select>
-   <select required value={issue.inputBatchId} onChange={e=>setIssue({...issue,inputBatchId:e.target.value})} className="rounded-lg border px-3 py-2 text-sm"><option value="">Select stock batch</option>{batches.filter(b=>b.remainingSheets>0).map(b=><option key={b._id} value={b._id}>{b.batchNumber} · {b.materialType} · {b.remainingSheets} sheets</option>)}</select>
+   <select value={issue.inputBatchModel} onChange={e=>setIssue({...issue,inputBatchModel:e.target.value,inputBatchId:''})} className="rounded-lg border px-3 py-2 text-sm"><option value="FacingMaterialBatch">Printed / facing stock</option><option value="CutSheetBatch">Cut-sheet stock</option></select>
+   {issue.inputBatchModel==='CutSheetBatch'&&<select value={issue.inputMaterialType} onChange={e=>setIssue({...issue,inputMaterialType:e.target.value})} className="rounded-lg border px-3 py-2 text-sm"><option value="printed">Plain paper for printing</option><option value="printed_laminated">Printed + laminated</option><option value="khaki">Khaki</option><option value="duplex">Duplex board</option></select>}
+   <select required value={issue.inputBatchId} onChange={e=>setIssue({...issue,inputBatchId:e.target.value})} className="rounded-lg border px-3 py-2 text-sm"><option value="">Select stock batch</option>{(issue.inputBatchModel==='CutSheetBatch'?cutBatches:batches).filter(b=>b.remainingSheets>0).map(b=><option key={b._id} value={b._id}>{b.batchNumber} · {b.remainingSheets} sheets · {b.lengthInches}×{b.widthInches} in</option>)}</select>
    <input required type="number" min="1" step="1" placeholder="Sheets to issue" value={issue.issuedSheets} onChange={e=>setIssue({...issue,issuedSheets:e.target.value})} className="rounded-lg border px-3 py-2 text-sm"/>
    <label className="text-xs text-slate-600">Issue date<input required type="date" value={issue.issueDate} onChange={e=>setIssue({...issue,issueDate:e.target.value})} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"/></label>
    <label className="text-xs text-slate-600">Expected return<input type="date" value={issue.expectedReturnDate} onChange={e=>setIssue({...issue,expectedReturnDate:e.target.value})} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"/></label>
