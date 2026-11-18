@@ -1,6 +1,8 @@
 
 const mongoose = require('mongoose');
+const companyScopePlugin = require('../utils/companyScope');
 const facingMaterialBatchSchema = new mongoose.Schema({
+  companyKey: { type: String, enum: ['sk-packaging', 'nsb-industrial-solutions'], default: 'sk-packaging', index: true },
   batchNumber: { type: String, unique: true, required: true },
   materialType: { type: String, enum: ['printed', 'printed_laminated', 'khaki', 'duplex'], required: true },
   lengthInches: { type: Number, required: true, min: 0.1 },
@@ -18,4 +20,6 @@ const facingMaterialBatchSchema = new mongoose.Schema({
   recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
 facingMaterialBatchSchema.index({ inwardDate: -1 });
+facingMaterialBatchSchema.plugin(companyScopePlugin);
+
 module.exports = mongoose.model('FacingMaterialBatch', facingMaterialBatchSchema);
