@@ -15,6 +15,7 @@ import ReelStockPage from './pages/ReelStock/ReelStockPage';
 import StockInwardPage from './pages/StockInward/StockInwardPage';
 import ProductionPage from './pages/Production/ProductionPage';
 import ConversionPage from './pages/Conversion/ConversionPage';
+import SheetPastingPage from './pages/Production/SheetPastingPage';
 import DispatchPage from './pages/Operations/DispatchPage';
 import StockLedgerPage from './pages/Reports/StockLedgerPage';
 import WasteRegisterPage from './pages/Reports/WasteRegisterPage';
@@ -67,6 +68,7 @@ function Sidebar() {
     ] },
     { group: 'Factory Operations', items: [
       { name: 'Production', path: '/operations/production', icon: Factory },
+      { name: 'Sheet Cutting & Pasting', path: '/operations/pasting', icon: Scissors },
       { name: 'Production Planning & Reports', path: '/operations/production-intelligence', icon: ChartNoAxesCombined },
       { name: 'Conversion', path: '/operations/conversion', icon: Scissors },
       { name: 'Box Dispatch', path: '/operations/dispatch', icon: Truck },
@@ -135,6 +137,7 @@ export default function App() {
           <Route path="inventory/inwards" element={<Navigate to="/inventory/inward" replace />} />
           <Route path="inventory/ledger" element={<StockLedgerPage />} />
           <Route path="operations/production" element={<ProductionPage />} />
+          <Route path="operations/pasting" element={<SheetPastingPage />} />
           <Route path="operations/production-intelligence" element={<ProductionIntelligencePage />} />
           <Route path="operations/conversion" element={<ConversionPage />} />
           <Route path="operations/dispatch" element={<DispatchPage />} />

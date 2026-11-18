@@ -5,7 +5,7 @@ const stockMovementSchema = new mongoose.Schema({
   movementType: {
     type: String,
     required: true,
-    enum: ['inward_receipt', 'production_issue', 'sheet_cutting', 'adjustment', 'dispatch']
+    enum: ['inward_receipt', 'production_issue', 'sheet_cutting', 'sheet_pasting', 'adjustment', 'dispatch']
   },
   referenceId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -14,12 +14,12 @@ const stockMovementSchema = new mongoose.Schema({
   },
   referenceModel: {
     type: String,
-    enum: ['InwardReceipt', 'ProductionRun', 'CorrugatedSheet', 'FinishedBox', 'Dispatch', 'ReelUnit', 'OpeningStockAdjustment', 'StockReconciliation']
+    enum: ['InwardReceipt', 'ProductionRun', 'PastingRun', 'CorrugatedSheet', 'FacingMaterialBatch', 'FinishedBox', 'Dispatch', 'ReelUnit', 'OpeningStockAdjustment', 'StockReconciliation']
   },
   itemType: {
     type: String,
     required: true,
-    enum: ['reel', 'sheet', 'finished_good']
+    enum: ['reel', 'sheet', 'facing_material', 'finished_good']
   },
   specificationSummary: { type: String, required: true },
   quantityChange: { type: Number, required: true },
