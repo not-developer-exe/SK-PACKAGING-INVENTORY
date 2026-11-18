@@ -2,8 +2,9 @@ const express = require('express');
 const router = express.Router();
 const { recordConversion, getAvailableSheets, getFinishedGoods } = require('../controllers/conversion.controller');
 const { protect } = require('../middlewares/auth.middleware');
+const { requireRole } = require('../middlewares/role.middleware');
 
-router.use(protect);
+router.use(protect, requireRole('admin'));
 
 router.get('/sheets', getAvailableSheets);
 router.get('/finished-goods', getFinishedGoods);

@@ -80,7 +80,7 @@ export default function UserManagementPage() {
           <label className="text-sm">Full name<input required minLength="2" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="mt-1 w-full rounded-lg border px-3 py-2" /></label>
           <label className="text-sm">Email address<input required type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="mt-1 w-full rounded-lg border px-3 py-2" /></label>
           <label className="text-sm">Initial password<input required minLength="12" maxLength="128" type="password" autoComplete="new-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="mt-1 w-full rounded-lg border px-3 py-2" /><span className="text-xs text-slate-500">Minimum 12 characters.</span></label>
-          <label className="text-sm">Role<select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="mt-1 w-full rounded-lg border bg-white px-3 py-2"><option value="accountant">Accountant</option><option value="admin">Administrator</option></select></label>
+          <label className="text-sm">Role<select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="mt-1 w-full rounded-lg border bg-white px-3 py-2"><option value="accountant">Accountant</option></select></label>
         </div>
         <button disabled={saving} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{saving ? 'Saving...' : 'Create account'}</button>
       </form>
@@ -102,7 +102,7 @@ export default function UserManagementPage() {
                 <span className={'rounded-full px-3 py-1 text-xs font-semibold ' + (item.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500')}>{item.isActive ? 'Active' : 'Deactivated'}</span>
               </div>
               <div className="flex flex-wrap items-end gap-3">
-                <label className="text-xs text-slate-500">Role<select value={item.role} disabled={saving} onChange={(e) => update(item.id, { role: e.target.value }, 'Role updated for ' + item.email)} className="mt-1 block rounded-lg border bg-white px-3 py-2 text-sm text-slate-800"><option value="accountant">Accountant</option><option value="admin">Administrator</option></select></label>
+                <label className="text-xs text-slate-500">Role<select value={item.role} disabled={saving || item.email?.toLowerCase() === 'official.additya.singh@gmail.com'} onChange={(e) => update(item.id, { role: e.target.value }, 'Role updated for ' + item.email)} className="mt-1 block rounded-lg border bg-white px-3 py-2 text-sm text-slate-800"><option value="accountant">Accountant</option>{item.email?.toLowerCase() === 'official.additya.singh@gmail.com' && <option value="admin">Owner · Administrator</option>}</select></label>
                 <button disabled={saving || (item.id === currentUser?.id && item.isActive)} onClick={() => update(item.id, { isActive: !item.isActive }, item.isActive ? 'Account deactivated.' : 'Account activated.')} className="rounded-lg border px-3 py-2 text-sm disabled:opacity-40">{item.isActive ? 'Deactivate account' : 'Activate account'}</button>
                 <div className="flex min-w-[240px] flex-1 gap-2">
                   <input type="password" autoComplete="new-password" placeholder="New password (12+ chars)" value={passwords[item.id] || ''} onChange={(e) => setPasswords((current) => ({ ...current, [item.id]: e.target.value }))} className="min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm" />
@@ -114,7 +114,7 @@ export default function UserManagementPage() {
           </div>
         )}
       </section>
-      <p className="text-xs text-slate-500"><ShieldCheck size={14} className="mr-1 inline" />Only administrators can manage accounts. The last active administrator cannot be demoted or deactivated. User changes are written to the audit log.</p>
+      <p className="text-xs text-slate-500"><ShieldCheck size={14} className="mr-1 inline" />Only administrators can manage accounts. Only Aditya's owner account has administrator privileges. All other staff accounts are limited to accountant access. User changes are written to the audit log.</p>
     </div>
   );
 }

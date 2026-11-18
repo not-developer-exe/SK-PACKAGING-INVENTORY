@@ -28,8 +28,8 @@ exports.createUser = async (req, res) => {
   if (typeof name !== 'string' || name.trim().length < 2 ||
       typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) ||
       typeof password !== 'string' || password.length < 12 || password.length > 128 ||
-      !['admin', 'accountant'].includes(role)) {
-    return res.status(400).json({ message: 'Enter a name, valid email, password of at least 12 characters, and valid role.' });
+      role !== 'accountant') {
+    return res.status(400).json({ message: 'Enter a name, valid email, password of at least 12 characters. Only the owner account can be an administrator.' });
   }
   try {
     const normalizedEmail = email.trim().toLowerCase();
@@ -40,7 +40,7 @@ exports.createUser = async (req, res) => {
       name: name.trim(),
       email: normalizedEmail,
       password,
-      role,
+      role: 'accountant',
       isActive: true
     });
     await writeAuditLog(req, { action: 'user.created', entityType: 'User', entityId: user._id, entityLabel: user.email, summary: 'User account created: ' + user.email, metadata: { role } });
@@ -56,8 +56,11 @@ exports.updateUser = async (req, res) => {
   if (name !== undefined && (typeof name !== 'string' || name.trim().length < 2)) {
     return res.status(400).json({ message: 'Name must contain at least 2 characters.' });
   }
-  if (role !== undefined && !['admin', 'accountant'].includes(role)) {
+  if (role !== undefined && role !== 'accountant' && role !== 'admin') {
     return res.status(400).json({ message: 'Invalid user role.' });
+  }
+  if (role === 'admin') {
+    return res.status(403).json({ message: 'Administrator access is reserved exclusively for the owner account.' });
   }
   if (isActive !== undefined && typeof isActive !== 'boolean') {
     return res.status(400).json({ message: 'isActive must be a boolean.' });
@@ -81,20 +84,21 @@ exports.updateUser = async (req, res) => {
       const user = await User.findById(req.params.id).session(session);
       if (!user) throw Object.assign(new Error('User not found.'), { statusCode: 404 });
 
-      const nextRole = role ?? user.role;
-      const nextActive = isActive ?? user.isActive;
-      const removesAdmin = user.role === 'admin' && user.isActive && (nextRole !== 'admin' || !nextActive);
-      if (removesAdmin) {
-        const activeAdmins = await User.countDocuments({ role: 'admin', isActive: true }).session(session);
-        if (activeAdmins <= 1) throw Object.assign(new Error('The last active administrator cannot be demoted or deactivated.'), { statusCode: 409 });
+      const ownerEmail = String(process.env.ADMIN_EMAIL || 'official.additya.singh@gmail.com').trim().toLowerCase();
+      const isOwnerAccount = String(user.email).trim().toLowerCase() === ownerEmail;
+      if (isOwnerAccount && ((role !== undefined && role !== 'admin') || isActive === false)) {
+        throw Object.assign(new Error('The owner administrator account cannot be demoted or deactivated here.'), { statusCode: 403 });
       }
-      if (String(user._id) === String(req.user._id) && !nextActive) {
+      if (!isOwnerAccount && role === 'admin') {
+        throw Object.assign(new Error('Only the designated owner account can hold administrator privileges.'), { statusCode: 403 });
+      }
+      if (String(user._id) === String(req.user._id) && !(isActive ?? user.isActive)) {
         throw Object.assign(new Error('You cannot deactivate your own account.'), { statusCode: 400 });
       }
 
       const before = { name: user.name, role: user.role, isActive: user.isActive };
       if (name !== undefined) user.name = name.trim();
-      if (role !== undefined) user.role = role;
+      user.role = isOwnerAccount ? 'admin' : 'accountant';
       if (isActive !== undefined) user.isActive = isActive;
       if (password !== undefined) user.password = password;
       await user.save({ session });

@@ -29,8 +29,10 @@ exports.login = async (req, res) => {
     }
 
     generateToken(user._id, res);
+    const ownerEmail = String(process.env.ADMIN_EMAIL || 'official.additya.singh@gmail.com').trim().toLowerCase();
+    const role = user.email.trim().toLowerCase() === ownerEmail ? 'admin' : 'accountant';
     return res.json({
-      user: { id: user._id, name: user.name, email: user.email, role: user.role }
+      user: { id: user._id, name: user.name, email: user.email, role }
     });
   } catch (error) {
     console.error('[AUTH] Login failed:', error.message);
