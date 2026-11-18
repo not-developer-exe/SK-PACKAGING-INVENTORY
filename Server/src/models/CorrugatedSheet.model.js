@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 
+const companyScopePlugin = require('../utils/companyScope');
 const corrugatedSheetSchema = new mongoose.Schema({
+  companyKey: { type: String, enum: ['sk-packaging', 'nsb-industrial-solutions'], default: 'sk-packaging', index: true },
   productionRunId: { type: mongoose.Schema.Types.ObjectId, ref: 'ProductionRun' },
   pastingRunId: { type: mongoose.Schema.Types.ObjectId, ref: 'PastingRun' },
   
@@ -17,5 +19,7 @@ const corrugatedSheetSchema = new mongoose.Schema({
   
   status: { type: String, enum: ['available', 'consumed'], default: 'available' }
 }, { timestamps: true });
+
+corrugatedSheetSchema.plugin(companyScopePlugin);
 
 module.exports = mongoose.model('CorrugatedSheet', corrugatedSheetSchema);
