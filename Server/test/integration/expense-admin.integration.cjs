@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 
 process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = 'integration-test-secret-that-is-long-enough';
+process.env.GST_STATE_CODE = process.env.GST_STATE_CODE || '23';
 if (!process.env.MONGODB_URI) throw new Error('MONGODB_URI must point to a MongoDB replica set');
 
 const mongoose = require('mongoose');
@@ -57,7 +58,7 @@ before(async () => {
     { name: 'Integration Admin', email: 'admin@test.local', password: 'AdminPassword-12345', role: 'admin', isActive: true },
     { name: 'Integration Accountant', email: 'accountant@test.local', password: 'AccountantPassword-12345', role: 'accountant', isActive: true }
   ]);
-  party = await Party.create({ name: 'Original Party', type: 'Customer', city: 'Gwalior' });
+  party = await Party.create({ name: 'Original Party', type: 'Customer', city: 'Gwalior', stateCode: '23' });
   server = app.listen(0);
   await new Promise(resolve => server.once('listening', resolve));
   baseUrl = 'http://127.0.0.1:' + server.address().port;
