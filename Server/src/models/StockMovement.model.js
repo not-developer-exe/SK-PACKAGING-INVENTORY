@@ -7,7 +7,7 @@ const stockMovementSchema = new mongoose.Schema({
   movementType: {
     type: String,
     required: true,
-    enum: ['inward_receipt', 'production_issue', 'sheet_cutting', 'sheet_pasting', 'adjustment', 'dispatch']
+    enum: ['inward_receipt', 'production_issue', 'sheet_cutting', 'sheet_pasting', 'adjustment', 'dispatch', 'job_work_issue', 'job_work_return']
   },
   referenceId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -16,7 +16,7 @@ const stockMovementSchema = new mongoose.Schema({
   },
   referenceModel: {
     type: String,
-    enum: ['InwardReceipt', 'ProductionRun', 'PastingRun', 'CorrugatedSheet', 'FacingMaterialBatch', 'FinishedBox', 'Dispatch', 'ReelUnit', 'OpeningStockAdjustment', 'StockReconciliation']
+    enum: ['InwardReceipt', 'ProductionRun', 'PastingRun', 'CorrugatedSheet', 'FacingMaterialBatch', 'FinishedBox', 'Dispatch', 'ReelUnit', 'OpeningStockAdjustment', 'StockReconciliation', 'JobWorkOrder']
   },
   itemType: {
     type: String,
