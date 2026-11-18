@@ -47,7 +47,7 @@ exports.recordConversion = async (req, res) => {
   // Reject obviously impossible requests before opening a transaction. The same checks
   // are repeated inside the transaction to protect against concurrent stock changes.
   const preflightSheet = await CorrugatedSheet.findById(sheetId)
-    .select('status sheetCount totalWeightKg')
+    .select('status ply sheetCount totalWeightKg')
     .lean();
   if (preflightSheet?.ply === 2) {
     return res.status(409).json({ message: '2-ply corrugated sheets are intermediate stock. Complete Sheet Cutting & Pasting before box conversion.' });
