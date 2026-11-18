@@ -26,6 +26,7 @@ const productSpecificationRoutes = require('./routes/productSpecification.routes
 const productionPlanRoutes = require('./routes/productionPlan.routes');
 const productionIntelligenceRoutes = require('./routes/productionIntelligence.routes');
 const nsbRoutes = require('./routes/nsb.routes');
+const rawMaterialRoutes = require('./routes/rawMaterial.routes');
 
 const app = express();
 const allowedOrigins = (process.env.CLIENT_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174')
@@ -62,6 +63,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/parties', (req, res, next) => { req.companyKey = 'sk-packaging'; next(); }, partyRoutes);
 app.use('/api/inward', inwardRoutes);
 app.use('/api/inventory', inventoryRoutes);
+app.use('/api/raw-materials', (req, res, next) => { req.companyKey = 'sk-packaging'; next(); }, rawMaterialRoutes);
 app.use('/api/controls', (req, res, next) => { req.companyKey = 'sk-packaging'; next(); }, controlRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/production', (req, res, next) => { req.companyKey = 'sk-packaging'; next(); }, productionRoutes);
