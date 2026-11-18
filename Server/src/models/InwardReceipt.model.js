@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 
+const companyScopePlugin = require('../utils/companyScope');
 const inwardReceiptLineSchema = new mongoose.Schema({
   reelWidthInches: { type: Number, required: true },
   bf: { type: Number, required: true },
@@ -33,5 +34,7 @@ const inwardReceiptSchema = new mongoose.Schema({
 inwardReceiptSchema.index({ supplierId: 1, invoiceReference: 1 }, { unique: true, sparse: true });
 
 inwardReceiptSchema.index({ receiptDate: -1, supplierId: 1 });
+
+inwardReceiptLineSchema.plugin(companyScopePlugin);
 
 module.exports = mongoose.model('InwardReceipt', inwardReceiptSchema);
