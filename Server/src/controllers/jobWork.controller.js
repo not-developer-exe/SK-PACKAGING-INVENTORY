@@ -102,9 +102,10 @@ exports.receiveFromJobWorker = async(req,res)=>{
     await session.withTransaction(async()=>{
       const order=await JobWorkOrder.findById(orderId).session(session);
       if(!order||['completed','cancelled'].includes(order.status)){const e=new Error('Job-work order is not open for returns.');e.statusCode=409;throw e;}
-      if(order.returnedSheets+sheets+wSheets>order.issuedSheets || order.returnedWeightKg+weight+wWeight>order.issuedWeightKg+0.01){const e=new Error('Return plus wastage exceeds the material quantity issued.');e.statusCode=409;throw e;}
-      const allocatedMaterialCost=Number((order.inputMaterialCost*weight/order.issuedWeightKg).toFixed(2));
-      const allocatedWastageMaterialCost=Number((order.inputMaterialCost*wWeight/order.issuedWeightKg).toFixed(2));
+      if(order.returnedSheets+sheets+wSheets>order.issuedSheets){const e=new Error('Returned plus wastage sheets exceed the quantity issued.');e.statusCode=409;throw e;}
+      // Allocate source material cost by sheet count, not returned kg: printing/lamination can add weight.
+      const allocatedMaterialCost=Number((order.inputMaterialCost*sheets/order.issuedSheets).toFixed(2));
+      const allocatedWastageMaterialCost=Number((order.inputMaterialCost*wSheets/order.issuedSheets).toFixed(2));
       const allocatedJobCharges=charges;
       const batchRate=Number(((allocatedMaterialCost+allocatedJobCharges)/weight).toFixed(4));
       const [batch]=await FacingMaterialBatch.create([{
