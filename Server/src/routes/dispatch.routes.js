@@ -2,9 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { recordDispatch, getAvailableBoxes, getDispatches, cancelDispatch, markDelivered } = require('../controllers/dispatch.controller');
 const { protect } = require('../middlewares/auth.middleware');
-const { requireRole } = require('../middlewares/role.middleware');
 
-router.use(protect, requireRole('admin'));
+router.use(protect);
 
 router.get('/boxes', getAvailableBoxes);
 router.get('/', getDispatches)
