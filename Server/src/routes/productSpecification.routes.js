@@ -10,8 +10,8 @@ const { protect } = require('../middlewares/auth.middleware');
 
 router.use(protect);
 router.get('/', getProductSpecifications);
-router.post('/', requireRole('admin'), createProductSpecification);
-router.patch('/:id', requireRole('admin'), updateProductSpecification);
-router.delete('/:id', requireRole('admin'), archiveProductSpecification);
+router.post('/', createProductSpecification);
+router.patch('/:id', updateProductSpecification);
+router.delete('/:id', archiveProductSpecification);
 
 module.exports = router;
