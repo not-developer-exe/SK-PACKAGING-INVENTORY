@@ -13,6 +13,7 @@ Create a database user with access only to the ERP database. Add the deployment 
 Copy `Server/.env.example` to `Server/.env` and set:
 
 - `MONGODB_URI`: replica-set connection string for the production database.
+- `GST_STATE_CODE`: the two-digit state code of the company's GST registration (or set `GSTIN` and the API will read its first two digits). Invoice creation is blocked until this is configured.
 - `JWT_SECRET`: a unique random secret of at least 32 bytes.
 - `ADMIN_EMAIL`: `official.additya.singh@gmail.com`.
 - `ADMIN_PASSWORD`: a unique password of 12–128 characters.
