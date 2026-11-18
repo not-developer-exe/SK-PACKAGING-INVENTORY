@@ -11,6 +11,8 @@ const { calculateSheetConsumption } = require('../utils/sheetConversion');
 const { calculateMaterialCost } = require('../utils/materialCosting');
 const { calculateBomVariance } = require('../utils/bomCalculations');
 const { buildDateRangeFilter, isValidDateOnly } = require('../utils/dateFilters');
+const consumeRawMaterials = require('../utils/consumeRawMaterials');
+const { calculateFinishedGoodsCost } = require('../utils/finishedGoodsCosting');
 
 exports.recordConversion = async (req, res) => {
   const {
@@ -22,6 +24,8 @@ exports.recordConversion = async (req, res) => {
     boxesProduced: rawBoxesProduced,
     productSpecificationId,
     productionPlanId,
+    rawMaterialConsumptions = [],
+    conversionCharges = {},
     conversionDate: rawConversionDate
   } = req.body || {};
 
@@ -169,11 +173,23 @@ exports.recordConversion = async (req, res) => {
       }
 
       const unitCostPerKg = Number(sheet.unitCostPerKg?.toString() || 0);
-      const costingStatus = sheet.costingStatus === 'available' ? 'available' : 'unavailable';
-      const materialCost = costingStatus === 'available'
+      const sheetCostingAvailable = sheet.costingStatus === 'available';
+      const sheetMaterialCost = sheetCostingAvailable
         ? calculateMaterialCost(consumption.consumedWeightKg, unitCostPerKg)
         : 0;
-      const costPerBox = boxesProduced > 0 ? Number((materialCost / boxesProduced).toFixed(2)) : 0;
+      const rawMaterialResult = await consumeRawMaterials({
+        req, session, consumptions: rawMaterialConsumptions, movementDate: conversionDate,
+        reference: 'Finished goods conversion', notes: 'Consumed for finished-goods batch'
+      });
+      const labourCost = Number(conversionCharges?.labourCost ?? 0);
+      const otherConversionCost = Number(conversionCharges?.otherCost ?? 0);
+      const costBreakdown = calculateFinishedGoodsCost({
+        sheetMaterialCost, rawMaterialCost: rawMaterialResult.totalCost,
+        labourCost, otherConversionCost, quantityProduced: boxesProduced
+      });
+      const costingStatus = sheetCostingAvailable ? 'available' : 'unavailable';
+      const materialCost = sheetMaterialCost + rawMaterialResult.totalCost;
+      const costPerBox = costingStatus === 'available' ? costBreakdown.costPerBox : 0;
 
       const [box] = await FinishedBox.create([{
         batchNumber,
@@ -197,6 +213,15 @@ exports.recordConversion = async (req, res) => {
         materialCost,
         costPerBox,
         costingStatus,
+        costBreakdown: {
+          sheetMaterialCost,
+          rawMaterialCost: rawMaterialResult.totalCost,
+          rawMaterialConsumptions: rawMaterialResult.lines,
+          labourCost,
+          otherConversionCost,
+          totalConversionCost: costBreakdown.totalConversionCost,
+          totalCost: costBreakdown.totalCost
+        },
         recordedBy: req.user._id
       }], { session });
 
@@ -246,6 +271,11 @@ exports.recordConversion = async (req, res) => {
           consumedWeightKg: consumption.consumedWeightKg,
           boxesProduced,
           materialCost,
+          sheetMaterialCost,
+          rawMaterialCost: rawMaterialResult.totalCost,
+          labourCost,
+          otherConversionCost,
+          totalCost: costBreakdown.totalCost,
           costPerBox,
           costingStatus,
           productSpecificationId: productSpecification ? String(productSpecification._id) : null,
