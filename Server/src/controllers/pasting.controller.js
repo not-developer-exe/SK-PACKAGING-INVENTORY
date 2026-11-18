@@ -6,6 +6,7 @@ const CorrugatedSheet = require('../models/CorrugatedSheet.model');
 const StockMovement = require('../models/StockMovement.model');
 const Sequence = require('../models/Sequence.model');
 const writeAuditLog = require('../utils/writeAuditLog');
+const consumeRawMaterials = require('../utils/consumeRawMaterials');
 
 const num = (v) => Number(v?.toString?.() ?? v ?? 0);
 const dec = (v) => mongoose.Types.Decimal128.fromString(String(Number(v).toFixed(3)));
@@ -49,7 +50,7 @@ exports.getFacingMaterial = async (req, res) => {
 };
 
 exports.recordPasting = async (req, res) => {
-  const { runDate, operatorName, machineName = '', sourceSheetId, facingBatchId, sheetsConsumed, facingSheetsConsumed, outputSheetCount, outputWeightKg, adhesiveWeightKg = 0, wasteWeightKg = 0, notes = '' } = req.body || {};
+  const { runDate, operatorName, machineName = '', sourceSheetId, facingBatchId, sheetsConsumed, facingSheetsConsumed, outputSheetCount, outputWeightKg, adhesiveWeightKg = 0, wasteWeightKg = 0, rawMaterialConsumptions = [], notes = '' } = req.body || {};
   const date = Number.isInteger(new Date(runDate + 'T00:00:00+05:30').getTime()) ? new Date(runDate + 'T00:00:00+05:30') : null;
   const used = Number(sheetsConsumed), facingUsed = Number(facingSheetsConsumed), outCount = Number(outputSheetCount);
   const outKg = Number(outputWeightKg), glueKg = Number(adhesiveWeightKg), wasteKg = Number(wasteWeightKg);
@@ -99,19 +100,26 @@ exports.recordPasting = async (req, res) => {
 
     const sourceRate = source.costingStatus === 'available' ? num(source.unitCostPerKg) : 0;
     const facingRate = num(facing.ratePerKg);
-    const materialCost = Number((sourceUsedKg * sourceRate + facingUsedKg * facingRate).toFixed(2));
-    const costableWeight = outKg > 0 ? outKg : 1;
-    const unitCost = Number((materialCost / costableWeight).toFixed(6));
+    const sheetMaterialCost = Number((sourceUsedKg * sourceRate + facingUsedKg * facingRate).toFixed(2));
     const existing = await PastingRun.countDocuments().session(session);
     const seq = await Sequence.findOneAndUpdate({ _id: 'pasting-run' },
       [{ $set: { value: { $add: [{ $max: [{ $ifNull: ['$value', existing] }, existing] }, 1] } } }],
       { new: true, upsert: true, session, updatePipeline: true });
     const runNumber = 'PS-' + String(seq.value).padStart(6, '0');
+    const rawConsumption = await consumeRawMaterials({
+      req, session, consumptions: rawMaterialConsumptions, movementDate: date,
+      reference: runNumber, notes: 'Consumed during sheet pasting ' + runNumber
+    });
+    const rawMaterialCost = rawConsumption.totalCost;
+    const materialCost = Number((sheetMaterialCost + rawMaterialCost).toFixed(2));
+    const costableWeight = outKg > 0 ? outKg : 1;
+    const unitCost = Number((materialCost / costableWeight).toFixed(6));
     const [run] = await PastingRun.create([{
       runNumber, runDate: date, operatorName: String(operatorName).trim(), machineName: String(machineName).trim(),
       sourceSheetId: source._id, facingBatchId: facing._id, sheetsConsumed: used, facingSheetsConsumed: facingUsed,
       outputSheetCount: outCount, outputWeightKg: dec(outKg), facingWeightKg: dec(facingUsedKg),
       adhesiveWeightKg: dec(glueKg), wasteWeightKg: dec(wasteKg), materialCost: dec(materialCost),
+      sheetMaterialCost: dec(sheetMaterialCost), rawMaterialCost: dec(rawMaterialCost), rawMaterialConsumptions: rawConsumption.lines,
       unitCostPerKg: dec(unitCost), notes: String(notes).trim(), recordedBy: req.user._id
     }], { session });
     const [output] = await CorrugatedSheet.create([{
@@ -126,7 +134,7 @@ exports.recordPasting = async (req, res) => {
       { movementDate: date, movementType: 'sheet_pasting', referenceId: facing._id, referenceModel: 'FacingMaterialBatch', itemType: 'facing_material', specificationSummary: facing.materialType + ' ' + facing.lengthInches + 'x' + facing.widthInches, quantityChange: -facingUsed, weightChangeKg: dec(-facingUsedKg), notes: 'Issued to pasting ' + runNumber, performedBy: req.user._id },
       { movementDate: date, movementType: 'sheet_pasting', referenceId: output._id, referenceModel: 'CorrugatedSheet', itemType: 'sheet', specificationSummary: '3-ply ' + output.lengthInches + 'x' + output.widthInches, quantityChange: outCount, weightChangeKg: dec(outKg), notes: 'Produced by pasting ' + runNumber, performedBy: req.user._id }
     ], { session, ordered: true });
-    await writeAuditLog(req, { action: 'pasting.recorded', entityType: 'PastingRun', entityId: run._id, entityLabel: runNumber, summary: 'Pasting run ' + runNumber + ' produced ' + outCount + ' 3-ply sheets.', metadata: { sourceUsedKg, facingUsedKg, materialCost, unitCost, wasteKg } }, session);
+    await writeAuditLog(req, { action: 'pasting.recorded', entityType: 'PastingRun', entityId: run._id, entityLabel: runNumber, summary: 'Pasting run ' + runNumber + ' produced ' + outCount + ' 3-ply sheets.', metadata: { sourceUsedKg, facingUsedKg, materialCost, sheetMaterialCost, rawMaterialCost, rawMaterialConsumptions: rawConsumption.lines, unitCost, wasteKg } }, session);
     await session.commitTransaction();
     return res.status(201).json({ message: 'Sheet pasting recorded.', run, outputSheet: output });
   } catch (error) {

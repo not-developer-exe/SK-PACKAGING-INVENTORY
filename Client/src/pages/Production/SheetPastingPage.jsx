@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import axiosClient from '../../api/axiosClient';
 import { pastingService } from '../../services/pastingService';
 import { conversionService } from '../../services/conversionService';
 import { Loader2, Layers, PackagePlus, RefreshCw } from 'lucide-react';
@@ -11,6 +12,8 @@ export default function SheetPastingPage() {
   const [sheets, setSheets] = useState([]);
   const [facing, setFacing] = useState([]);
   const [runs, setRuns] = useState([]);
+  const [rawMaterials, setRawMaterials] = useState([]);
+  const [rawMaterialConsumptions, setRawMaterialConsumptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -21,10 +24,11 @@ export default function SheetPastingPage() {
   const refresh = async () => {
     setLoading(true);
     try {
-      const [allSheets, batches, history] = await Promise.all([conversionService.getAvailableSheets(), pastingService.getFacingMaterial(), pastingService.getPastingRuns()]);
+      const [allSheets, batches, history, materials] = await Promise.all([conversionService.getAvailableSheets(), pastingService.getFacingMaterial(), pastingService.getPastingRuns(), axiosClient.get('/raw-materials?activeOnly=true')]);
       setSheets(allSheets.filter(s => Number(s.ply) === 2 && Number(s.sheetCount) > 0));
       setFacing(batches.filter(b => ['available','partial'].includes(b.status) && Number(b.remainingSheets) > 0));
       setRuns(history);
+      setRawMaterials(materials.data.materials || []);
     } catch (e) { setError(e.response?.data?.message || e.message || 'Unable to load pasting data.'); }
     finally { setLoading(false); }
   };
@@ -41,9 +45,9 @@ export default function SheetPastingPage() {
   const submitPasting = async (e) => {
     e.preventDefault(); setSaving(true); setError(''); setSuccess('');
     try {
-      const result = await pastingService.recordPasting({ ...form, sheetsConsumed:Number(form.sheetsConsumed), facingSheetsConsumed:Number(form.facingSheetsConsumed), outputSheetCount:Number(form.outputSheetCount), outputWeightKg:Number(form.outputWeightKg), adhesiveWeightKg:Number(form.adhesiveWeightKg || 0), wasteWeightKg:Number(form.wasteWeightKg || 0) });
+      const result = await pastingService.recordPasting({ ...form, sheetsConsumed:Number(form.sheetsConsumed), facingSheetsConsumed:Number(form.facingSheetsConsumed), outputSheetCount:Number(form.outputSheetCount), outputWeightKg:Number(form.outputWeightKg), adhesiveWeightKg:Number(form.adhesiveWeightKg || 0), wasteWeightKg:Number(form.wasteWeightKg || 0), rawMaterialConsumptions:rawMaterialConsumptions.filter(x=>x.materialId&&Number(x.quantity)>0).map(x=>({materialId:x.materialId,quantity:Number(x.quantity)})) });
       setSuccess('Pasting run ' + result.run.runNumber + ' recorded. New 3-ply batch is ready for box conversion.');
-      setForm({ runDate:today(), operatorName:'', machineName:'', sourceSheetId:'', facingBatchId:'', sheetsConsumed:'', facingSheetsConsumed:'', outputSheetCount:'', outputWeightKg:'', adhesiveWeightKg:'', wasteWeightKg:'0', notes:'' }); await refresh();
+      setForm({ runDate:today(), operatorName:'', machineName:'', sourceSheetId:'', facingBatchId:'', sheetsConsumed:'', facingSheetsConsumed:'', outputSheetCount:'', outputWeightKg:'', adhesiveWeightKg:'', wasteWeightKg:'0', notes:'' }); setRawMaterialConsumptions([]); await refresh();
     } catch(e) { setError(e.response?.data?.message || e.message || 'Pasting failed.'); }
     finally { setSaving(false); }
   };
@@ -56,6 +60,11 @@ export default function SheetPastingPage() {
     <div className="flex gap-2 border-b">{[['pasting','Pasting production'],['inward','Facing material inward']].map(([v,t])=><button key={v} onClick={()=>setTab(v)} className={'px-4 py-2 text-sm font-semibold '+(tab===v?'border-b-2 border-blue-600 text-blue-700':'text-slate-500')}>{t}</button>)}</div>
     {error && <div role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>}
     {success && <div role="status" className="rounded-lg bg-green-50 p-3 text-sm text-green-700">{success}</div>}
+    {tab==='pasting' && <section className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-5 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2"><div><h2 className="font-semibold text-emerald-900">Raw materials consumed in pasting</h2><p className="text-xs text-emerald-800">Optional · issue gum, silicate or other consumables in their registered UOM. Adhesive weight above remains a process measurement.</p></div><button type="button" onClick={()=>setRawMaterialConsumptions([...rawMaterialConsumptions,{materialId:'',quantity:''}])} className="rounded-lg border border-emerald-300 bg-white px-3 py-2 text-xs font-semibold text-emerald-800">+ Add material</button></div>
+      {rawMaterialConsumptions.map((line,index)=>{const selected=rawMaterials.find(m=>m._id===line.materialId);return <div key={index} className="grid grid-cols-12 gap-2"><select value={line.materialId} onChange={e=>{const next=[...rawMaterialConsumptions];next[index]={...next[index],materialId:e.target.value};setRawMaterialConsumptions(next);}} className="col-span-7 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm"><option value="">Select raw material</option>{rawMaterials.map(m=><option key={m._id} value={m._id}>{m.code} · {m.name} ({m.currentQty} {m.uom} available)</option>)}</select><div className="col-span-4"><input type="number" min="0.000001" step="any" required value={line.quantity} onChange={e=>{const next=[...rawMaterialConsumptions];next[index]={...next[index],quantity:e.target.value};setRawMaterialConsumptions(next);}} placeholder={selected?'Quantity ('+selected.uom+')':'Quantity'} className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm"/><p className="mt-1 text-[11px] text-emerald-800">{selected?'Rate ₹'+Number(selected.averageRate||0).toFixed(2)+' / '+selected.uom:'Choose a material first'}</p></div><button type="button" onClick={()=>setRawMaterialConsumptions(rawMaterialConsumptions.filter((_,i)=>i!==index))} className="col-span-1 text-red-600">×</button></div>;})}
+      {!rawMaterials.length&&<p className="text-xs text-amber-700">No active raw materials found. Add materials and inward stock first.</p>}
+    </section>}
     {tab==='inward' ? <form onSubmit={submitInward} className="grid gap-4 rounded-2xl border bg-white p-5 md:grid-cols-3">
       <div><label className={label}>Material type *</label><select className={field} value={inward.materialType} onChange={e=>setInward({...inward,materialType:e.target.value})}><option value="printed">Printed</option><option value="printed_laminated">Printed + laminated</option><option value="khaki">Khaki</option><option value="duplex">Duplex</option></select></div>
       <div><label className={label}>Inward date *</label><input className={field} type="date" required value={inward.inwardDate} onChange={e=>setInward({...inward,inwardDate:e.target.value})}/></div>
