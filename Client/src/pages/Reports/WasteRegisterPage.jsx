@@ -85,8 +85,6 @@ export default function WasteRegisterPage() {
           <h2 className="text-sm font-semibold text-slate-600">Legacy Unverified Variance</h2>
           <p className="mt-2 text-3xl font-bold text-slate-900">{Number(data.legacyUnverifiedWasteKg || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })} <span className="text-base font-medium">kg</span></p>
         </div>
-      </div>
-
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-slate-600">Recoverable Scrap Material Cost</h2>
           <p className="mt-2 text-3xl font-bold text-slate-900">₹{Number(data.totalWasteMaterialCost || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</p>
