@@ -13,6 +13,7 @@ import SalesInvoicesPage from './pages/Sales/SalesInvoicesPage';
 import CreateInvoicePage from './pages/Sales/CreateInvoicePage';
 import ReelStockPage from './pages/ReelStock/ReelStockPage';
 import StockInwardPage from './pages/StockInward/StockInwardPage';
+import RawMaterialPage from './pages/StockInward/RawMaterialPage';
 import ProductionPage from './pages/Production/ProductionPage';
 import ConversionPage from './pages/Conversion/ConversionPage';
 import SheetPastingPage from './pages/Production/SheetPastingPage';
@@ -58,7 +59,7 @@ function Sidebar() {
     ] },
     { group: 'Stock', items: [
       { name: 'Reel Stock', path: '/inventory/reels', icon: Package },
-      { name: 'Raw Material Stock', path: '/inventory/inward', icon: ArrowDownToLine },
+      { name: 'Raw Material Stock', path: '/inventory/raw-materials', icon: ArrowDownToLine },
       { name: 'Stock Register', path: '/inventory/ledger', icon: BookOpen },
       { name: 'Finished Goods Stock', path: '/operations/dispatch', icon: Package }
     ] },
@@ -145,6 +146,7 @@ export default function App() {
           <Route path="expenses" element={<ExpensesPage />} />
           <Route path="inventory/reels" element={<ReelStockPage />} />
           <Route path="inventory/inward" element={<StockInwardPage />} />
+          <Route path="inventory/raw-materials" element={<RawMaterialPage />} />
           <Route path="inventory/inwards" element={<Navigate to="/inventory/inward" replace />} />
           <Route path="inventory/ledger" element={<StockLedgerPage />} />
           <Route path="operations/production" element={<ProductionPage />} />
