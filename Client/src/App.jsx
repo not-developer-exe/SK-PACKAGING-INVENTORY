@@ -28,6 +28,7 @@ import AdminRecordsPage from './pages/Reports/AdminRecordsPage';
 import ProductSpecificationPage from './pages/Products/ProductSpecificationPage';
 import ProductionIntelligencePage from './pages/Production/ProductionIntelligencePage';
 import FinancialHealthPage from './pages/Reports/FinancialHealthPage';
+import RouteErrorBoundary from './components/RouteErrorBoundary';
 
 function RequireAuth() {
   const { user, loading } = useAuth();
@@ -101,7 +102,17 @@ function Sidebar() {
 }
 
 function AppLayout() {
-  return <div className="flex min-h-screen overflow-hidden bg-slate-50 font-sans"><Sidebar /><main className="min-w-0 flex-1 overflow-y-auto p-4 sm:p-8"><Outlet /></main></div>;
+  const location = useLocation();
+  return (
+    <div className="flex h-dvh min-h-0 overflow-hidden bg-slate-50 font-sans">
+      <Sidebar />
+      <main className="min-h-0 min-w-0 flex-1 overflow-y-auto p-4 sm:p-8">
+        <RouteErrorBoundary key={location.pathname} pathname={location.pathname}>
+          <Outlet />
+        </RouteErrorBoundary>
+      </main>
+    </div>
+  );
 }
 
 export default function App() {
