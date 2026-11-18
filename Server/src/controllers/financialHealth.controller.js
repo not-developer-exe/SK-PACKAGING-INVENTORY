@@ -124,8 +124,8 @@ exports.getFinancialHealth = async (req, res) => {
       },
       notes: [
         'Customer collections use payment allocations recorded against invoices, not invoice totals.',
-        'Supplier payments use Payment Sent entries in all party ledgers, including archived parties, so historical outflows remain visible.',
-        'Supplier payables are based on supplier party-ledger balances. Inward receipts currently post inventory and landed cost but do not create supplier bills automatically; enter/maintain supplier opening and bill balances in the party ledger before relying on payable totals.',
+        'Supplier payments use Payment Sent entries in all party ledgers, including archived parties, so historical outflows remain visible. New Payment Out entries are allocated to the oldest open Purchase Bills first; older payments remain unallocated until reviewed.',
+        'Supplier payables are based on supplier party-ledger balances. Inward receipts post inventory and landed cost but do not create supplier bills automatically; record supplier invoices through Party Master > Purchase Bill and reconcile them with Stock Inward separately.',
         'Expenses use their recorded expense date as a cash-outflow proxy; the register does not currently store a separate payment date or unpaid expense status.',
         'Stock landed-cost expenses are excluded to avoid double counting freight already capitalized into reel landed cost.',
         'Receivable aging is based on invoice date because contractual due dates are not currently stored.',
