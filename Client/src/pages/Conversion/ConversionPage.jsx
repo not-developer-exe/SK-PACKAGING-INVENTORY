@@ -289,7 +289,7 @@ export default function ConversionPage() {
         <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
           <table className="w-full min-w-[950px] text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-              <tr><th className="px-4 py-3">Date</th><th className="px-4 py-3">Batch</th><th className="px-4 py-3">Customer</th><th className="px-4 py-3">Item</th><th className="px-4 py-3">Dimensions</th><th className="px-4 py-3 text-right">Produced</th><th className="px-4 py-3 text-right">Available</th><th className="px-4 py-3 text-right">Cost / box</th><th className="px-4 py-3 text-right">Batch cost</th><th className="px-4 py-3 text-right">BOM variance</th></tr>
+              <tr><th className="px-4 py-3">Date</th><th className="px-4 py-3">Batch</th><th className="px-4 py-3">Customer</th><th className="px-4 py-3">Item</th><th className="px-4 py-3">Dimensions</th><th className="px-4 py-3 text-right">Produced</th><th className="px-4 py-3 text-right">Available</th><th className="px-4 py-3 text-right">Cost / box</th><th className="px-4 py-3 text-right">Batch cost</th><th className="px-4 py-3">Cost details</th><th className="px-4 py-3 text-right">BOM variance</th></tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {finishedGoods.map(box => <tr key={box._id}>
@@ -302,9 +302,10 @@ export default function ConversionPage() {
                 <td className="px-4 py-3 text-right font-semibold">{Number(box.quantityAvailable || 0).toLocaleString('en-IN')}</td>
                 <td className="px-4 py-3 text-right">{box.costingStatus === 'available' ? '₹' + Number(box.costPerBox || 0).toFixed(2) : 'Pending'}</td>
                 <td className="px-4 py-3 text-right">{box.costingStatus === 'available' ? '₹' + Number(box.costBreakdown?.totalCost ?? box.materialCost ?? 0).toFixed(2) : 'Pending'}</td>
+                <td className="px-4 py-3"><details className="text-xs"><summary className="cursor-pointer font-medium text-blue-700">Breakdown</summary><div className="mt-2 min-w-44 space-y-1 text-slate-600"><p>Sheets: ₹{Number(box.costBreakdown?.sheetMaterialCost ?? box.materialCost ?? 0).toFixed(2)}</p><p>Raw materials: ₹{Number(box.costBreakdown?.rawMaterialCost || 0).toFixed(2)}</p><p>Labour: ₹{Number(box.costBreakdown?.labourCost || 0).toFixed(2)}</p><p>Other: ₹{Number(box.costBreakdown?.otherConversionCost || 0).toFixed(2)}</p>{(box.costBreakdown?.rawMaterialConsumptions || []).map((line,index)=><p key={line.materialId || index}>{line.name}: {line.quantity} {line.uom} · ₹{Number(line.amount || 0).toFixed(2)}</p>)}</div></details></td>
                 <td className="px-4 py-3 text-right">{box.bomVariance ? <span className={Number(box.bomVariance.weightVarianceKg) > 0 ? 'font-semibold text-amber-700' : 'font-semibold text-emerald-700'}>{Number(box.bomVariance.weightVarianceKg) > 0 ? '+' : ''}{Number(box.bomVariance.weightVarianceKg).toFixed(2)} kg ({Number(box.bomVariance.weightVariancePercent).toFixed(2)}%)</span> : '—'}</td>
               </tr>)}
-              {!finishedGoods.length && <tr><td colSpan={10} className="p-8 text-center text-slate-500">No finished goods batches found for this period.</td></tr>}
+              {!finishedGoods.length && <tr><td colSpan={11} className="p-8 text-center text-slate-500">No finished goods batches found for this period.</td></tr>}
             </tbody>
           </table>
         </div>
