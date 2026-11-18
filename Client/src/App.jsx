@@ -19,6 +19,7 @@ import ConversionPage from './pages/Conversion/ConversionPage';
 import SheetPastingPage from './pages/Production/SheetPastingPage';
 import DispatchPage from './pages/Operations/DispatchPage';
 import JobWorkPage from './pages/Operations/JobWorkPage';
+import ReelCuttingPage from './pages/Operations/ReelCuttingPage';
 import StockLedgerPage from './pages/Reports/StockLedgerPage';
 import WasteRegisterPage from './pages/Reports/WasteRegisterPage';
 import OpeningStockPage from './pages/Reports/OpeningStockPage';
@@ -76,6 +77,7 @@ function Sidebar() {
       { name: 'Sheet Cutting & Pasting', path: '/operations/pasting', icon: Scissors },
       { name: 'Box Manufacturing', path: '/operations/conversion', icon: Scissors },
       { name: 'Production Plan & Reports', path: '/operations/production-intelligence', icon: ChartNoAxesCombined },
+      { name: 'Reel-to-Sheet Cutting', path: '/operations/reel-cutting', icon: Scissors },
       { name: 'External Job Work', path: '/operations/job-work', icon: Truck },
       { name: 'Dispatch', path: '/operations/dispatch', icon: Truck },
       { name: 'Scrap Register', path: '/operations/waste', icon: Trash2 }
@@ -156,6 +158,7 @@ export default function App() {
           <Route path="operations/production-intelligence" element={<ProductionIntelligencePage />} />
           <Route path="operations/conversion" element={<ConversionPage />} />
           <Route path="operations/dispatch" element={<DispatchPage />} />
+          <Route path="operations/reel-cutting" element={<ReelCuttingPage />} />
           <Route path="operations/job-work" element={<JobWorkPage />} />
           <Route path="operations/waste" element={<WasteRegisterPage />} />
           <Route path="admin/opening-stock" element={<OpeningStockPage />} />
