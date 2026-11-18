@@ -11,7 +11,7 @@ exports.getLedger = async (req, res) => {
       ]
     } : {};
     if (req.query.movementType) {
-      const allowed = ['inward_receipt', 'production_issue', 'sheet_cutting', 'adjustment', 'dispatch'];
+      const allowed = ['inward_receipt', 'production_issue', 'sheet_cutting', 'adjustment', 'dispatch', 'job_work_issue', 'job_work_return'];
       if (!allowed.includes(req.query.movementType)) return res.status(400).json({ message: 'Invalid movement type.' });
       filter.movementType = req.query.movementType;
     }
