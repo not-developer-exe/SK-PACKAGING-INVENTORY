@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { ShieldCheck, ClipboardList, FilePlus2, PackageCheck, Users } from 'lucide-react';
+import { ClipboardList, FilePlus2, PackageCheck, Users, Receipt, FileText } from 'lucide-react';
 import { dashboardService } from '../services/dashboardService';
 import { Layers3, Factory, Package, ArrowRight, Loader2, Trash2, RefreshCw } from 'lucide-react';
 
@@ -18,12 +18,17 @@ export default function Overview() {
   const isAdmin = user?.role === 'admin';
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
-  const quickActions = [
+  const quickActions = isAdmin ? [
     { label: 'Record stock inward', description: 'Add incoming paper reels', to: '/inventory/inward', icon: PackageCheck },
     { label: 'Record production', description: 'Log factory production', to: '/operations/production', icon: Factory },
     { label: 'Create delivery challan', description: 'Dispatch finished boxes', to: '/operations/dispatch', icon: ClipboardList },
     { label: 'Create GST invoice', description: 'Bill an unbilled challan', to: '/sales/new', icon: FilePlus2 },
-    ...(isAdmin ? [{ label: 'Manage users', description: 'Control team access', to: '/admin/users', icon: Users }] : [])
+    { label: 'Manage users', description: 'Control team access', to: '/admin/users', icon: Users }
+  ] : [
+    { label: 'Sales invoices', description: 'Review issued tax invoices', to: '/sales', icon: FileText },
+    { label: 'Create GST invoice', description: 'Bill an unbilled challan', to: '/sales/new', icon: FilePlus2 },
+    { label: 'Party Master', description: 'Manage customer and supplier accounts', to: '/parties', icon: Users },
+    { label: 'Record expense', description: 'Enter factory expenses', to: '/expenses', icon: Receipt }
   ];
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -47,11 +52,11 @@ export default function Overview() {
     }
   }, []);
 
-  useEffect(() => { fetchStats(); }, [fetchStats]);
+  useEffect(() => { if (isAdmin) fetchStats(); else setLoading(false); }, [fetchStats, isAdmin]);
 
-  if (loading && !stats) return <div className="flex h-64 items-center justify-center gap-3 text-slate-500"><Loader2 className="animate-spin text-blue-600" size={28} /><span>Loading factory overview…</span></div>;
+  if (isAdmin && loading && !stats) return <div className="flex h-64 items-center justify-center gap-3 text-slate-500"><Loader2 className="animate-spin text-blue-600" size={28} /><span>Loading factory overview…</span></div>;
 
-  if (error && !stats) return (
+  if (isAdmin && error && !stats) return (
     <section className="mx-auto mt-12 max-w-xl rounded-2xl border border-red-200 bg-white p-8 text-center shadow-sm">
       <h1 className="text-lg font-semibold text-slate-900">Dashboard unavailable</h1>
       <p className="mt-2 text-sm text-slate-600">{error}</p>
@@ -86,15 +91,15 @@ export default function Overview() {
         </div>
       </section>
 
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      {isAdmin && <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-slate-900">Factory Overview</h2>
           <p className="mt-1 text-sm text-slate-500">Live metrics from your corrugation plant.</p>
         </div>
         <button onClick={fetchStats} disabled={loading} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-60"><RefreshCw size={15} className={loading ? 'animate-spin' : ''} /> Refresh</button>
-      </div>
+      </div>}
 
-      {error && <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{error} Showing the last successfully loaded figures.</div>}
+      {isAdmin && error && <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{error} Showing the last successfully loaded figures.</div>}
 
       <section className="space-y-3">
         <div><h2 className="text-lg font-semibold text-slate-900">Quick actions</h2><p className="text-sm text-slate-500">Jump straight into your daily work.</p></div>
@@ -109,7 +114,7 @@ export default function Overview() {
         </div>
       </section>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {isAdmin && <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map(({ title, value, unit, detail, label, to, icon: Icon, tone }) => (
           <article key={title} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md">
             <div className="flex items-center gap-3"><div className={`rounded-lg p-2 ${tones[tone]}`}><Icon size={20} /></div><h2 className="font-semibold text-slate-900">{title}</h2></div>
@@ -118,9 +123,9 @@ export default function Overview() {
             <Link to={to} className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-700">{label} <ArrowRight size={16} /></Link>
           </article>
         ))}
-      </div>
+      </div>}
 
-      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+      {isAdmin && <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-100 px-6 py-4"><h3 className="font-semibold text-slate-900">Recent Dispatches</h3></div>
         <div className="divide-y divide-slate-100">
           {stats?.recentActivity?.length ? stats.recentActivity.map((dispatch) => (
@@ -130,7 +135,7 @@ export default function Overview() {
             </div>
           )) : <p className="p-6 text-sm text-slate-500">No recent dispatches.</p>}
         </div>
-      </section>
+      </section>}
     </div>
   );
 }
