@@ -7,6 +7,11 @@ const { recalculatePartyLedger } = require('../utils/partyLedger');
 const { isValidDateOnly } = require('../utils/dateFilters');
 const { normalizeStateCode } = require('../utils/gst');
 
+function companyFilter(req) {
+  if (req.companyKey === 'nsb-industrial-solutions') return { companyKey: 'nsb-industrial-solutions' };
+  return { $or: [{ companyKey: 'sk-packaging' }, { companyKey: { $exists: false } }] };
+}
+
 function transactionUnavailable(error) {
   return error?.code === 20 ||
     /Transaction numbers are only allowed|replica set member or mongos|does not support transactions/i.test(error?.message || '');
@@ -31,7 +36,7 @@ exports.getParties = async (req, res) => {
       : requestedType === 'supplier'
         ? { type: { $in: ['Supplier', 'Both'] } }
         : {};
-    const parties = await Party.find({ isActive: { $ne: false }, ...typeFilter }).sort({ name: 1 }).lean();
+    const parties = await Party.find({ isActive: { $ne: false }, ...typeFilter, ...companyFilter(req) }).sort({ name: 1 }).lean();
     return res.json(parties);
   } catch (error) {
     console.error('[PARTIES] List failed:', error.message);
@@ -50,10 +55,11 @@ exports.createParty = async (req, res) => {
   }
 
   try {
-    const duplicate = await Party.findOne({ isActive: { $ne: false }, name: new RegExp('^' + name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') });
+    const duplicate = await Party.findOne({ ...companyFilter(req), isActive: { $ne: false }, name: new RegExp('^' + name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') });
     if (duplicate) return res.status(409).json({ message: 'A party with this name already exists.' });
 
     const newParty = new Party({
+      companyKey: req.companyKey || 'sk-packaging',
       name: name.trim(),
       type,
       phone: typeof phone === 'string' ? phone.trim() : '',
@@ -91,7 +97,7 @@ exports.updateParty = async (req, res) => {
   }
 
   try {
-    const party = await Party.findById(req.params.id);
+    const party = await Party.findOne({ _id: req.params.id, ...companyFilter(req) });
     if (!party) return res.status(404).json({ message: 'Party not found.' });
     const before = { name: party.name, type: party.type, phone: party.phone, city: party.city, stateCode: party.stateCode };
     if (name !== undefined) party.name = name.trim();
@@ -114,7 +120,7 @@ exports.updateParty = async (req, res) => {
 exports.getArchivedParties = async (req, res) => {
   if (req.user?.role !== 'admin') return res.status(403).json({ message: 'Administrator access required.' });
   try {
-    const parties = await Party.find({ isActive: false }).sort({ updatedAt: -1 }).lean();
+    const parties = await Party.find({ isActive: false, ...companyFilter(req) }).sort({ updatedAt: -1 }).lean();
     return res.json({ parties });
   } catch (error) {
     console.error('[PARTIES] Archived list failed:', error.message);
@@ -127,11 +133,12 @@ exports.restoreParty = async (req, res) => {
   try {
     let restoredParty;
     await session.withTransaction(async () => {
-      const party = await Party.findById(req.params.id).session(session);
+      const party = await Party.findOne({ _id: req.params.id, ...companyFilter(req) }).session(session);
       if (!party || party.isActive !== false) {
         throw Object.assign(new Error('Archived party not found.'), { statusCode: 404 });
       }
       const duplicate = await Party.findOne({
+        ...companyFilter(req),
         _id: { $ne: party._id },
         isActive: { $ne: false },
         name: party.name
@@ -166,7 +173,7 @@ exports.deleteParty = async (req, res) => {
   try {
     let archivedParty;
     await session.withTransaction(async () => {
-      const party = await Party.findById(req.params.id).session(session);
+      const party = await Party.findOne({ _id: req.params.id, ...companyFilter(req) }).session(session);
       if (!party || party.isActive === false) {
         throw Object.assign(new Error('Active party not found.'), { statusCode: 404 });
       }
@@ -217,7 +224,7 @@ exports.recordPurchaseBill = async (req, res) => {
   try {
     let updatedParty;
     await session.withTransaction(async () => {
-      const party = await Party.findById(req.params.id).session(session);
+      const party = await Party.findOne({ _id: req.params.id, ...companyFilter(req) }).session(session);
       if (!party || party.isActive === false) {
         throw Object.assign(new Error('Active supplier not found.'), { statusCode: 404 });
       }
@@ -280,7 +287,7 @@ exports.addTransaction = async (req, res) => {
   try {
     let updatedParty;
     await session.withTransaction(async () => {
-      const party = await Party.findById(req.params.id).session(session);
+      const party = await Party.findOne({ _id: req.params.id, ...companyFilter(req) }).session(session);
       if (!party || party.isActive === false) throw Object.assign(new Error('Active party not found.'), { statusCode: 404 });
       const isPaymentIn = direction === 'in';
       if (isPaymentIn && !['Customer', 'Both'].includes(party.type)) {
@@ -415,7 +422,7 @@ exports.deleteTransaction = async (req, res) => {
   try {
     let updatedParty;
     await session.withTransaction(async () => {
-      const party = await Party.findById(req.params.partyId).session(session);
+      const party = await Party.findOne({ _id: req.params.partyId, ...companyFilter(req) }).session(session);
       if (!party) throw Object.assign(new Error('Party not found.'), { statusCode: 404 });
       const txn = party.ledger.id(req.params.txnId);
       if (!txn) throw Object.assign(new Error('Transaction not found.'), { statusCode: 404 });
