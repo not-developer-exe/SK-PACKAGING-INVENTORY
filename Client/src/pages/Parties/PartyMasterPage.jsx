@@ -5,7 +5,7 @@ import axiosClient from '../../api/axiosClient';
 import DateRangeFilter from '../../components/DateRangeFilter';
 import { toLocalDateInput } from '../../lib/date';
 
-const emptyForm = { name: '', type: 'Customer', phone: '', city: '', openingBalance: '0' };
+const emptyForm = { name: '', type: 'Customer', phone: '', city: '', stateCode: '', openingBalance: '0' };
 const money = (value) => '₹' + Math.abs(Number(value || 0)).toLocaleString('en-IN', { maximumFractionDigits: 2 });
 
 export default function PartyMasterPage() {
@@ -91,7 +91,7 @@ export default function PartyMasterPage() {
 
   const openEdit = (party) => {
     setEditingParty(party);
-    setPartyForm({ name: party.name || '', type: party.type || 'Customer', phone: party.phone || '', city: party.city || '', openingBalance: '0' });
+    setPartyForm({ name: party.name || '', type: party.type || 'Customer', phone: party.phone || '', city: party.city || '', stateCode: party.stateCode || '', openingBalance: '0' });
     setError('');
     setShowPartyModal(true);
   };
@@ -103,14 +103,14 @@ export default function PartyMasterPage() {
     try {
       if (editingParty) {
         const { data } = await axiosClient.patch('/parties/' + editingParty._id, {
-          name: partyForm.name, type: partyForm.type, phone: partyForm.phone, city: partyForm.city
+          name: partyForm.name, type: partyForm.type, phone: partyForm.phone, city: partyForm.city, stateCode: partyForm.stateCode
         });
         setParties((current) => current.map((item) => item._id === data._id ? data : item));
         if (selectedParty?._id === data._id) setSelectedParty(data);
         setSuccess('Party details updated.');
       } else {
         const { data } = await axiosClient.post('/parties', {
-          name: partyForm.name, type: partyForm.type, phone: partyForm.phone, city: partyForm.city,
+          name: partyForm.name, type: partyForm.type, phone: partyForm.phone, city: partyForm.city, stateCode: partyForm.stateCode,
           openingBalance: Number(partyForm.openingBalance)
         });
         setParties((current) => [data, ...current]);
@@ -234,7 +234,7 @@ export default function PartyMasterPage() {
               <button onClick={() => { setSelectedParty(null); setFrom(''); setTo(''); }} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><ArrowLeft size={20} /></button>
               <div>
                 <h2 className="text-xl font-bold text-slate-900">{selectedParty.name}</h2>
-                <p className="mt-1 text-sm text-slate-500"><Phone size={13} className="mr-1 inline" />{selectedParty.phone || 'No phone'} <MapPin size={13} className="ml-3 mr-1 inline" />{selectedParty.city || 'No city'} · {selectedParty.type}</p>
+                <p className="mt-1 text-sm text-slate-500"><Phone size={13} className="mr-1 inline" />{selectedParty.phone || 'No phone'} <MapPin size={13} className="ml-3 mr-1 inline" />{selectedParty.city || 'No city'} · State code {selectedParty.stateCode || 'not set'} · {selectedParty.type}</p>
               </div>
             </div>
             <div className="text-right">
@@ -321,6 +321,7 @@ export default function PartyMasterPage() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <label className="block text-sm">City<input value={partyForm.city} onChange={(e) => setPartyForm({ ...partyForm, city: e.target.value })} className="mt-1 w-full rounded-lg border px-3 py-2" /></label>
+            <label className="block text-sm">GST state code<input inputMode="numeric" pattern="[0-9]{2}" maxLength="2" placeholder="e.g. 23" value={partyForm.stateCode} onChange={(e) => setPartyForm({ ...partyForm, stateCode: e.target.value.replace(/\\D/g, '').slice(0, 2) })} className="mt-1 w-full rounded-lg border px-3 py-2" /><span className="text-xs text-slate-500">Two-digit code from the customer's GST registration/place of supply.</span></label>
             {!editingParty && <label className="block text-sm">Opening balance (₹)<input type="number" step="0.01" required value={partyForm.openingBalance} onChange={(e) => setPartyForm({ ...partyForm, openingBalance: e.target.value })} className="mt-1 w-full rounded-lg border px-3 py-2" /><span className="text-xs text-slate-500">Negative = payable; positive = receivable.</span></label>}
           </div>
           {editingParty && <p className="text-xs text-slate-500">Opening balance is immutable after creation. Use a separately audited adjustment process for corrections.</p>}
