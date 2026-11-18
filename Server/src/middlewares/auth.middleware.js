@@ -19,13 +19,11 @@ exports.protect = async (req, res, next) => {
     // The owner identity is the sole source of administrator privilege.
     // A stale or incorrectly assigned database role cannot grant admin access.
     const ownerEmail = normalizeEmail(process.env.ADMIN_EMAIL || 'official.additya.singh@gmail.com');
-    const accountantEmail = normalizeEmail(process.env.ACCOUNTANT_EMAIL || 'admin@skpackaging.com');
     const email = normalizeEmail(user.email);
     if (email === ownerEmail) {
       user.role = 'admin';
     } else {
       user.role = 'accountant';
-      if (email === accountantEmail && user.role !== 'accountant') user.role = 'accountant';
     }
 
     req.user = user;
