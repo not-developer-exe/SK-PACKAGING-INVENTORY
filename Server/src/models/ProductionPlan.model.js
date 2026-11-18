@@ -19,4 +19,5 @@ const productionPlanSchema = new mongoose.Schema({
  updatedBy:{type:mongoose.Schema.Types.ObjectId,ref:'User'}
 },{timestamps:true});
 productionPlanSchema.index({dueDate:1,status:1});
+productionPlanSchema.plugin(companyScopePlugin);
 module.exports=mongoose.model('ProductionPlan',productionPlanSchema);
