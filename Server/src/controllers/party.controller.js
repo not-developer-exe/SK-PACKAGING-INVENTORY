@@ -259,10 +259,10 @@ exports.recordPurchaseBill = async (req, res) => {
 };
 
 exports.addTransaction = async (req, res) => {
-  const { amount: rawAmount, mode, ref = '', direction, date: rawDate } = req.body || {};
+  const { amount: rawAmount, mode, ref = '', direction, date: rawDate, allocations: requestedBillAllocations = [] } = req.body || {};
   const amount = Number(rawAmount);
   if (!Number.isFinite(amount) || amount <= 0 || !['in', 'out'].includes(direction) ||
-      typeof mode !== 'string' || !mode.trim() || (ref !== '' && typeof ref !== 'string')) {
+      typeof mode !== 'string' || !mode.trim() || (ref !== '' && typeof ref !== 'string') || !Array.isArray(requestedBillAllocations)) {
     return res.status(400).json({ message: 'Enter a positive amount, payment mode and valid direction.' });
   }
   if (rawDate !== undefined && !isValidDateOnly(rawDate)) {
@@ -283,13 +283,68 @@ exports.addTransaction = async (req, res) => {
       if (!isPaymentIn && !['Supplier', 'Both'].includes(party.type)) {
         throw Object.assign(new Error('Payment sent can only be recorded for a supplier.'), { statusCode: 400 });
       }
+      let supplierBillAllocations = [];
+      let unallocatedSupplierAmount = 0;
+      if (!isPaymentIn) {
+        const billEntries = party.ledger
+          .filter((entry) => entry.type === 'Purchase Bill')
+          .sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0) || String(a._id).localeCompare(String(b._id)));
+        const billById = new Map(billEntries.map((entry) => [String(entry._id), entry]));
+        const alreadyAllocated = new Map();
+        for (const entry of party.ledger) {
+          if (entry.type !== 'Payment Sent') continue;
+          for (const allocation of entry.allocations || []) {
+            const key = String(allocation.billEntryId);
+            alreadyAllocated.set(key, Number(((alreadyAllocated.get(key) || 0) + Number(allocation.amount || 0)).toFixed(2)));
+          }
+        }
+        const remainingByBill = new Map(billEntries.map((bill) => [
+          String(bill._id),
+          Math.max(0, Number((Number(bill.credit || 0) - (alreadyAllocated.get(String(bill._id)) || 0)).toFixed(2)))
+        ]));
+        if (requestedBillAllocations.length) {
+          const seen = new Set();
+          for (const item of requestedBillAllocations) {
+            const billId = String(item?.billEntryId || '');
+            const allocationAmount = Number(item?.amount);
+            if (!mongoose.isValidObjectId(billId) || !Number.isFinite(allocationAmount) || allocationAmount <= 0 || seen.has(billId)) {
+              throw Object.assign(new Error('Supplier bill allocations contain an invalid or duplicate bill/amount.'), { statusCode: 400 });
+            }
+            const bill = billById.get(billId);
+            const outstanding = remainingByBill.get(billId) || 0;
+            if (!bill || allocationAmount > outstanding + 0.005) {
+              throw Object.assign(new Error('A selected supplier bill is missing or the allocation exceeds its outstanding balance.'), { statusCode: 409 });
+            }
+            seen.add(billId);
+            supplierBillAllocations.push({ billEntryId: bill._id, amount: Number(allocationAmount.toFixed(2)) });
+          }
+        } else {
+          let remainingPayment = Number(amount.toFixed(2));
+          for (const bill of billEntries) {
+            if (remainingPayment <= 0.005) break;
+            const billId = String(bill._id);
+            const outstanding = remainingByBill.get(billId) || 0;
+            if (outstanding <= 0.005) continue;
+            const allocated = Number(Math.min(remainingPayment, outstanding).toFixed(2));
+            supplierBillAllocations.push({ billEntryId: bill._id, amount: allocated });
+            remainingPayment = Number((remainingPayment - allocated).toFixed(2));
+          }
+        }
+        const allocatedTotal = Number(supplierBillAllocations.reduce((sum, item) => sum + item.amount, 0).toFixed(2));
+        if (allocatedTotal > amount + 0.005) {
+          throw Object.assign(new Error('Supplier bill allocations cannot exceed the payment amount.'), { statusCode: 400 });
+        }
+        unallocatedSupplierAmount = Number((amount - allocatedTotal).toFixed(2));
+      }
+
       const newTxn = {
         date: paymentDate,
         type: isPaymentIn ? 'Payment Received' : 'Payment Sent',
         ref: mode.trim() + (ref.trim() ? ' / ' + ref.trim() : ''),
         debit: isPaymentIn ? 0 : amount,
         credit: isPaymentIn ? amount : 0,
-        balance: 0
+        balance: 0,
+        ...(supplierBillAllocations.length ? { allocations: supplierBillAllocations } : {})
       };
       party.ledger.push(newTxn);
       const ledgerEntryId = party.ledger[party.ledger.length - 1]._id;
@@ -336,7 +391,7 @@ exports.addTransaction = async (req, res) => {
         entityId: party._id,
         entityLabel: party.name,
         summary: newTxn.type + ' recorded for ' + party.name,
-        metadata: { amount, mode: mode.trim(), ref: ref.trim(), direction, resultingBalance: newBalance, invoiceAllocations, unallocatedAmount }
+        metadata: { amount, mode: mode.trim(), ref: ref.trim(), direction, resultingBalance: newBalance, invoiceAllocations, unallocatedAmount, supplierBillAllocations: supplierBillAllocations.map((item) => ({ billEntryId: String(item.billEntryId), amount: item.amount })), unallocatedSupplierAmount }
       }, session);
       updatedParty = party;
     });
@@ -366,7 +421,7 @@ exports.deleteTransaction = async (req, res) => {
         throw Object.assign(new Error('Invoice ledger entries cannot be deleted directly. Use a dedicated invoice cancellation or credit-note process.'), { statusCode: 409 });
       }
 
-      const removedEntry = { type: txn.type, ref: txn.ref, debit: txn.debit, credit: txn.credit };
+      const removedEntry = { type: txn.type, ref: txn.ref, debit: txn.debit, credit: txn.credit, allocations: (txn.allocations || []).map((item) => ({ billEntryId: String(item.billEntryId), amount: item.amount })) };
       const linkedInvoices = await Invoice.find({ customerId: party._id, 'payments.ledgerEntryId': txn._id }).session(session);
       let reversedInvoiceAllocations = [];
       for (const invoice of linkedInvoices) {
