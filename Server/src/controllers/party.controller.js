@@ -25,7 +25,13 @@ async function auditPartyChange(req, action, party, summary, metadata = {}) {
 
 exports.getParties = async (req, res) => {
   try {
-    const parties = await Party.find({ isActive: { $ne: false } }).sort({ name: 1 }).lean();
+    const requestedType = String(req.query.type || 'all').toLowerCase();
+    const typeFilter = requestedType === 'customer'
+      ? { type: { $in: ['Customer', 'Both'] } }
+      : requestedType === 'supplier'
+        ? { type: { $in: ['Supplier', 'Both'] } }
+        : {};
+    const parties = await Party.find({ isActive: { $ne: false }, ...typeFilter }).sort({ name: 1 }).lean();
     return res.json(parties);
   } catch (error) {
     console.error('[PARTIES] List failed:', error.message);
