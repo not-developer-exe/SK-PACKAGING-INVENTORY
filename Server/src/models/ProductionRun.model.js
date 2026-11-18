@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 
+const companyScopePlugin = require('../utils/companyScope');
 const consumedReelSchema = new mongoose.Schema({
+  companyKey: { type: String, enum: ['sk-packaging', 'nsb-industrial-solutions'], default: 'sk-packaging', index: true },
   reelId: { type: mongoose.Schema.Types.ObjectId, ref: 'ReelUnit', required: true },
   reelCode: { type: String, trim: true },
   reelRole: { type: String, enum: ['plain_surface', 'flute'], required: true },
@@ -51,5 +53,7 @@ const productionRunSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 productionRunSchema.index({ runDate: -1 });
+
+consumedReelSchema.plugin(companyScopePlugin);
 
 module.exports = mongoose.model('ProductionRun', productionRunSchema);
