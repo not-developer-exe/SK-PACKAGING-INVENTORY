@@ -28,6 +28,7 @@ import AdminRecordsPage from './pages/Reports/AdminRecordsPage';
 import ProductSpecificationPage from './pages/Products/ProductSpecificationPage';
 import ProductionIntelligencePage from './pages/Production/ProductionIntelligencePage';
 import FinancialHealthPage from './pages/Reports/FinancialHealthPage';
+import RouteErrorBoundary from './components/RouteErrorBoundary';
 
 function RequireAuth() {
   const { user, loading } = useAuth();
@@ -80,7 +81,7 @@ function Sidebar() {
   };
 
   return (
-    <aside className="flex h-screen w-64 shrink-0 flex-col border-r border-slate-200 bg-slate-900 text-slate-300">
+    <aside className="flex h-dvh w-64 shrink-0 flex-col border-r border-slate-200 bg-slate-900 text-slate-300">
       <div className="flex h-16 items-center border-b border-slate-800 px-6"><h1 className="text-lg font-bold tracking-wide text-white">SK PACKAGING</h1></div>
       <nav className="flex-1 overflow-y-auto py-4">
         {navigation.map((section) => <div key={section.group} className="mb-6">
@@ -101,7 +102,17 @@ function Sidebar() {
 }
 
 function AppLayout() {
-  return <div className="flex min-h-screen overflow-hidden bg-slate-50 font-sans"><Sidebar /><main className="min-w-0 flex-1 overflow-y-auto p-4 sm:p-8"><Outlet /></main></div>;
+  const location = useLocation();
+  return (
+    <div className="flex h-dvh min-h-0 overflow-hidden bg-slate-50 font-sans">
+      <Sidebar />
+      <main className="min-h-0 min-w-0 flex-1 overflow-y-auto p-4 sm:p-8">
+        <RouteErrorBoundary key={location.pathname} pathname={location.pathname}>
+          <Outlet />
+        </RouteErrorBoundary>
+      </main>
+    </div>
+  );
 }
 
 export default function App() {
@@ -121,6 +132,7 @@ export default function App() {
           <Route path="expenses" element={<ExpensesPage />} />
           <Route path="inventory/reels" element={<ReelStockPage />} />
           <Route path="inventory/inward" element={<StockInwardPage />} />
+          <Route path="inventory/inwards" element={<Navigate to="/inventory/inward" replace />} />
           <Route path="inventory/ledger" element={<StockLedgerPage />} />
           <Route path="operations/production" element={<ProductionPage />} />
           <Route path="operations/production-intelligence" element={<ProductionIntelligencePage />} />
