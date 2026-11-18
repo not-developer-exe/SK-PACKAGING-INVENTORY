@@ -92,7 +92,7 @@ exports.updateUser = async (req, res) => {
       if (!isOwnerAccount && role === 'admin') {
         throw Object.assign(new Error('Only the designated owner account can hold administrator privileges.'), { statusCode: 403 });
       }
-      if (String(user._id) === String(req.user._id) && !nextActive) {
+      if (String(user._id) === String(req.user._id) && !(isActive ?? user.isActive)) {
         throw Object.assign(new Error('You cannot deactivate your own account.'), { statusCode: 400 });
       }
 
