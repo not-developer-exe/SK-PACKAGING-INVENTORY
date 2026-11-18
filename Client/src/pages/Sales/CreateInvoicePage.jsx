@@ -18,6 +18,7 @@ export default function CreateInvoicePage() {
   
   const [invoiceDate, setInvoiceDate] = useState(toLocalDateInput());
   const [customerId, setCustomerId] = useState('');
+  const [placeOfSupplyStateCode, setPlaceOfSupplyStateCode] = useState('');
   const [dispatchId, setDispatchId] = useState('');
   const [gstPercent, setGstPercent] = useState(5);
   const [items, setItems] = useState([]);
@@ -45,6 +46,7 @@ export default function CreateInvoicePage() {
     const fetchChallans = async () => {
       if (!customerId) {
         setUninvoicedChallans([]);
+        setPlaceOfSupplyStateCode('');
         setDispatchId('');
         setItems([]);
         return;
@@ -64,6 +66,10 @@ export default function CreateInvoicePage() {
     };
     fetchChallans();
   }, [customerId]);
+
+  useEffect(() => {
+    setPlaceOfSupplyStateCode(selectedCustomer?.stateCode || '');
+  }, [customerId, selectedCustomer?.stateCode]);
 
   const handleChallanSelect = (selectedId) => {
     setDispatchId(selectedId);
@@ -92,8 +98,7 @@ export default function CreateInvoicePage() {
   const taxableAmounts = (items || []).map((item) => Number(((item.quantity || 0) * (item.rate || 0)).toFixed(2)));
   const subTotal = Number(taxableAmounts.reduce((sum, amount) => sum + amount, 0).toFixed(2));
   const selectedCustomer = customers.find((customer) => customer._id === customerId);
-  const placeOfSupplyStateCode = selectedCustomer?.stateCode || '';
-  const taxReady = taxContextConfigured && /^\\d{2}$/.test(companyStateCode) && /^\\d{2}$/.test(placeOfSupplyStateCode);
+  const taxReady = taxContextConfigured && /^\d{2}$/.test(companyStateCode) && /^\d{2}$/.test(placeOfSupplyStateCode);
   const isIntraState = taxReady && companyStateCode === placeOfSupplyStateCode;
   const cgstAmount = isIntraState ? Number((subTotal * gstPercent / 200).toFixed(2)) : 0;
   const sgstAmount = isIntraState ? Number((subTotal * gstPercent / 200).toFixed(2)) : 0;
@@ -178,9 +183,10 @@ export default function CreateInvoicePage() {
                 )}
               </div>
               <div className="sm:col-span-2 rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
-                Company GST state: <strong>{companyStateCode || 'Not configured'}</strong> · Customer place of supply: <strong>{placeOfSupplyStateCode || 'Not entered'}</strong>
+                Company GST state: <strong>{companyStateCode || 'Not configured'}</strong>
+                <label className="mt-2 block text-sm text-slate-700">Place of supply state code<input inputMode="numeric" pattern="[0-9]{2}" maxLength="2" value={placeOfSupplyStateCode} onChange={(e) => setPlaceOfSupplyStateCode(e.target.value.replace(/\D/g, '').slice(0, 2))} placeholder="Two-digit state code" className="mt-1 w-full rounded-lg border bg-white px-3 py-2" /></label>
                 {!taxContextConfigured && <p className="mt-1 text-amber-700">Set GST_STATE_CODE (or GSTIN) in the server environment before issuing invoices.</p>}
-                {taxContextConfigured && !placeOfSupplyStateCode && <p className="mt-1 text-amber-700">Enter the customer's two-digit GST state code in Party Master.</p>}
+                {taxContextConfigured && !placeOfSupplyStateCode && <p className="mt-1 text-amber-700">Enter the delivery place-of-supply state code. The customer state is prefilled when available.</p>}
               </div>
             </div>
           </div>
