@@ -23,11 +23,12 @@ export default function ProductionPage() {
   const [wasteBreakdown, setWasteBreakdown] = useState([{ category: 'edge_trim', weightKg: '', notes: '' }]);
   
   const [inputReels, setInputReels] = useState([
-    { reelId: '', requestedWidthInches: '', weightConsumedKg: '' }
+    { reelRole: 'plain_surface', reelId: '', requestedWidthInches: '', weightConsumedKg: '' },
+    { reelRole: 'flute', reelId: '', requestedWidthInches: '', weightConsumedKg: '' }
   ]);
   
   const [outputSheets, setOutputSheets] = useState([
-    { ply: 3, lengthInches: '', widthInches: '', sheetCount: '', totalWeightKg: '' }
+    { ply: 2, lengthInches: '', widthInches: '', sheetCount: '', totalWeightKg: '' }
   ]);
 
   useEffect(() => {
@@ -112,8 +113,8 @@ export default function ProductionPage() {
       setMachineName('');
       setRecoverableWasteKg('');
       setWasteBreakdown([{ category: 'edge_trim', weightKg: '', notes: '' }]);
-      setInputReels([{ reelId: '', requestedWidthInches: '', weightConsumedKg: '' }]);
-      setOutputSheets([{ ply: 3, lengthInches: '', widthInches: '', sheetCount: '', totalWeightKg: '' }]);
+      setInputReels([{ reelRole: 'plain_surface', reelId: '', requestedWidthInches: '', weightConsumedKg: '' }, { reelRole: 'flute', reelId: '', requestedWidthInches: '', weightConsumedKg: '' }]);
+      setOutputSheets([{ ply: 2, lengthInches: '', widthInches: '', sheetCount: '', totalWeightKg: '' }]);
       fetchReels(); // Refresh physical reels drop-down
 
     } catch (err) {
@@ -128,8 +129,8 @@ export default function ProductionPage() {
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Corrugation & Sheet Cutting</h1>
-        <p className="mt-1 text-sm text-slate-500">Record machine runs, consume paper reels, and generate WIP corrugated sheets.</p>
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Corrugation — 2-Ply Production</h1>
+        <p className="mt-1 text-sm text-slate-500">Worker 1: consume one plain-surface reel and one flute reel to produce 2-ply corrugated roll, then record the cut 2-ply sheet sizes. Sheet pasting is a separate operation.</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -161,14 +162,14 @@ export default function ProductionPage() {
           <div className="rounded-2xl border border-amber-200 bg-amber-50/30 p-5">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-amber-900">Input Materials</h2>
-              <button type="button" onClick={() => setInputReels([...inputReels, { reelId: '', requestedWidthInches: '', weightConsumedKg: '' }])} className="flex items-center gap-1 text-sm font-medium text-amber-700 hover:text-amber-900">
-                <Plus size={16} /> Add Reel
-              </button>
+              <span className="text-xs font-semibold text-amber-800">Exactly 2 reels required</span>
             </div>
             
             <div className="space-y-3">
               {inputReels.map((input, idx) => (
-                <div key={idx} className="flex gap-2 items-start">
+                <div key={input.reelRole} className="space-y-1">
+                  <p className="text-xs font-bold uppercase tracking-wide text-amber-900">{input.reelRole === 'plain_surface' ? 'Reel 1 · Plain surface' : 'Reel 2 · Flute'}</p>
+                  <div className="flex gap-2 items-start">
                   <div className="flex-1">
                     <select required value={input.reelId} onChange={e => {
                         const newReels = [...inputReels];
@@ -205,15 +206,11 @@ export default function ProductionPage() {
                       className="w-full rounded-lg border border-amber-200 px-3 py-2 text-sm outline-none focus:border-amber-400 bg-white"
                     />
                   </div>
-                  {inputReels.length > 1 && (
-                    <button type="button" onClick={() => setInputReels(inputReels.filter((_, i) => i !== idx))} className="mt-2 text-red-500 hover:text-red-700">
-                      <Trash2 size={18} />
-                    </button>
-                  )}
+                  </div>
                 </div>
               ))}
               <div className="rounded-lg bg-amber-100/70 p-3 text-xs text-amber-900">
-                Enter the width you intended to use. The selected reel's actual width is captured separately; any difference is recorded as a width substitution.
+                Each reel keeps its own BF, GSM, quality and landed rate from Reel Stock. Plain-surface and flute specifications may be identical or different. Enter required width and consumed kg separately for each reel.
               </div>
               <div className="pt-2 text-right text-sm font-semibold text-amber-800">
                 Total Input: {totalInputWeight.toFixed(2)} kg
@@ -226,7 +223,7 @@ export default function ProductionPage() {
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-blue-900">Output Sheets</h2>
               <button type="button" onClick={() => setOutputSheets([...outputSheets, { ply: 3, lengthInches: '', widthInches: '', sheetCount: '', totalWeightKg: '' }])} className="flex items-center gap-1 text-sm font-medium text-blue-700 hover:text-blue-900">
-                <Plus size={16} /> Add Size
+                <Plus size={16} /> Add Cut Size
               </button>
             </div>
 
@@ -236,9 +233,7 @@ export default function ProductionPage() {
                   <div className="col-span-2 sm:col-span-1">
                     <label className="text-xs text-slate-500">Ply</label>
                     <select value={out.ply} onChange={e => { const newOut = [...outputSheets]; newOut[idx].ply = e.target.value; setOutputSheets(newOut); }} className="w-full rounded-lg border border-blue-200 px-2 py-1.5 text-sm bg-white outline-none focus:border-blue-400">
-                      <option value="3">3 Ply</option>
-                      <option value="5">5 Ply</option>
-                      <option value="7">7 Ply</option>
+                      <option value="2">2 Ply intermediate</option>
                     </select>
                   </div>
                   <div className="col-span-3 sm:col-span-1">
