@@ -45,12 +45,14 @@ exports.getParties = async (req, res) => {
 };
 
 exports.createParty = async (req, res) => {
-  const { name, type, phone = '', city = '', stateCode = '', openingBalance = 0 } = req.body || {};
+  const { name, type, phone = '', email = '', gstin = '', legalName = '', tradeName = '', registeredAddress = '', pincode = '', city = '', stateName = '', registrationStatus = '', stateCode = '', openingBalance = 0 } = req.body || {};
   const balance = Number(openingBalance);
   if (typeof name !== 'string' || name.trim().length < 2 ||
       !['Customer', 'Supplier', 'Both'].includes(type) ||
       (stateCode && !normalizeStateCode(stateCode)) ||
-      !Number.isFinite(balance)) {
+      (gstin && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(String(gstin).toUpperCase())) ||
+      (email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) ||
+      (pincode && !/^[0-9]{6}$/.test(pincode)) || !Number.isFinite(balance)) {
     return res.status(400).json({ message: 'Enter a party name, valid party type and finite opening balance.' });
   }
 
@@ -63,6 +65,14 @@ exports.createParty = async (req, res) => {
       name: name.trim(),
       type,
       phone: typeof phone === 'string' ? phone.trim() : '',
+      email: typeof email === 'string' ? email.trim().toLowerCase() : '',
+      gstin: gstin ? String(gstin).trim().toUpperCase() : undefined,
+      legalName: typeof legalName === 'string' ? legalName.trim() : '',
+      tradeName: typeof tradeName === 'string' ? tradeName.trim() : '',
+      registeredAddress: typeof registeredAddress === 'string' ? registeredAddress.trim() : '',
+      pincode: typeof pincode === 'string' ? pincode.trim() : '',
+      stateName: typeof stateName === 'string' ? stateName.trim() : '',
+      registrationStatus: typeof registrationStatus === 'string' ? registrationStatus.trim() : '',
       city: typeof city === 'string' ? city.trim() : '',
       ...(stateCode ? { stateCode: normalizeStateCode(stateCode) } : {}),
       balance,
@@ -85,12 +95,16 @@ exports.createParty = async (req, res) => {
 };
 
 exports.updateParty = async (req, res) => {
-  const { name, phone, city, type, stateCode } = req.body || {};
+  const { name, phone, email, gstin, legalName, tradeName, registeredAddress, pincode, city, stateName, registrationStatus, type, stateCode } = req.body || {};
   if (name !== undefined && (typeof name !== 'string' || name.trim().length < 2)) {
     return res.status(400).json({ message: 'Party name must contain at least 2 characters.' });
   }
   if (phone !== undefined && typeof phone !== 'string') return res.status(400).json({ message: 'Phone must be text.' });
   if (city !== undefined && typeof city !== 'string') return res.status(400).json({ message: 'City must be text.' });
+  if (email !== undefined && email !== '' && (typeof email !== 'string' || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email))) return res.status(400).json({ message: 'Enter a valid email address.' });
+  if (gstin !== undefined && gstin !== '' && (typeof gstin !== 'string' || !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(gstin.trim().toUpperCase()))) return res.status(400).json({ message: 'Enter a valid 15-character GSTIN format.' });
+  if (pincode !== undefined && pincode !== '' && (typeof pincode !== 'string' || !/^[0-9]{6}$/.test(pincode))) return res.status(400).json({ message: 'PIN code must contain 6 digits.' });
+  for (const [field, value] of Object.entries({ legalName, tradeName, registeredAddress, pincode, stateName, registrationStatus })) if (value !== undefined && typeof value !== 'string') return res.status(400).json({ message: field + ' must be text.' });
   if (stateCode !== undefined && stateCode !== '' && !normalizeStateCode(stateCode)) return res.status(400).json({ message: 'Enter a valid two-digit GST state code.' });
   if (type !== undefined && !['Customer', 'Supplier', 'Both'].includes(type)) {
     return res.status(400).json({ message: 'Invalid party type.' });
@@ -99,17 +113,25 @@ exports.updateParty = async (req, res) => {
   try {
     const party = await Party.findOne({ _id: req.params.id, ...companyFilter(req) });
     if (!party) return res.status(404).json({ message: 'Party not found.' });
-    const before = { name: party.name, type: party.type, phone: party.phone, city: party.city, stateCode: party.stateCode };
+    const before = { name: party.name, type: party.type, phone: party.phone, email: party.email, gstin: party.gstin, legalName: party.legalName, tradeName: party.tradeName, registeredAddress: party.registeredAddress, pincode: party.pincode, city: party.city, stateName: party.stateName, registrationStatus: party.registrationStatus, stateCode: party.stateCode };
     if (name !== undefined) party.name = name.trim();
     if (phone !== undefined) party.phone = phone.trim();
     if (city !== undefined) party.city = city.trim();
+    if (email !== undefined) party.email = email.trim().toLowerCase();
+    if (gstin !== undefined) party.gstin = gstin ? gstin.trim().toUpperCase() : undefined;
+    if (legalName !== undefined) party.legalName = legalName.trim();
+    if (tradeName !== undefined) party.tradeName = tradeName.trim();
+    if (registeredAddress !== undefined) party.registeredAddress = registeredAddress.trim();
+    if (pincode !== undefined) party.pincode = pincode.trim();
+    if (stateName !== undefined) party.stateName = stateName.trim();
+    if (registrationStatus !== undefined) party.registrationStatus = registrationStatus.trim();
     if (stateCode !== undefined) party.stateCode = stateCode ? normalizeStateCode(stateCode) : undefined;
     if (type !== undefined && type !== party.type && party.ledger.some((entry) => entry.type !== 'Opening Balance')) {
       return res.status(409).json({ message: 'Party type cannot be changed after financial transactions have been recorded.' });
     }
     if (type !== undefined) party.type = type;
     await party.save();
-    await auditPartyChange(req, 'party.updated', party, 'Party details updated: ' + party.name, { before, after: { name: party.name, type: party.type, phone: party.phone, city: party.city, stateCode: party.stateCode } });
+    await auditPartyChange(req, 'party.updated', party, 'Party details updated: ' + party.name, { before, after: { name: party.name, type: party.type, phone: party.phone, email: party.email, gstin: party.gstin, legalName: party.legalName, tradeName: party.tradeName, registeredAddress: party.registeredAddress, pincode: party.pincode, city: party.city, stateName: party.stateName, registrationStatus: party.registrationStatus, stateCode: party.stateCode } });
     return res.json(party);
   } catch (error) {
     console.error('[PARTIES] Update failed:', error.message);
