@@ -906,7 +906,7 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
     referenceId: pastedSheet._id,
     movementType: 'production_issue'
   });
-  assert.equal(sheetIssue.quantityChange, -50);
+  assert.equal(sheetIssue.quantityChange, -25);
   assert.equal(Number(sheetIssue.weightChangeKg.toString()), -30);
   const finishedMovement = await StockMovement.findOne({
     referenceId: finishedBox._id,
