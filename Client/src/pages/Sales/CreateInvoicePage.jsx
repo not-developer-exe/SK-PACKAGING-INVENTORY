@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, Receipt, ArrowLeft, CheckCircle2 } from 'lucide-react';
-import { invoiceService } from '../../services/invoiceService';
 import axiosClient from '../../api/axiosClient';
 import { toLocalDateInput } from '../../lib/date';
 import { useDialogs } from '../../context/DialogContext';
@@ -137,7 +136,7 @@ export default function CreateInvoicePage({ company = 'sk' }) {
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <div className="flex items-center gap-4">
-        <button onClick={() => navigate('/sales')} className="rounded-lg p-2 text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition">
+        <button onClick={() => navigate(routeBase)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition">
           <ArrowLeft size={20} />
         </button>
         <div>
