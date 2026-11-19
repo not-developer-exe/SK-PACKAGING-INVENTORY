@@ -272,7 +272,7 @@ export default function PartyMasterPage({ company = 'sk' }) {
               <button onClick={() => { setSelectedParty(null); setFrom(''); setTo(''); }} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><ArrowLeft size={20} /></button>
               <div>
                 <h2 className="text-xl font-bold text-slate-900">{selectedParty.name}</h2>
-                <p className="mt-1 text-sm text-slate-500"><Phone size={13} className="mr-1 inline" />{selectedParty.phone || 'No phone'} <MapPin size={13} className="ml-3 mr-1 inline" />{selectedParty.city || 'No city'} · State code {selectedParty.stateCode || 'not set'} · {selectedParty.type}</p>
+                <p className="mt-1 text-sm text-slate-500"><Phone size={13} className="mr-1 inline" />{selectedParty.phone || 'No phone'} <MapPin size={13} className="ml-3 mr-1 inline" />{selectedParty.city || 'No city'} · {selectedParty.stateName || ('State code ' + (selectedParty.stateCode || 'not set'))} · {selectedParty.type}</p>{selectedParty.gstin && <p className="mt-1 text-xs text-slate-500">GSTIN: {selectedParty.gstin} · {selectedParty.registrationStatus || 'Status not verified'}</p>}{selectedParty.registeredAddress && <p className="mt-1 max-w-2xl text-xs text-slate-500">{selectedParty.registeredAddress}{selectedParty.pincode ? ' – ' + selectedParty.pincode : ''}</p>}
               </div>
             </div>
             <div className="text-right">
