@@ -5,12 +5,14 @@ import { useAuth } from '../../context/AuthContext';
 import axiosClient from '../../api/axiosClient';
 import DateRangeFilter from '../../components/DateRangeFilter';
 import { partiesService } from '../../services/partiesService';
+import { useDialogs } from '../../context/DialogContext';
 
 const money = (value) => '₹' + Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function SalesInvoicesPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { confirm, prompt } = useDialogs();
   const [invoices, setInvoices] = useState([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -48,10 +50,10 @@ export default function SalesInvoicesPage() {
 
 
   const cancelInvoice = async (invoice) => {
-    const reason = window.prompt('Reason for cancelling invoice ' + invoice.invoiceNumber + ' (minimum 10 characters):');
+    const reason = await prompt({ title: 'Cancel invoice ' + invoice.invoiceNumber, message: 'Enter a cancellation reason (minimum 10 characters).', placeholder: 'Cancellation reason…', minLength: 10, confirmLabel: 'Continue', destructive: true });
     if (reason === null) return;
-    if (reason.trim().length < 10) { setError('Please enter a cancellation reason of at least 10 characters.'); return; }
-    if (!window.confirm('Cancel this unpaid invoice and reverse its customer ledger debit?')) return;
+    const approved = await confirm({ title: 'Confirm invoice cancellation', message: 'Cancel this unpaid invoice and reverse its customer ledger debit? This action will be recorded in the audit log.', confirmLabel: 'Cancel invoice', destructive: true });
+    if (!approved) return;
     setCancellingId(invoice._id); setError('');
     try {
       await axiosClient.patch('/invoices/' + invoice._id + '/cancel', { reason: reason.trim() });
@@ -108,7 +110,7 @@ export default function SalesInvoicesPage() {
             <table className="w-full min-w-[760px] text-left text-sm">
               <thead className="border-b bg-white text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-4">Date</th><th className="px-5 py-4">Invoice No.</th><th className="px-5 py-4">Customer</th><th className="px-5 py-4">Challan</th><th className="px-5 py-4 text-right">Invoice Total</th><th className="px-5 py-4 text-right">Balance Due</th><th className="px-5 py-4 text-right">Gross Profit</th><th className="px-5 py-4 text-center">Status</th>{user?.role === "admin" && <th className="px-5 py-4 text-center">Action</th>}</tr></thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredInvoices.map((invoice) => <tr key={invoice._id} className="hover:bg-slate-50">
+                {filteredInvoices.map((invoice) => <tr key={invoice._id} onClick={() => navigate("/sales/" + invoice._id)} onKeyDown={(event) => { if (event.key === "Enter") navigate("/sales/" + invoice._id); }} tabIndex={0} role="link" aria-label={"Open invoice " + invoice.invoiceNumber} className="cursor-pointer hover:bg-blue-50/40 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500">
                   <td className="px-5 py-4 text-slate-600">{new Date(invoice.invoiceDate).toLocaleDateString('en-IN')}</td>
                   <td className="px-5 py-4 font-semibold text-blue-700">{invoice.invoiceNumber}</td>
                   <td className="px-5 py-4 font-medium text-slate-900">{invoice.customerId?.name || '—'}</td>
@@ -116,7 +118,7 @@ export default function SalesInvoicesPage() {
                   <td className="px-5 py-4 text-right font-medium">{money(invoice.grandTotal)}</td>
                   <td className="px-5 py-4 text-right font-semibold text-amber-700">{money(invoice.balanceDue)}</td>
                   <td className="px-5 py-4 text-right font-semibold">{invoice.costingStatus === 'available' ? money(invoice.grossProfit) : 'Cost pending'}</td>
-                  <td className="px-5 py-4 text-center"><span className={'inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ' + (statusStyle[invoice.status] || statusStyle.Pending)}>{invoice.status}</span></td>{user?.role === "admin" && <td className="px-5 py-4 text-center">{invoice.status !== "Cancelled" && invoice.balanceDue >= invoice.grandTotal - 0.005 && !(invoice.payments || []).length ? <button disabled={cancellingId === invoice._id} onClick={() => cancelInvoice(invoice)} className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2 py-1 text-xs text-red-700 disabled:opacity-50"><Ban size={13}/>{cancellingId === invoice._id ? "Cancelling…" : "Cancel"}</button> : <span className="text-xs text-slate-400">—</span>}</td>}
+                  <td className="px-5 py-4 text-center"><span className={'inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ' + (statusStyle[invoice.status] || statusStyle.Pending)}>{invoice.status}</span></td>{user?.role === "admin" && <td className="px-5 py-4 text-center">{invoice.status !== "Cancelled" && invoice.balanceDue >= invoice.grandTotal - 0.005 && !(invoice.payments || []).length ? <button disabled={cancellingId === invoice._id} onClick={(event) => { event.stopPropagation(); cancelInvoice(invoice); }} className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2 py-1 text-xs text-red-700 disabled:opacity-50"><Ban size={13}/>{cancellingId === invoice._id ? "Cancelling…" : "Cancel"}</button> : <span className="text-xs text-slate-400">—</span>}</td>}
                 </tr>)}
                 {!filteredInvoices.length && <tr><td colSpan={user?.role === "admin" ? 9 : 8} className="p-10 text-center text-slate-500">No invoices found for this filter.</td></tr>}
               </tbody>
