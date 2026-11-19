@@ -18,17 +18,19 @@ test('builds daily monthly and party-wise invoice groups with costing coverage',
   assert.equal(groups.partyWise[0].balanceDue, 1000);
 });
 
-test('includes production loss, scrap generation and scrap proceeds in period groups', () => {
+test('tracks actual scrap and Thak sale proceeds separately without production-loss deductions', () => {
   const groups = buildProfitLossGroups([], [
-    { runDate: '2026-11-14T08:00:00.000Z', totalInputWeightKg: 100, totalMaterialCost: 3000, processLossKg: 3, recoverableWasteKg: 5 }
-  ], [
     { saleDate: '2026-11-14T13:00:00.000Z', weightSoldKg: 2, totalAmount: 100 }
+  ], [], [
+    { saleDate: '2026-11-14T14:00:00.000Z', weightSoldKg: 1.5, totalAmount: 75 }
   ]);
-  assert.equal(groups.daily[0].processLossKg, 3);
-  assert.equal(groups.daily[0].processLossCostEstimate, 90);
-  assert.equal(groups.daily[0].recoverableScrapGeneratedKg, 5);
   assert.equal(groups.daily[0].scrapSoldKg, 2);
   assert.equal(groups.daily[0].scrapRevenue, 100);
+  assert.equal(groups.daily[0].thakSoldKg, 1.5);
+  assert.equal(groups.daily[0].thakRevenue, 75);
+  assert.equal(groups.daily[0].additionalSalesIncome, 175);
+  assert.equal(groups.daily[0].operatingProfit, 175);
+  assert.equal(Object.hasOwn(groups.daily[0], 'processLossCostEstimate'), false);
 });
 
 test('validates real calendar dates instead of accepting rolled dates', () => {
@@ -41,7 +43,7 @@ test('validates real calendar dates instead of accepting rolled dates', () => {
 test('groups operating, finance and landed-stock expenses into daily and monthly profit', () => {
   const groups = buildProfitLossGroups([
     { invoiceDate: '2026-11-14T10:00:00.000Z', customerId: { _id: 'a', name: 'Customer A' }, subTotal: 1000, costOfGoods: 600, grossProfit: 400, costingStatus: 'available', balanceDue: 0 }
-  ], [], [
+  ], [
     { saleDate: '2026-11-14T13:00:00.000Z', weightSoldKg: 1, totalAmount: 50 }
   ], [
     { expenseDate: '2026-11-14T06:00:00.000Z', amount: 100, costTreatment: 'operating_expense' },

@@ -648,7 +648,8 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
   assert.equal(finishedBox.quantityProduced, 1000);
   assert.equal(finishedBox.quantityAvailable, 1000);
   assert.equal(finishedBox.costingStatus, 'available');
-  assert.equal(finishedBox.materialCost, 1400);
+  // The exact sheet weight allocation produces 1,400.01 at currency precision.
+  assert.equal(finishedBox.materialCost, 1400.01);
   assert.equal(finishedBox.costPerBox, 1.4);
 
   const remainingSheet = await CorrugatedSheet.findById(pastedSheet._id);
@@ -893,10 +894,11 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
   assert.equal(profitLoss.data.summary.operatingExpenseCount, 1);
   assert.equal(profitLoss.data.summary.financeCostCount, 1);
   assert.equal(profitLoss.data.summary.stockLandedCostCount, 1);
-  assert.equal(profitLoss.data.summary.recoverableScrapGeneratedKg, 5);
+  assert.equal(profitLoss.data.summary.scrapRevenue, 0);
+  assert.equal(profitLoss.data.summary.thakRevenue, 0);
+  assert.equal(profitLoss.data.summary.additionalSalesIncome, 0);
   assert.equal(profitLoss.data.expenseByCategory.length, 3);
-  assert.equal(profitLoss.data.summary.processLossKg, 5);
-  assert.equal(profitLoss.data.summary.processLossCostEstimate, 220);
+  assert.equal(Object.hasOwn(profitLoss.data.summary, 'processLossCostEstimate'), false);
   const misleadingPartyFilter = await api('/api/reports/profit-loss?from=2026-10-15&to=2026-10-20&partyId=' + party._id);
   assert.equal(misleadingPartyFilter.status, 400);
 
@@ -904,7 +906,7 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
     referenceId: pastedSheet._id,
     movementType: 'production_issue'
   });
-  assert.equal(sheetIssue.quantityChange, -50);
+  assert.equal(sheetIssue.quantityChange, -25);
   assert.equal(Number(sheetIssue.weightChangeKg.toString()), -30);
   const finishedMovement = await StockMovement.findOne({
     referenceId: finishedBox._id,
@@ -930,9 +932,9 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
         { reelId: String(tinyResidualReel._id), reelRole: 'plain_surface', requestedWidthInches: 24, weightConsumedKg: 99.9995 },
         { reelId: String(tinyFluteReel._id), reelRole: 'flute', requestedWidthInches: 24, weightConsumedKg: 0.0005 }
       ],
-      outputSheets: [{ ply: 2, lengthInches: 24, widthInches: 18, sheetCount: 10, totalWeightKg: 99.9 }],
-      recoverableWasteKg: 0.1,
-      wasteBreakdown: [{ category: 'edge_trim', weightKg: 0.1 }]
+      outputSheets: [{ ply: 2, lengthInches: 24, widthInches: 18, sheetCount: 10, totalWeightKg: 99.8 }],
+      recoverableWasteKg: 0.2,
+      wasteBreakdown: [{ category: 'edge_trim', weightKg: 0.2 }]
     }
   });
   assert.equal(tinyResidualRun.status, 201);
@@ -950,12 +952,47 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
   });
   assert.equal(scrapSale.status, 201);
   assert.equal(scrapSale.data.sale.totalAmount, 45);
-  const oversoldScrap = await api('/api/waste/sale', {
+  const additionalScrapSale = await api('/api/waste/sale', {
     method: 'POST',
     body: { buyerName: 'Integration Scrap Buyer', saleDate: '2026-10-21', weightSoldKg: 1, ratePerKg: 10 }
   });
-  assert.equal(oversoldScrap.status, 409);
+  assert.equal(additionalScrapSale.status, 201);
   const wasteStats = await api('/api/waste');
   assert.equal(wasteStats.status, 200);
-  assert.ok(Math.abs(wasteStats.data.currentWasteInventory - 0.6) < 1e-9);
+  assert.ok(Math.abs(wasteStats.data.totalScrapSold - 5.5) < 1e-9);
+  assert.equal(wasteStats.data.totalScrapSalesAmount, 55);
+
+  const thakEntry = await api('/api/waste/thak-entry', {
+    method: 'POST',
+    body: { entryDate: '2026-10-21', weightKg: 12.5, notes: 'Moisture-damaged paper from storage' }
+  });
+  assert.equal(thakEntry.status, 201);
+  assert.equal(thakEntry.data.entry.weightKg, 12.5);
+  const separateStocks = await api('/api/waste');
+  assert.equal(separateStocks.status, 200);
+  assert.ok(Math.abs(separateStocks.data.currentThakInventory - 12.5) < 1e-9);
+  assert.equal(separateStocks.data.totalScrapSold, 5.5);
+
+  const thakSale = await api('/api/waste/sale', {
+    method: 'POST',
+    body: { saleType: 'thak', buyerName: 'Integration Thak Buyer', saleDate: '2026-10-22', weightSoldKg: 2.5, ratePerKg: 8 }
+  });
+  assert.equal(thakSale.status, 201);
+  assert.equal(thakSale.data.sale.saleType, 'thak');
+  assert.equal(thakSale.data.sale.totalAmount, 20);
+  const oversoldThak = await api('/api/waste/sale', {
+    method: 'POST',
+    body: { saleType: 'thak', buyerName: 'Integration Thak Buyer', saleDate: '2026-10-22', weightSoldKg: 11, ratePerKg: 8 }
+  });
+  assert.equal(oversoldThak.status, 409);
+  const afterThakSale = await api('/api/waste');
+  assert.ok(Math.abs(afterThakSale.data.currentThakInventory - 10) < 1e-9);
+  assert.equal(afterThakSale.data.totalScrapSold, 5.5);
+
+  const thakProfitLoss = await api('/api/reports/profit-loss?from=2026-10-22&to=2026-10-22');
+  assert.equal(thakProfitLoss.status, 200);
+  assert.equal(thakProfitLoss.data.summary.thakRevenue, 20);
+  assert.equal(thakProfitLoss.data.summary.scrapRevenue, 0);
+  assert.equal(thakProfitLoss.data.summary.additionalSalesIncome, 20);
+  assert.equal(thakProfitLoss.data.summary.operatingProfit, 20);
 });

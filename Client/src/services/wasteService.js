@@ -8,5 +8,9 @@ export const wasteService = {
   async recordSale(saleData) {
     const { data } = await axiosClient.post('/waste/sale', saleData);
     return data;
+  },
+  async recordThakEntry(entryData) {
+    const { data } = await axiosClient.post('/waste/thak-entry', entryData);
+    return data;
   }
 };
