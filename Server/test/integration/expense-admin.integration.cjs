@@ -932,9 +932,9 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
         { reelId: String(tinyResidualReel._id), reelRole: 'plain_surface', requestedWidthInches: 24, weightConsumedKg: 99.9995 },
         { reelId: String(tinyFluteReel._id), reelRole: 'flute', requestedWidthInches: 24, weightConsumedKg: 0.0005 }
       ],
-      outputSheets: [{ ply: 2, lengthInches: 24, widthInches: 18, sheetCount: 10, totalWeightKg: 99.9 }],
-      recoverableWasteKg: 0.1,
-      wasteBreakdown: [{ category: 'edge_trim', weightKg: 0.1 }]
+      outputSheets: [{ ply: 2, lengthInches: 24, widthInches: 18, sheetCount: 10, totalWeightKg: 99.8 }],
+      recoverableWasteKg: 0.2,
+      wasteBreakdown: [{ category: 'edge_trim', weightKg: 0.2 }]
     }
   });
   assert.equal(tinyResidualRun.status, 201);
