@@ -4,7 +4,7 @@ const FinancialTransaction = require('../models/FinancialTransaction.model');
 const writeAuditLog = require('../utils/writeAuditLog');
 const VALID_COMPANIES = ['sk-packaging', 'nsb-industrial-solutions'];
 const companyKey = (req) => VALID_COMPANIES.includes(req.companyKey) ? req.companyKey : 'sk-packaging';
-const dateOnly = (value) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(new Date(value + 'T00:00:00+05:30').getTime());
+const dateOnly = (value) => { if (typeof value !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return false; const [year, month, day] = value.split('-').map(Number); const check = new Date(Date.UTC(year, month - 1, day)); return check.getUTCFullYear() === year && check.getUTCMonth() === month - 1 && check.getUTCDate() === day; };
 const money = (value) => Number(Number(value).toFixed(2));
 
 async function accountBalances(key) {
