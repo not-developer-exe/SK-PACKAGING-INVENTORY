@@ -48,4 +48,5 @@ test('does not count a cancelled dispatch as an uninvoiced delivery', () => {
   const result = reconcileSalesDispatch({ dispatches: [{ ...dispatch, status: 'cancelled' }] });
   assert.equal(result.totals.cancelledDispatches, 1);
   assert.equal(result.totals.uninvoicedDispatches, 0);
+  assert.equal(result.totals.dispatchedBoxes, 0);
 });
