@@ -32,7 +32,7 @@ exports.createAccount = async (req, res) => {
     const account = await FinancialAccount.create({
       companyKey: key, name: body.name.trim(), type, openingBalance: money(openingBalance), currentBalance: money(openingBalance),
       bankName: body.bankName || '', accountHolder: body.accountHolder || '', accountNumber: body.accountNumber || '',
-      ifsc: String(body.ifsc || '').toUpperCase(), branch: body.branch || '', upiId: body.upiId || '',
+      ifsc: String(body.ifsc || '').toUpperCase(), branch: body.branch || '', branchAddress: body.branchAddress || '', bankCity: body.bankCity || '', bankState: body.bankState || '', upiId: body.upiId || '',
       isDefaultForInvoice: Boolean(body.isDefaultForInvoice), createdBy: req.user._id
     });
     if (account.isDefaultForInvoice) await FinancialAccount.updateMany({ companyKey: key, _id: { $ne: account._id } }, { $set: { isDefaultForInvoice: false } });
@@ -98,6 +98,6 @@ exports.listTransactions = async (req, res) => {
 exports.getInvoiceBankDetails = async (req, res) => {
   try {
     const account = await FinancialAccount.findOne({ companyKey: companyKey(req), type: 'bank', isActive: true, isDefaultForInvoice: true }).lean();
-    res.json({ bankDetails: account ? { bankName: account.bankName, accountHolder: account.accountHolder, accountNumber: account.accountNumber, ifsc: account.ifsc, branch: account.branch, upiId: account.upiId } : null });
+    res.json({ bankDetails: account ? { bankName: account.bankName, accountHolder: account.accountHolder, accountNumber: account.accountNumber, ifsc: account.ifsc, branch: account.branch, branchAddress: account.branchAddress, bankCity: account.bankCity, bankState: account.bankState, upiId: account.upiId } : null });
   } catch (error) { res.status(500).json({ message: 'Unable to load invoice bank details.' }); }
 };

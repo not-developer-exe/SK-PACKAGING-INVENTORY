@@ -6,7 +6,7 @@ import DateRangeFilter from '../../components/DateRangeFilter';
 import { toLocalDateInput } from '../../lib/date';
 import { useDialogs } from '../../context/DialogContext';
 
-const emptyForm = { name: '', type: 'Customer', phone: '', city: '', stateCode: '', openingBalance: '0' };
+const emptyForm = { name: '', type: 'Customer', phone: '', email: '', gstin: '', legalName: '', tradeName: '', registeredAddress: '', pincode: '', city: '', stateName: '', registrationStatus: '', stateCode: '', openingBalance: '0' };
 const money = (value) => '₹' + Math.abs(Number(value || 0)).toLocaleString('en-IN', { maximumFractionDigits: 2 });
 
 export default function PartyMasterPage({ company = 'sk' }) {
@@ -24,6 +24,7 @@ export default function PartyMasterPage({ company = 'sk' }) {
   const [to, setTo] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [gstinLoading, setGstinLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [showPartyModal, setShowPartyModal] = useState(false);
@@ -94,9 +95,25 @@ export default function PartyMasterPage({ company = 'sk' }) {
 
   const openEdit = (party) => {
     setEditingParty(party);
-    setPartyForm({ name: party.name || '', type: party.type || 'Customer', phone: party.phone || '', city: party.city || '', stateCode: party.stateCode || '', openingBalance: '0' });
+    setPartyForm({ name: party.name || '', type: party.type || 'Customer', phone: party.phone || '', email: party.email || '', gstin: party.gstin || '', legalName: party.legalName || '', tradeName: party.tradeName || '', registeredAddress: party.registeredAddress || '', pincode: party.pincode || '', city: party.city || '', stateName: party.stateName || '', registrationStatus: party.registrationStatus || '', stateCode: party.stateCode || '', openingBalance: '0' });
     setError('');
     setShowPartyModal(true);
+  };
+
+  const lookupGstin = async () => {
+    const code = String(partyForm.gstin || '').trim().toUpperCase();
+    if (!/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(code)) { setError('Enter a valid 15-character GSTIN first.'); return; }
+    setPartyForm(old => ({ ...old, gstin: code, stateCode: code.slice(0, 2) }));
+    setGstinLoading(true); setError('');
+    try {
+      const endpoint = company === 'nsb' ? '/nsb/lookups/gstin/' : '/lookups/gstin/';
+      const { data } = await axiosClient.get(endpoint + encodeURIComponent(code));
+      const t = data.taxpayer || {};
+      setPartyForm(old => ({ ...old, gstin: code, legalName: t.legalName || old.legalName, tradeName: t.tradeName || old.tradeName, registeredAddress: t.address || old.registeredAddress, pincode: t.pincode || old.pincode, city: t.city || old.city, stateName: t.stateName || old.stateName, stateCode: t.stateCode || old.stateCode, registrationStatus: t.registrationStatus || old.registrationStatus, name: old.name || t.tradeName || t.legalName || '' }));
+      setSuccess('GSTIN details fetched. Please verify the returned data before saving.');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Unable to fetch GST taxpayer details.');
+    } finally { setGstinLoading(false); }
   };
 
   const saveParty = async (event) => {
@@ -106,14 +123,14 @@ export default function PartyMasterPage({ company = 'sk' }) {
     try {
       if (editingParty) {
         const { data } = await axiosClient.patch(apiBase + '/' + editingParty._id, {
-          name: partyForm.name, type: partyForm.type, phone: partyForm.phone, city: partyForm.city, stateCode: partyForm.stateCode
+          name: partyForm.name, type: partyForm.type, phone: partyForm.phone, email: partyForm.email, gstin: partyForm.gstin, legalName: partyForm.legalName, tradeName: partyForm.tradeName, registeredAddress: partyForm.registeredAddress, pincode: partyForm.pincode, city: partyForm.city, stateName: partyForm.stateName, registrationStatus: partyForm.registrationStatus, stateCode: partyForm.stateCode
         });
         setParties((current) => current.map((item) => item._id === data._id ? data : item));
         if (selectedParty?._id === data._id) setSelectedParty(data);
         setSuccess('Party details updated.');
       } else {
         const { data } = await axiosClient.post(apiBase, {
-          name: partyForm.name, type: partyForm.type, phone: partyForm.phone, city: partyForm.city, stateCode: partyForm.stateCode,
+          name: partyForm.name, type: partyForm.type, phone: partyForm.phone, email: partyForm.email, gstin: partyForm.gstin, legalName: partyForm.legalName, tradeName: partyForm.tradeName, registeredAddress: partyForm.registeredAddress, pincode: partyForm.pincode, city: partyForm.city, stateName: partyForm.stateName, registrationStatus: partyForm.registrationStatus, stateCode: partyForm.stateCode,
           openingBalance: Number(partyForm.openingBalance)
         });
         setParties((current) => [data, ...current]);
@@ -256,7 +273,7 @@ export default function PartyMasterPage({ company = 'sk' }) {
               <button onClick={() => { setSelectedParty(null); setFrom(''); setTo(''); }} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><ArrowLeft size={20} /></button>
               <div>
                 <h2 className="text-xl font-bold text-slate-900">{selectedParty.name}</h2>
-                <p className="mt-1 text-sm text-slate-500"><Phone size={13} className="mr-1 inline" />{selectedParty.phone || 'No phone'} <MapPin size={13} className="ml-3 mr-1 inline" />{selectedParty.city || 'No city'} · State code {selectedParty.stateCode || 'not set'} · {selectedParty.type}</p>
+                <p className="mt-1 text-sm text-slate-500"><Phone size={13} className="mr-1 inline" />{selectedParty.phone || 'No phone'} <MapPin size={13} className="ml-3 mr-1 inline" />{selectedParty.city || 'No city'} · {selectedParty.stateName || ('State code ' + (selectedParty.stateCode || 'not set'))} · {selectedParty.type}</p>{selectedParty.gstin && <p className="mt-1 text-xs text-slate-500">GSTIN: {selectedParty.gstin} · {selectedParty.registrationStatus || 'Status not verified'}</p>}{selectedParty.registeredAddress && <p className="mt-1 max-w-2xl text-xs text-slate-500">{selectedParty.registeredAddress}{selectedParty.pincode ? ' – ' + selectedParty.pincode : ''}</p>}
               </div>
             </div>
             <div className="text-right">
@@ -343,16 +360,26 @@ export default function PartyMasterPage({ company = 'sk' }) {
       </section>}
 
       {showPartyModal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => setShowPartyModal(false)}>
-        <form onSubmit={saveParty} onClick={(e) => e.stopPropagation()} className="w-full max-w-lg space-y-4 rounded-2xl bg-white p-6 shadow-xl">
+        <form onSubmit={saveParty} onClick={(e) => e.stopPropagation()} className="max-h-[90vh] w-full max-w-2xl space-y-4 overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
           <div className="flex items-center justify-between"><h2 className="text-lg font-bold">{editingParty ? 'Edit party details' : 'Create party'}</h2><button type="button" onClick={() => setShowPartyModal(false)}><X size={19} /></button></div>
-          <label className="block text-sm">Firm name<input required minLength="2" value={partyForm.name} onChange={(e) => setPartyForm({ ...partyForm, name: e.target.value })} className="mt-1 w-full rounded-lg border px-3 py-2" /></label>
+          <label className="block text-sm">Firm / display name<input required minLength="2" value={partyForm.name} onChange={(e) => setPartyForm({ ...partyForm, name: e.target.value })} className="mt-1 w-full rounded-lg border px-3 py-2" /></label>
           <div className="grid grid-cols-2 gap-3">
             <label className="block text-sm">Type<select value={partyForm.type} onChange={(e) => setPartyForm({ ...partyForm, type: e.target.value })} className="mt-1 w-full rounded-lg border bg-white px-3 py-2"><option>Customer</option><option>Supplier</option><option>Both</option></select></label>
             <label className="block text-sm">Phone<input value={partyForm.phone} onChange={(e) => setPartyForm({ ...partyForm, phone: e.target.value })} className="mt-1 w-full rounded-lg border px-3 py-2" /></label>
           </div>
+          <label className="block text-sm">GSTIN<div className="mt-1 flex gap-2"><input maxLength="15" value={partyForm.gstin} onChange={(e) => setPartyForm({ ...partyForm, gstin: e.target.value.toUpperCase() })} placeholder="15-character GSTIN" className="w-full rounded-lg border px-3 py-2 uppercase" /><button type="button" onClick={lookupGstin} disabled={gstinLoading || !partyForm.gstin} className="shrink-0 rounded-lg border border-blue-200 bg-blue-50 px-3 text-xs font-semibold text-blue-700 disabled:opacity-50">{gstinLoading ? 'Fetching…' : 'Fetch GST details'}</button></div></label>
           <div className="grid grid-cols-2 gap-3">
-            <label className="block text-sm">City<input value={partyForm.city} onChange={(e) => setPartyForm({ ...partyForm, city: e.target.value })} className="mt-1 w-full rounded-lg border px-3 py-2" /></label>
-            <label className="block text-sm">GST state code<input inputMode="numeric" pattern="[0-9]{2}" maxLength="2" placeholder="e.g. 23" value={partyForm.stateCode} onChange={(e) => setPartyForm({ ...partyForm, stateCode: e.target.value.replace(/\D/g, '').slice(0, 2) })} className="mt-1 w-full rounded-lg border px-3 py-2" /><span className="text-xs text-slate-500">Two-digit code from the customer's GST registration/place of supply.</span></label>
+            <label className="block text-sm">Legal name<input value={partyForm.legalName} onChange={(e) => setPartyForm({ ...partyForm, legalName: e.target.value })} className="mt-1 w-full rounded-lg border px-3 py-2" /></label>
+            <label className="block text-sm">Trade name<input value={partyForm.tradeName} onChange={(e) => setPartyForm({ ...partyForm, tradeName: e.target.value })} className="mt-1 w-full rounded-lg border px-3 py-2" /></label>
+          </div>
+          <label className="block text-sm">Registered address<textarea rows="2" value={partyForm.registeredAddress} onChange={(e) => setPartyForm({ ...partyForm, registeredAddress: e.target.value })} className="mt-1 w-full rounded-lg border px-3 py-2" /></label>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block text-sm">Email<input type="email" value={partyForm.email} onChange={(e) => setPartyForm({ ...partyForm, email: e.target.value })} className="mt-1 w-full rounded-lg border px-3 py-2" /></label>
+            <label className="block text-sm">PIN code<input maxLength="6" value={partyForm.pincode} onChange={(e) => setPartyForm({ ...partyForm, pincode: e.target.value.replace(/\D/g, '').slice(0, 6) })} className="mt-1 w-full rounded-lg border px-3 py-2" /></label>
+            <label className="block text-sm">City / District<input value={partyForm.city} onChange={(e) => setPartyForm({ ...partyForm, city: e.target.value })} className="mt-1 w-full rounded-lg border px-3 py-2" /></label>
+            <label className="block text-sm">State<input value={partyForm.stateName} onChange={(e) => setPartyForm({ ...partyForm, stateName: e.target.value })} className="mt-1 w-full rounded-lg border px-3 py-2" /></label>
+            <label className="block text-sm">GST state code<input inputMode="numeric" pattern="[0-9]{2}" maxLength="2" placeholder="e.g. 23" value={partyForm.stateCode} onChange={(e) => setPartyForm({ ...partyForm, stateCode: e.target.value.replace(/\D/g, '').slice(0, 2) })} className="mt-1 w-full rounded-lg border px-3 py-2" /></label>
+            <label className="block text-sm">GST registration status<input value={partyForm.registrationStatus} onChange={(e) => setPartyForm({ ...partyForm, registrationStatus: e.target.value })} className="mt-1 w-full rounded-lg border px-3 py-2" /></label>
             {!editingParty && <label className="block text-sm">Opening balance (₹)<input type="number" step="0.01" required value={partyForm.openingBalance} onChange={(e) => setPartyForm({ ...partyForm, openingBalance: e.target.value })} className="mt-1 w-full rounded-lg border px-3 py-2" /><span className="text-xs text-slate-500">Negative = payable; positive = receivable.</span></label>}
           </div>
           {editingParty && <p className="text-xs text-slate-500">Opening balance is immutable after creation. Use a separately audited adjustment process for corrections.</p>}
