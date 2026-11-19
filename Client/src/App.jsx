@@ -140,6 +140,7 @@ function AppLayout() {
 export default function App() {
   const { user, loading } = useAuth();
   return (
+    <DialogProvider>
     <Routes>
       <Route path="/login" element={loading ? <div className="flex min-h-screen items-center justify-center text-sm text-slate-500">Checking your session…</div> : user ? <Navigate to="/" replace /> : <LoginPage />} />
       <Route element={<RequireAuth />}>
@@ -183,5 +184,6 @@ export default function App() {
       </Route>
       <Route path="*" element={<Navigate to={user ? '/' : '/login'} replace />} />
     </Routes>
+    </DialogProvider>
   );
 }
