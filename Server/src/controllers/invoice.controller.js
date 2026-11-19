@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const crypto = require('crypto');
+const InvoiceSequence = require('../models/InvoiceSequence.model');
 const Invoice = require('../models/Invoice.model');
 const Dispatch = require('../models/Dispatch.model');
 const Party = require('../models/Party.model');
@@ -10,12 +10,39 @@ const { matchesDispatchQuantities } = require('../utils/dispatchInvoiceValidatio
 const { recalculatePartyLedger } = require('../utils/partyLedger');
 const { normalizeStateCode, getCompanyStateCode, calculateGstBreakdown } = require('../utils/gst');
 
+const VALID_COMPANIES = ['sk-packaging', 'nsb-industrial-solutions'];
+function currentCompanyKey(req) { return VALID_COMPANIES.includes(req.companyKey) ? req.companyKey : 'sk-packaging'; }
+function invoiceCompanyFilter(req) {
+  const companyKey = currentCompanyKey(req);
+  return companyKey === 'sk-packaging'
+    ? { $or: [{ companyKey: 'sk-packaging' }, { companyKey: { $exists: false } }] }
+    : { companyKey };
+}
+function getFinancialYear(date) {
+  const year = date.getFullYear();
+  const startYear = date.getMonth() >= 3 ? year : year - 1;
+  return String(startYear).slice(-2) + '-' + String(startYear + 1).slice(-2);
+}
+async function nextInvoiceNumber(companyKey, invoiceDate, session) {
+  const financialYear = getFinancialYear(invoiceDate);
+  const sequence = await InvoiceSequence.findOneAndUpdate(
+    { companyKey, financialYear },
+    { $inc: { nextNumber: 1 }, $setOnInsert: { companyKey, financialYear } },
+    { new: true, upsert: true, setDefaultsOnInsert: true, session }
+  );
+  const prefix = companyKey === 'nsb-industrial-solutions'
+    ? (process.env.NSB_INVOICE_PREFIX || 'NSB')
+    : (process.env.SK_INVOICE_PREFIX || 'SK');
+  return prefix + '/' + financialYear + '/' + String(sequence.nextNumber).padStart(4, '0');
+}
+
+
 
 
 exports.getInvoiceById = async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid invoice ID.' });
   try {
-    const invoice = await Invoice.findById(req.params.id)
+    const invoice = await Invoice.findOne({ _id: req.params.id, ...invoiceCompanyFilter(req) })
       .populate('customerId')
       .populate('dispatchId')
       .populate('items.boxId')
@@ -36,7 +63,7 @@ exports.cancelInvoice = async (req, res) => {
   try {
     let cancelled;
     await session.withTransaction(async () => {
-      const target = await Invoice.findById(req.params.id).session(session);
+      const target = await Invoice.findOne({ _id: req.params.id, ...invoiceCompanyFilter(req) }).session(session);
       if (!target) throw Object.assign(new Error('Invoice not found.'), { statusCode: 404 });
       if (target.status === 'Cancelled') throw Object.assign(new Error('Invoice is already cancelled.'), { statusCode: 409 });
       if ((target.payments || []).length || Math.abs(Number(target.balanceDue || 0) - Number(target.grandTotal || 0)) > 0.005) {
@@ -65,7 +92,7 @@ exports.cancelInvoice = async (req, res) => {
 
 exports.getInvoices = async (req, res) => {
   try {
-    const filter = buildDateRangeFilter(req.query.from, req.query.to, 'invoiceDate');
+    const filter = { ...buildDateRangeFilter(req.query.from, req.query.to, 'invoiceDate'), ...invoiceCompanyFilter(req) };
     if (req.query.customerId) {
       if (!mongoose.isValidObjectId(req.query.customerId)) return res.status(400).json({ message: 'Invalid customer ID.' });
       filter.customerId = req.query.customerId;
@@ -94,7 +121,7 @@ exports.getUninvoicedDispatches = async (req, res) => {
 
     const [dispatches, billed] = await Promise.all([
       Dispatch.find({ customerId, status: { $ne: 'cancelled' } }).populate('boxes.boxId').sort({ createdAt: -1 }).lean(),
-      Invoice.find({ customerId }).select('dispatchId').lean()
+      Invoice.find({ customerId, ...invoiceCompanyFilter(req) }).select('dispatchId').lean()
     ]);
     const billedIds = new Set(billed.map((invoice) => String(invoice.dispatchId)));
     return res.json(dispatches.filter((dispatch) => !billedIds.has(String(dispatch._id))));
@@ -160,7 +187,8 @@ exports.createInvoice = async (req, res) => {
       // Keep all operations on the transaction session sequential.
       const customer = await Party.findById(customerId).session(session);
       const dispatch = await Dispatch.findOne({ _id: dispatchId, customerId }).session(session);
-      const existingInvoice = await Invoice.findOne({ dispatchId }).session(session);
+      const companyKey = currentCompanyKey(req);
+      const existingInvoice = await Invoice.findOne({ dispatchId, ...invoiceCompanyFilter(req) }).session(session);
 
       if (!customer || customer.isActive === false || !['Customer', 'Both'].includes(customer.type)) {
         const error = new Error('Selected customer was not found or is not a customer');
@@ -231,10 +259,10 @@ exports.createInvoice = async (req, res) => {
       const tax = calculateGstBreakdown({ taxableAmount: subTotal, gstPercent: gst, supplierStateCode: companyStateCode, placeOfSupplyStateCode });
       const { cgstAmount, sgstAmount, igstAmount, taxType } = tax;
       const grandTotal = Number((subTotal + cgstAmount + sgstAmount + igstAmount).toFixed(2));
-      const dateKey = invoiceDate.slice(2).replace(/-/g, '');
-      const invoiceNumber = `INV-${dateKey}-${Date.now()}-${crypto.randomInt(1000, 10000)}`;
+      const invoiceNumber = await nextInvoiceNumber(companyKey, date, session);
 
       const [created] = await Invoice.create([{
+        companyKey,
         invoiceNumber,
         invoiceDate: date,
         customerId,
