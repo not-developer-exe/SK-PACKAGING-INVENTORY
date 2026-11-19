@@ -1,6 +1,5 @@
 const Invoice = require('../models/Invoice.model');
 const ScrapSale = require('../models/ScrapSale.model');
-const ProductionRun = require('../models/ProductionRun.model');
 const Expense = require('../models/Expense.model');
 
 const { buildProfitLossGroups, isValidDateOnly } = require('../utils/profitLossAggregation');
@@ -30,7 +29,7 @@ exports.getProfitLoss = async (req, res) => {
       status: { $ne: 'Cancelled' }
     };
 
-    const [invoices, scrapSales, thakSales, productionRuns, expenses] = await Promise.all([
+    const [invoices, scrapSales, thakSales, expenses] = await Promise.all([
       Invoice.find(invoiceFilter)
         .populate('customerId', 'name')
         .select('invoiceNumber invoiceDate customerId subTotal costOfGoods grossProfit costingStatus balanceDue status')
@@ -38,9 +37,6 @@ exports.getProfitLoss = async (req, res) => {
         .lean(),
       ScrapSale.find({ saleDate: { $gte: fromDate, $lt: toDate }, saleType: { $ne: 'thak' } }).sort({ saleDate: 1 }).lean(),
       ScrapSale.find({ saleDate: { $gte: fromDate, $lt: toDate }, saleType: 'thak' }).sort({ saleDate: 1 }).lean(),
-      ProductionRun.find({ runDate: { $gte: fromDate, $lt: toDate } })
-        .select('runDate')
-        .lean(),
       Expense.find({ expenseDate: { $gte: fromDate, $lt: toDate } }).sort({ expenseDate: 1 }).lean(),
     ]);
 
@@ -71,7 +67,7 @@ exports.getProfitLoss = async (req, res) => {
     const scrapWeightKg = Number(scrapSales.reduce((sum, sale) => sum + Number(sale.weightSoldKg || 0), 0).toFixed(3));
     const thakWeightKg = Number(thakSales.reduce((sum, sale) => sum + Number(sale.weightSoldKg || 0), 0).toFixed(3));
 
-    const { daily, monthly, partyWise } = buildProfitLossGroups(invoices, productionRuns, scrapSales, expenses, thakSales);
+    const { daily, monthly, partyWise } = buildProfitLossGroups(invoices, scrapSales, expenses, thakSales);
 
     return res.json({
       period: { from, to },
