@@ -51,7 +51,7 @@ exports.createParty = async (req, res) => {
       !['Customer', 'Supplier', 'Both'].includes(type) ||
       (stateCode && !normalizeStateCode(stateCode)) ||
       (gstin && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(String(gstin).toUpperCase())) ||
-      (email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) ||
+      (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) ||
       (pincode && !/^[0-9]{6}$/.test(pincode)) || !Number.isFinite(balance)) {
     return res.status(400).json({ message: 'Enter a party name, valid party type and finite opening balance.' });
   }
@@ -101,7 +101,7 @@ exports.updateParty = async (req, res) => {
   }
   if (phone !== undefined && typeof phone !== 'string') return res.status(400).json({ message: 'Phone must be text.' });
   if (city !== undefined && typeof city !== 'string') return res.status(400).json({ message: 'City must be text.' });
-  if (email !== undefined && email !== '' && (typeof email !== 'string' || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email))) return res.status(400).json({ message: 'Enter a valid email address.' });
+  if (email !== undefined && email !== '' && (typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) return res.status(400).json({ message: 'Enter a valid email address.' });
   if (gstin !== undefined && gstin !== '' && (typeof gstin !== 'string' || !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(gstin.trim().toUpperCase()))) return res.status(400).json({ message: 'Enter a valid 15-character GSTIN format.' });
   if (pincode !== undefined && pincode !== '' && (typeof pincode !== 'string' || !/^[0-9]{6}$/.test(pincode))) return res.status(400).json({ message: 'PIN code must contain 6 digits.' });
   for (const [field, value] of Object.entries({ legalName, tradeName, registeredAddress, pincode, stateName, registrationStatus })) if (value !== undefined && typeof value !== 'string') return res.status(400).json({ message: field + ' must be text.' });
