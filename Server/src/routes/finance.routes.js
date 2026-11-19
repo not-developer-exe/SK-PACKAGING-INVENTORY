@@ -1,0 +1,12 @@
+const express = require('express');
+const router = express.Router();
+const { protect } = require('../middlewares/auth.middleware');
+const { requireRole } = require('../middlewares/role.middleware');
+const { listAccounts, createAccount, listTransactions, createTransaction, getInvoiceBankDetails } = require('../controllers/finance.controller');
+router.use(protect);
+router.get('/accounts', listAccounts);
+router.post('/accounts', requireRole('admin'), createAccount);
+router.get('/transactions', listTransactions);
+router.post('/transactions', createTransaction);
+router.get('/invoice-bank-details', getInvoiceBankDetails);
+module.exports = router;
