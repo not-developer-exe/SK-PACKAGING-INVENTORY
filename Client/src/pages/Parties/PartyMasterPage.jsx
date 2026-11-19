@@ -81,7 +81,8 @@ export default function PartyMasterPage({ company = 'sk' }) {
   };
 
   const filteredParties = useMemo(() => parties.filter((party) => {
-    const matchesSearch = party.name.toLowerCase().includes(search.toLowerCase());
+    const term = search.trim().toLowerCase();
+    const matchesSearch = !term || [party.name, party.legalName, party.tradeName, party.gstin, party.phone, party.email].some((value) => String(value || '').toLowerCase().includes(term));
     const matchesType = typeFilter === 'All' || party.type === typeFilter || party.type === 'Both';
     return matchesSearch && matchesType;
   }), [parties, search, typeFilter]);
@@ -276,12 +277,27 @@ export default function PartyMasterPage({ company = 'sk' }) {
                 <p className="mt-1 text-sm text-slate-500"><Phone size={13} className="mr-1 inline" />{selectedParty.phone || 'No phone'} <MapPin size={13} className="ml-3 mr-1 inline" />{selectedParty.city || 'No city'} · {selectedParty.stateName || ('State code ' + (selectedParty.stateCode || 'not set'))} · {selectedParty.type}</p>{selectedParty.gstin && <p className="mt-1 text-xs text-slate-500">GSTIN: {selectedParty.gstin} · {selectedParty.registrationStatus || 'Status not verified'}</p>}{selectedParty.registeredAddress && <p className="mt-1 max-w-2xl text-xs text-slate-500">{selectedParty.registeredAddress}{selectedParty.pincode ? ' – ' + selectedParty.pincode : ''}</p>}
               </div>
             </div>
-            <div className="text-right">
+            <div className="flex items-center gap-4">
+              <button onClick={() => openEdit(selectedParty)} className="rounded-lg border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-700">Edit party details</button>
+              <div className="text-right">
               <p className="text-xs uppercase text-slate-500">Current outstanding</p>
               <p className="text-2xl font-bold text-slate-900">{money(selectedParty.balance)}</p>
               <p className="text-xs text-slate-500">{balanceLabel(selectedParty.balance)}</p>
+              </div>
             </div>
           </div>
+          <section className="rounded-2xl border bg-white p-5">
+            <div className="mb-3 flex items-center justify-between"><h3 className="font-semibold text-slate-900">Party registration & contact details</h3><span className="text-xs text-slate-500">{selectedParty.registrationStatus || (selectedParty.gstin ? 'Status not verified' : 'GST details not entered')}</span></div>
+            <div className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
+              <div><p className="text-xs text-slate-500">GSTIN</p><p className="font-medium">{selectedParty.gstin || 'Not entered'}</p></div>
+              <div><p className="text-xs text-slate-500">Legal name</p><p className="font-medium">{selectedParty.legalName || 'Not entered'}</p></div>
+              <div><p className="text-xs text-slate-500">Trade name</p><p className="font-medium">{selectedParty.tradeName || 'Not entered'}</p></div>
+              <div><p className="text-xs text-slate-500">Email</p><p className="font-medium">{selectedParty.email || 'Not entered'}</p></div>
+              <div><p className="text-xs text-slate-500">Phone</p><p className="font-medium">{selectedParty.phone || 'Not entered'}</p></div>
+              <div><p className="text-xs text-slate-500">State / GST state code</p><p className="font-medium">{selectedParty.stateName || 'State not entered'} {selectedParty.stateCode ? '(' + selectedParty.stateCode + ')' : ''}</p></div>
+              <div className="sm:col-span-2 lg:col-span-3"><p className="text-xs text-slate-500">Registered address</p><p className="whitespace-pre-line font-medium">{[selectedParty.registeredAddress, selectedParty.city, selectedParty.stateName, selectedParty.pincode].filter(Boolean).join(', ') || 'Not entered'}</p></div>
+            </div>
+          </section>
 
           {['Supplier', 'Both'].includes(selectedParty.type) && <section className="overflow-hidden rounded-2xl border bg-white">
             <div className="border-b bg-slate-50 p-4"><h3 className="font-semibold text-slate-900">Supplier bill-wise outstanding</h3><p className="mt-1 text-xs text-slate-500">Payments recorded after this update are allocated to the oldest open bills first. Historical payments remain unallocated until reviewed.</p></div>
@@ -334,8 +350,8 @@ export default function PartyMasterPage({ company = 'sk' }) {
                 <thead className="border-b text-xs uppercase text-slate-500"><tr><th className="px-5 py-4">Party</th><th className="px-5 py-4">Contact</th><th className="px-5 py-4">Type</th><th className="px-5 py-4 text-right">Balance</th><th className="px-5 py-4 text-right">Actions</th></tr></thead>
                 <tbody className="divide-y">
                   {filteredParties.map((party) => <tr key={party._id} onClick={() => setSelectedParty(party)} className="cursor-pointer hover:bg-slate-50">
-                    <td className="px-5 py-4"><p className="font-semibold text-slate-900">{party.name}</p><p className="text-xs text-slate-500">{party.city || '—'}</p></td>
-                    <td className="px-5 py-4">{party.phone || '—'}</td>
+                    <td className="px-5 py-4"><p className="font-semibold text-slate-900">{party.name}</p><p className="text-xs text-slate-500">{party.tradeName || party.legalName || party.city || '—'}</p>{party.gstin && <p className="mt-1 text-xs text-slate-500">GSTIN: {party.gstin}</p>}</td>
+                    <td className="px-5 py-4">{party.phone || '—'}{party.email && <p className="mt-1 text-xs text-slate-500">{party.email}</p>}</td>
                     <td className="px-5 py-4">{party.type}</td>
                     <td className="px-5 py-4 text-right font-semibold">{money(party.balance)} <span className="block text-xs font-normal text-slate-500">{balanceLabel(party.balance)}</span></td>
                     <td className="px-5 py-4 text-right" onClick={(e) => e.stopPropagation()}>
