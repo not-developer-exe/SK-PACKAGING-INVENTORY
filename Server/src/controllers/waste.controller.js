@@ -130,7 +130,10 @@ exports.recordThakEntry = async (req, res) => {
 exports.recordScrapSale = async (req, res) => {
   const buyerName = typeof req.body?.buyerName === 'string' ? req.body.buyerName.trim() : '';
   const rawSaleDate = req.body?.saleDate;
-  const saleType = req.body?.saleType === 'thak' ? 'thak' : 'scrap';
+  const saleType = req.body?.saleType ?? 'scrap';
+  if (!['scrap', 'thak'].includes(saleType)) {
+    return res.status(400).json({ message: 'Sale type must be either normal scrap or Thak.' });
+  }
   if (rawSaleDate !== undefined && !isValidDateOnly(rawSaleDate)) {
     return res.status(400).json({ message: 'Sale date must be a real calendar date in YYYY-MM-DD format.' });
   }
