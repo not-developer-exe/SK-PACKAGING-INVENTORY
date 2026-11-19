@@ -14,14 +14,16 @@ export default function InvoiceDetailPage({ company = 'sk' }) {
   const [invoice, setInvoice] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [bankDetails, setBankDetails] = useState(null);
 
   useEffect(() => {
     let active = true;
+    axiosClient.get((company === 'nsb' ? '/nsb/finance' : '/finance') + '/invoice-bank-details').then(({ data }) => { if (active) setBankDetails(data.bankDetails || null); }).catch(() => { if (active) setBankDetails(null); });
     axiosClient.get(apiBase + '/' + id).then(({ data }) => { if (active) setInvoice(data.invoice); })
       .catch((err) => { if (active) setError(err.response?.data?.message || 'Unable to load invoice.'); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [id]);
+  }, [id, apiBase, company]);
 
   if (loading) return <div className="flex h-64 items-center justify-center text-slate-500"><Loader2 className="mr-2 animate-spin" />Loading invoice…</div>;
   if (error || !invoice) return <div className="mx-auto max-w-3xl rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">{error || 'Invoice not found.'}<button onClick={() => navigate(routeBase)} className="ml-3 underline">Back to invoices</button></div>;
@@ -34,7 +36,7 @@ export default function InvoiceDetailPage({ company = 'sk' }) {
 
   return <div className="mx-auto max-w-5xl space-y-4">
     <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
-      <button onClick={() => navigate('/sales')} className="rounded-lg border bg-white px-3 py-2 text-sm"><ArrowLeft className="mr-1 inline" size={16}/>Back to invoices</button>
+      <button onClick={() => navigate(routeBase)} className="rounded-lg border bg-white px-3 py-2 text-sm"><ArrowLeft className="mr-1 inline" size={16}/>Back to invoices</button>
       <button onClick={() => window.print()} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white"><Printer className="mr-2 inline" size={16}/>Print / Save PDF</button>
     </div>
     <article className="invoice-paper mx-auto bg-white p-8 text-slate-900 shadow-sm sm:p-10">
@@ -69,7 +71,7 @@ export default function InvoiceDetailPage({ company = 'sk' }) {
         <div className="flex justify-between text-xs"><span className="text-slate-500">Balance due</span><strong>{money(invoice.balanceDue)}</strong></div>
       </div>
       <div className="mt-5 rounded-lg bg-slate-50 p-3 text-xs"><strong>Terms &amp; Conditions</strong><ol className="mt-2 list-decimal space-y-1 pl-4 text-slate-600"><li>Payment is due as per mutually agreed terms.</li><li>Complaints regarding quantity, quality, damage or discrepancies must be communicated in writing within 48 hours of delivery, with supporting details and evidence.</li><li>Complaints received after this period may not be entertained, subject to applicable laws and statutory rights.</li><li>Returns require prior written approval.</li></ol></div>
-      <div className="mt-6 grid grid-cols-2 gap-8 text-xs"><div><p className="font-semibold">Bank details</p><p className="mt-2 text-slate-500">Bank name, account number, IFSC and branch must be configured in Company Profile.</p></div><div className="flex min-h-24 flex-col items-end justify-end text-right"><p className="font-semibold">For {seller.legalName || 'Seller company'}</p><div className="h-10"/><p className="border-t border-slate-400 pt-2">Authorized signatory</p></div></div>
+      <div className="mt-6 grid grid-cols-2 gap-8 text-xs"><div><p className="font-semibold">Bank details</p>{bankDetails ? <div className="mt-2 space-y-1 text-slate-600"><p>{bankDetails.bankName}</p>{bankDetails.accountHolder && <p>Account holder: {bankDetails.accountHolder}</p>}<p>A/c No.: {bankDetails.accountNumber}</p><p>IFSC: {bankDetails.ifsc}</p>{bankDetails.branch && <p>Branch: {bankDetails.branch}</p>}{bankDetails.upiId && <p>UPI: {bankDetails.upiId}</p>}</div> : <p className="mt-2 text-slate-500">No default invoice bank account configured. Add one in Bank & Cash.</p>}</div><div className="flex min-h-24 flex-col items-end justify-end text-right"><p className="font-semibold">For {seller.legalName || 'Seller company'}</p><div className="h-10"/><p className="border-t border-slate-400 pt-2">Authorized signatory</p></div></div>
       {invoice.status === 'Cancelled' && <p className="mt-6 border-2 border-red-600 py-2 text-center text-lg font-bold tracking-widest text-red-600">CANCELLED</p>}
       <p className="mt-6 border-t border-slate-200 pt-3 text-center text-[10px] text-slate-400">This invoice view is generated from the ERP invoice record.</p>
     </article>
