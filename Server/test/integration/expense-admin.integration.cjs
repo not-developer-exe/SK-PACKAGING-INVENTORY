@@ -431,6 +431,7 @@ test('configured ADMIN_EMAIL promotes an existing owner login to active admin', 
   const promoted = await User.findById(owner._id);
   assert.equal(promoted.role, 'admin');
   assert.equal(promoted.isActive, true);
+  process.env.ADMIN_EMAIL = 'official.additya.singh@gmail.com';
 });
 
 
