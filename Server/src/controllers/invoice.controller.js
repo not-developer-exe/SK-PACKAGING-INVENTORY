@@ -18,7 +18,13 @@ function invoiceCompanyFilter(req) {
     ? { $or: [{ companyKey: 'sk-packaging' }, { companyKey: { $exists: false } }] }
     : { companyKey };
 }
-function companyStateCode(req) {\n  const env = currentCompanyKey(req) === 'nsb-industrial-solutions'\n    ? { GSTIN: process.env.NSB_GSTIN, GST_STATE_CODE: process.env.NSB_GST_STATE_CODE }\n    : { GSTIN: process.env.SK_GSTIN || process.env.GSTIN, GST_STATE_CODE: process.env.SK_GST_STATE_CODE || process.env.GST_STATE_CODE };\n  return getCompanyStateCode(env);\n}\nfunction getFinancialYear(date) {
+function companyStateCode(req) {
+  const env = currentCompanyKey(req) === 'nsb-industrial-solutions'
+    ? { GSTIN: process.env.NSB_GSTIN, GST_STATE_CODE: process.env.NSB_GST_STATE_CODE }
+    : { GSTIN: process.env.SK_GSTIN || process.env.GSTIN, GST_STATE_CODE: process.env.SK_GST_STATE_CODE || process.env.GST_STATE_CODE };
+  return getCompanyStateCode(env);
+}
+function getFinancialYear(date) {
   const year = date.getFullYear();
   const startYear = date.getMonth() >= 3 ? year : year - 1;
   return String(startYear).slice(-2) + '-' + String(startYear + 1).slice(-2);
@@ -185,7 +191,8 @@ exports.createInvoice = async (req, res) => {
 
     await session.withTransaction(async () => {
       // Keep all operations on the transaction session sequential.
-      const companyKey = currentCompanyKey(req);\n      const customer = await Party.findOne({ _id: customerId, companyKey }).session(session);
+      const companyKey = currentCompanyKey(req);
+      const customer = await Party.findOne({ _id: customerId, companyKey }).session(session);
       const dispatch = await Dispatch.findOne({ _id: dispatchId, customerId, companyKey }).session(session);
       const companyKey = currentCompanyKey(req);
       const existingInvoice = await Invoice.findOne({ dispatchId, ...invoiceCompanyFilter(req) }).session(session);
