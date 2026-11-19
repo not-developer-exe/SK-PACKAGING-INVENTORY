@@ -359,7 +359,7 @@ export default function PartyMasterPage({ company = 'sk' }) {
       </section>}
 
       {showPartyModal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => setShowPartyModal(false)}>
-        <form onSubmit={saveParty} onClick={(e) => e.stopPropagation()} className="w-full max-w-lg space-y-4 rounded-2xl bg-white p-6 shadow-xl">
+        <form onSubmit={saveParty} onClick={(e) => e.stopPropagation()} className="max-h-[90vh] w-full max-w-2xl space-y-4 overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
           <div className="flex items-center justify-between"><h2 className="text-lg font-bold">{editingParty ? 'Edit party details' : 'Create party'}</h2><button type="button" onClick={() => setShowPartyModal(false)}><X size={19} /></button></div>
           <label className="block text-sm">Firm / display name<input required minLength="2" value={partyForm.name} onChange={(e) => setPartyForm({ ...partyForm, name: e.target.value })} className="mt-1 w-full rounded-lg border px-3 py-2" /></label>
           <div className="grid grid-cols-2 gap-3">
