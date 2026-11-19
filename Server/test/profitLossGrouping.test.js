@@ -20,13 +20,10 @@ test('builds daily monthly and party-wise invoice groups with costing coverage',
 
 test('tracks actual scrap and Thak sale proceeds separately without production-loss deductions', () => {
   const groups = buildProfitLossGroups([], [
-    { runDate: '2026-11-14T08:00:00.000Z', totalInputWeightKg: 100, totalMaterialCost: 3000, processLossKg: 3, recoverableWasteKg: 5 }
-  ], [
     { saleDate: '2026-11-14T13:00:00.000Z', weightSoldKg: 2, totalAmount: 100 }
   ], [], [
     { saleDate: '2026-11-14T14:00:00.000Z', weightSoldKg: 1.5, totalAmount: 75 }
   ]);
-  assert.equal(groups.daily[0].productionRunCount, 1);
   assert.equal(groups.daily[0].scrapSoldKg, 2);
   assert.equal(groups.daily[0].scrapRevenue, 100);
   assert.equal(groups.daily[0].thakSoldKg, 1.5);
