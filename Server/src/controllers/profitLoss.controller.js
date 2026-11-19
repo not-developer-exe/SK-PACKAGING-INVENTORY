@@ -109,7 +109,7 @@ exports.getProfitLoss = async (req, res) => {
         'Factory conversion overheads such as labour, power and rent are recorded as period operating expenses, not allocated into unsold finished-goods inventory.',
         'Invoices without a recorded manufacturing cost are excluded from gross-profit totals and counted as uncosted.',
         'Normal scrap and Thak sale proceeds are tracked separately and added to material gross profit as additional sales income.',
-        'Production trim, machine-stage waste and process-loss estimates are operational records only; they are not deducted from profit. Thak is entered and weighed separately, and only its actual sale proceeds affect profit.',
+        'No production-stage trim or process-loss estimate is used in profit calculations. Normal scrap is recorded only when sold. Thak is weighed and tracked separately, and only its actual sale proceeds affect profit.',
         'Operating profit = costed material gross profit + normal scrap sale proceeds + Thak sale proceeds - recorded operating expenses. Finance costs are then deducted to show net profit before tax.',
         'This is an operational management report, not a statutory financial statement; depreciation, income-tax provisions and required inventory overhead adjustments are not included.',
         'Invoices without cost snapshots remain excluded from gross profit and operating profit; review costing coverage before relying on the result.',
