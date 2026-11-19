@@ -36,7 +36,7 @@ exports.lookupGstin = async (req, res) => {
       address: [address.bno, address.flno, address.bnm, address.st, address.loc, address.dst, address.stcd, address.pncd].filter(Boolean).join(', ') || (typeof address === 'string' ? address : ''),
       city: address.dst || address.loc || data.city || '',
       stateCode: gstin.slice(0, 2),
-      stateName: address.stcd || STATE_NAMES[gstin.slice(0, 2)],
+      stateName: STATE_NAMES[gstin.slice(0, 2)],
       pincode: address.pncd || data.pincode || ''
     };
     if (!details.legalName && !details.tradeName && !details.address) return res.status(502).json({ message: 'The GST provider returned no usable taxpayer details. Please verify manually.' });
