@@ -5,9 +5,11 @@ import { partiesService } from '../../services/partiesService';
 import { invoiceService } from '../../services/invoiceService';
 import axiosClient from '../../api/axiosClient';
 import { toLocalDateInput } from '../../lib/date';
+import { useDialogs } from '../../context/DialogContext';
 
 export default function CreateInvoicePage() {
   const navigate = useNavigate();
+  const { alert } = useDialogs();
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   
@@ -125,7 +127,7 @@ export default function CreateInvoicePage() {
       });
       navigate('/sales');
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to generate GST Invoice');
+      await alert({ title: 'Invoice could not be created', message: err.response?.data?.message || 'Failed to generate GST Invoice' });
       setSubmitting(false);
     }
   };

@@ -11,6 +11,7 @@ import Overview from './pages/Overview';
 import PartyMasterPage from './pages/Parties/PartyMasterPage';
 import SalesInvoicesPage from './pages/Sales/SalesInvoicesPage';
 import CreateInvoicePage from './pages/Sales/CreateInvoicePage';
+import InvoiceDetailPage from './pages/Sales/InvoiceDetailPage';
 import ReelStockPage from './pages/ReelStock/ReelStockPage';
 import StockInwardPage from './pages/StockInward/StockInwardPage';
 import RawMaterialPage from './pages/StockInward/RawMaterialPage';
@@ -36,6 +37,7 @@ import InventoryValuationPage from './pages/Reports/InventoryValuationPage';
 import SalesDispatchReconciliationPage from './pages/Reports/SalesDispatchReconciliationPage';
 import NSBOverviewPage from './pages/NSB/NSBOverviewPage';
 import RouteErrorBoundary from './components/RouteErrorBoundary';
+import { DialogProvider } from './context/DialogContext';
 
 function RequireAuth() {
   const { user, loading } = useAuth();
@@ -148,6 +150,7 @@ export default function App() {
           <Route path="parties" element={<PartyMasterPage />} />
           <Route path="sales" element={<SalesInvoicesPage />} />
           <Route path="sales/new" element={<CreateInvoicePage />} />
+          <Route path="sales/:id" element={<InvoiceDetailPage />} />
           <Route path="reports/profit-loss" element={<ProfitLossPage />} />
           <Route path="reports/financial-health" element={<FinancialHealthPage />} />
           <Route path="reports/activity" element={<PeriodActivityPage />} />

@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import axiosClient from '../../api/axiosClient';
 import DateRangeFilter from '../../components/DateRangeFilter';
 import { toLocalDateInput } from '../../lib/date';
+import { useDialogs } from '../../context/DialogContext';
 
 const emptyForm = { name: '', type: 'Customer', phone: '', city: '', stateCode: '', openingBalance: '0' };
 const money = (value) => '₹' + Math.abs(Number(value || 0)).toLocaleString('en-IN', { maximumFractionDigits: 2 });
@@ -11,6 +12,7 @@ const money = (value) => '₹' + Math.abs(Number(value || 0)).toLocaleString('en
 export default function PartyMasterPage({ company = 'sk' }) {
   const apiBase = company === 'nsb' ? '/nsb/parties' : '/parties';
   const { user } = useAuth();
+  const { confirm } = useDialogs();
   const isAdmin = user?.role === 'admin';
   const [parties, setParties] = useState([]);
   const [archivedParties, setArchivedParties] = useState([]);
@@ -62,7 +64,7 @@ export default function PartyMasterPage({ company = 'sk' }) {
   };
 
   const restoreParty = async (party) => {
-    if (!window.confirm('Restore ' + party.name + ' to active customer/supplier lists?')) return;
+    if (!await confirm({ title: 'Restore party', message: 'Restore ' + party.name + ' to active customer/supplier lists?', confirmLabel: 'Restore party' })) return;
     setSaving(true);
     setError('');
     try {
@@ -126,7 +128,7 @@ export default function PartyMasterPage({ company = 'sk' }) {
   };
 
   const deleteParty = async (party) => {
-    if (!window.confirm('Archive ' + party.name + '? This hides the party from active selectors. Historical transactions and linked records will be retained. The outstanding balance and invoices must be settled first.')) return;
+    if (!await confirm({ title: 'Archive ' + party.name + '?', message: 'This hides the party from active selectors. Historical transactions and linked records will be retained. The outstanding balance and invoices must be settled first.', confirmLabel: 'Archive party', destructive: true })) return;
     setSaving(true);
     setError('');
     setSuccess('');
@@ -187,7 +189,7 @@ export default function PartyMasterPage({ company = 'sk' }) {
 
   const deleteTransaction = async (txn) => {
     if (!isAdmin || !selectedParty) return;
-    if (!window.confirm('Delete ledger entry ' + (txn.ref || txn.type) + '?')) return;
+    if (!await confirm({ title: 'Delete ledger entry?', message: 'Delete ledger entry ' + (txn.ref || txn.type) + '? The party balance will be recalculated.', confirmLabel: 'Delete entry', destructive: true })) return;
     setError('');
     try {
       const { data } = await axiosClient.delete(apiBase + '/' + selectedParty._id + '/transaction/' + txn._id);
