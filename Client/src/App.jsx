@@ -32,6 +32,7 @@ import AdminRecordsPage from './pages/Reports/AdminRecordsPage';
 import ProductSpecificationPage from './pages/Products/ProductSpecificationPage';
 import ProductionIntelligencePage from './pages/Production/ProductionIntelligencePage';
 import FinancialHealthPage from './pages/Reports/FinancialHealthPage';
+import InventoryValuationPage from './pages/Reports/InventoryValuationPage';
 import NSBOverviewPage from './pages/NSB/NSBOverviewPage';
 import RouteErrorBoundary from './components/RouteErrorBoundary';
 
@@ -63,6 +64,7 @@ function Sidebar() {
       { name: 'Reel Stock', path: '/inventory/reels', icon: Package },
       { name: 'Raw Material Stock', path: '/inventory/raw-materials', icon: ArrowDownToLine },
       { name: 'Stock Register', path: '/inventory/ledger', icon: BookOpen },
+      { name: 'Inventory Valuation', path: '/reports/inventory-valuation', icon: ChartNoAxesCombined },
       { name: 'Finished Goods Stock', path: '/operations/dispatch', icon: Package }
     ] },
     { group: 'Reports & Administration', items: [
@@ -147,6 +149,7 @@ export default function App() {
           <Route path="reports/profit-loss" element={<ProfitLossPage />} />
           <Route path="reports/financial-health" element={<FinancialHealthPage />} />
           <Route path="reports/activity" element={<PeriodActivityPage />} />
+          <Route path="reports/inventory-valuation" element={<InventoryValuationPage />} />
           <Route path="expenses" element={<ExpensesPage />} />
           <Route path="inventory/reels" element={<ReelStockPage />} />
           <Route path="inventory/inward" element={<StockInwardPage />} />
