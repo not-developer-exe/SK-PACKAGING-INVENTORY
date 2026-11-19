@@ -15,7 +15,10 @@ const invoice = {
   payments: [{ amount: 180 }], balanceDue: 1000, costingStatus: 'available',
   costOfGoods: 700, grossProfit: 300
 };
-const party = { _id: 'customer-1', ledger: [{ type: 'Tax Invoice', ref: 'INV-1', debit: 1180 }] };
+const party = { _id: 'customer-1', ledger: [
+  { _id: 'bill-entry-1', type: 'Tax Invoice', ref: 'INV-1', debit: 1180 },
+  { type: 'Payment Received', credit: 180, allocations: [{ billEntryId: 'bill-entry-1', amount: 180 }] }
+] };
 
 test('reconciles a delivered dispatch, invoice totals, customer ledger and payment balance', () => {
   const result = reconcileSalesDispatch({ dispatches: [dispatch], invoices: [invoice], parties: [party] });
@@ -48,5 +51,11 @@ test('does not count a cancelled dispatch as an uninvoiced delivery', () => {
   const result = reconcileSalesDispatch({ dispatches: [{ ...dispatch, status: 'cancelled' }] });
   assert.equal(result.totals.cancelledDispatches, 1);
   assert.equal(result.totals.uninvoicedDispatches, 0);
+  assert.equal(result.totals.dispatchedBoxes, 0);
+});
+
+test('flags an active invoice attached to a cancelled dispatch', () => {
+  const result = reconcileSalesDispatch({ dispatches: [{ ...dispatch, status: 'cancelled' }], invoices: [invoice], parties: [party] });
+  assert.ok(result.rows[0].issues.some((issue) => issue.includes('Cancelled dispatch')));
   assert.equal(result.totals.dispatchedBoxes, 0);
 });
