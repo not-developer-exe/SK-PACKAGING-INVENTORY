@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const InvoiceSequence = require('../models/InvoiceSequence.model');
+const CompanyProfile = require('../models/CompanyProfile.model');
 const Invoice = require('../models/Invoice.model');
 const Dispatch = require('../models/Dispatch.model');
 const Party = require('../models/Party.model');
@@ -18,8 +19,11 @@ function invoiceCompanyFilter(req) {
     ? { $or: [{ companyKey: 'sk-packaging' }, { companyKey: { $exists: false } }] }
     : { companyKey };
 }
-function companyStateCode(req) {
-  const env = currentCompanyKey(req) === 'nsb-industrial-solutions'
+async function companyStateCode(req) {
+  const key = currentCompanyKey(req);
+  const profile = await CompanyProfile.findOne({ companyKey: key }).select('gstin stateCode').lean();
+  if (profile?.stateCode || profile?.gstin) return getCompanyStateCode({ GSTIN: profile.gstin, GST_STATE_CODE: profile.stateCode });
+  const env = key === 'nsb-industrial-solutions'
     ? { GSTIN: process.env.NSB_GSTIN, GST_STATE_CODE: process.env.NSB_GST_STATE_CODE }
     : { GSTIN: process.env.SK_GSTIN || process.env.GSTIN, GST_STATE_CODE: process.env.SK_GST_STATE_CODE || process.env.GST_STATE_CODE };
   return getCompanyStateCode(env);
@@ -37,9 +41,10 @@ async function nextInvoiceNumber(companyKey, invoiceDate, session) {
     { $inc: { nextNumber: 1 }, $setOnInsert: { companyKey, financialYear } },
     { new: true, upsert: true, setDefaultsOnInsert: true, session }
   );
-  const prefix = companyKey === 'nsb-industrial-solutions'
+  const profile = await CompanyProfile.findOne({ companyKey }).select('invoicePrefix').lean();
+  const prefix = profile?.invoicePrefix || (companyKey === 'nsb-industrial-solutions'
     ? (process.env.NSB_INVOICE_PREFIX || 'NSB')
-    : (process.env.SK_INVOICE_PREFIX || 'SK');
+    : (process.env.SK_INVOICE_PREFIX || 'SK'));
   return prefix + '/' + financialYear + '/' + String(sequence.nextNumber).padStart(4, '0');
 }
 
@@ -139,7 +144,7 @@ exports.getUninvoicedDispatches = async (req, res) => {
 };
 
 exports.getTaxContext = async (req, res) => {
-  const stateCode = companyStateCode(req);
+  const stateCode = await companyStateCode(req);
   return res.json({
     companyStateCode: stateCode || null,
     configured: Boolean(stateCode),
@@ -172,7 +177,7 @@ exports.createInvoice = async (req, res) => {
     }
     const date = new Date(invoiceDate + 'T00:00:00+05:30');
     const gst = Number(gstPercent);
-    const supplierStateCode = companyStateCode(req);
+    const supplierStateCode = await companyStateCode(req);
     if (!supplierStateCode) return res.status(503).json({ message: 'Company GST state is not configured. Set GST_STATE_CODE (or GSTIN) before creating invoices.' });
     if (!Number.isFinite(gst) || gst < 0 || gst > 40) {
       return res.status(400).json({ message: 'Invoice date or GST rate is invalid' });

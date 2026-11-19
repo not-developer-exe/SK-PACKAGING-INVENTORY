@@ -37,6 +37,7 @@ import InventoryValuationPage from './pages/Reports/InventoryValuationPage';
 import SalesDispatchReconciliationPage from './pages/Reports/SalesDispatchReconciliationPage';
 import NSBOverviewPage from './pages/NSB/NSBOverviewPage';
 import FinancePage from './pages/Finance/FinancePage';
+import CompanyProfilePage from './pages/Settings/CompanyProfilePage';
 import RouteErrorBoundary from './components/RouteErrorBoundary';
 import { DialogProvider } from './context/DialogContext';
 
@@ -60,6 +61,7 @@ function Sidebar() {
       { name: 'Purchase & Stock Inward', path: '/inventory/inward', icon: ArrowDownToLine },
       { name: 'Expenses', path: '/expenses', icon: Receipt },
       { name: 'Bank & Cash', path: '/finance', icon: Wallet },
+      ...(user?.role === 'admin' ? [{ name: 'Firm Details', path: '/settings/company', icon: Building2 }] : []),
       { name: 'Customer & Supplier Dues', path: '/reports/financial-health', icon: Wallet },
       { name: 'Profit & Loss', path: '/reports/profit-loss', icon: ChartNoAxesCombined },
       { name: 'Daily & Monthly Reports', path: '/reports/activity', icon: ChartNoAxesCombined },
@@ -95,6 +97,7 @@ function Sidebar() {
       { name: 'NSB Customers & Suppliers', path: '/nsb/parties', icon: Users },
       { name: 'NSB Expenses', path: '/nsb/expenses', icon: Receipt },
       { name: 'NSB Bank & Cash', path: '/nsb/finance', icon: Wallet },
+      { name: 'NSB Firm Details', path: '/nsb/settings/company', icon: Building2 },
       { name: 'NSB Sales Invoices', path: '/nsb/sales', icon: FileText }
     ] }] : [])
   ];
@@ -152,6 +155,7 @@ export default function App() {
           <Route path="nsb" element={user?.role === 'admin' ? <NSBOverviewPage /> : <Navigate to="/" replace />} />
           <Route path="nsb/expenses" element={user?.role === 'admin' ? <ExpensesPage company="nsb" /> : <Navigate to="/" replace />} />
           <Route path="nsb/finance" element={user?.role === 'admin' ? <FinancePage company="nsb" /> : <Navigate to="/" replace />} />
+          <Route path="nsb/settings/company" element={user?.role === 'admin' ? <CompanyProfilePage company="nsb" /> : <Navigate to="/" replace />} />
           <Route path="nsb/sales" element={user?.role === 'admin' ? <SalesInvoicesPage company="nsb" /> : <Navigate to="/" replace />} />
           <Route path="nsb/sales/new" element={user?.role === 'admin' ? <CreateInvoicePage company="nsb" /> : <Navigate to="/" replace />} />
           <Route path="nsb/sales/:id" element={user?.role === 'admin' ? <InvoiceDetailPage company="nsb" /> : <Navigate to="/" replace />} />
@@ -167,6 +171,7 @@ export default function App() {
           <Route path="reports/sales-reconciliation" element={<SalesDispatchReconciliationPage />} />
           <Route path="expenses" element={<ExpensesPage />} />
           <Route path="finance" element={<FinancePage />} />
+          <Route path="settings/company" element={user?.role === 'admin' ? <CompanyProfilePage /> : <Navigate to="/" replace />} />
           <Route path="inventory/reels" element={<ReelStockPage />} />
           <Route path="inventory/inward" element={<StockInwardPage />} />
           <Route path="inventory/raw-materials" element={<RawMaterialPage />} />
