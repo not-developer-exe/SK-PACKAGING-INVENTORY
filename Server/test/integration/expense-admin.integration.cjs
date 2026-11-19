@@ -952,14 +952,15 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
   });
   assert.equal(scrapSale.status, 201);
   assert.equal(scrapSale.data.sale.totalAmount, 45);
-  const oversoldScrap = await api('/api/waste/sale', {
+  const additionalScrapSale = await api('/api/waste/sale', {
     method: 'POST',
     body: { buyerName: 'Integration Scrap Buyer', saleDate: '2026-10-21', weightSoldKg: 1, ratePerKg: 10 }
   });
-  assert.equal(oversoldScrap.status, 409);
+  assert.equal(additionalScrapSale.status, 201);
   const wasteStats = await api('/api/waste');
   assert.equal(wasteStats.status, 200);
-  assert.ok(Math.abs(wasteStats.data.currentWasteInventory - 0.6) < 1e-9);
+  assert.ok(Math.abs(wasteStats.data.totalScrapSold - 5.5) < 1e-9);
+  assert.equal(wasteStats.data.totalScrapSalesAmount, 55);
 
   const thakEntry = await api('/api/waste/thak-entry', {
     method: 'POST',
@@ -970,7 +971,7 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
   const separateStocks = await api('/api/waste');
   assert.equal(separateStocks.status, 200);
   assert.ok(Math.abs(separateStocks.data.currentThakInventory - 12.5) < 1e-9);
-  assert.ok(Math.abs(separateStocks.data.currentWasteInventory - 0.6) < 1e-9);
+  assert.equal(separateStocks.data.totalScrapSold, 5.5);
 
   const thakSale = await api('/api/waste/sale', {
     method: 'POST',
@@ -986,7 +987,7 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
   assert.equal(oversoldThak.status, 409);
   const afterThakSale = await api('/api/waste');
   assert.ok(Math.abs(afterThakSale.data.currentThakInventory - 10) < 1e-9);
-  assert.ok(Math.abs(afterThakSale.data.currentWasteInventory - 0.6) < 1e-9);
+  assert.equal(afterThakSale.data.totalScrapSold, 5.5);
 
   const thakProfitLoss = await api('/api/reports/profit-loss?from=2026-10-22&to=2026-10-22');
   assert.equal(thakProfitLoss.status, 200);
