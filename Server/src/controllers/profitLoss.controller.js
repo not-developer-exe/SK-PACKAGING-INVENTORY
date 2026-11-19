@@ -95,7 +95,6 @@ exports.getProfitLoss = async (req, res) => {
         stockLandedCostCount: expenses.filter((item) => item.costTreatment === 'stock_landed_cost').length,
         scrapWeightKg,
         thakWeightKg,
-        currentVerifiedScrapInventoryKg,
         costedInvoiceCount: costedInvoices.length,
         uncostedInvoiceCount: uncostedInvoices,
         grossProfitCoveragePercent: invoices.length ? Number((costedInvoices.length / invoices.length * 100).toFixed(1)) : 100
