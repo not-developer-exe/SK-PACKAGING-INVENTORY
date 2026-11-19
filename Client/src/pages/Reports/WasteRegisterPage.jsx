@@ -16,6 +16,10 @@ export default function WasteRegisterPage() {
   const [buyerName, setBuyerName] = useState('');
   const [weightSoldKg, setWeightSoldKg] = useState('');
   const [ratePerKg, setRatePerKg] = useState('');
+  const [saleType, setSaleType] = useState('scrap');
+  const [thakWeightKg, setThakWeightKg] = useState('');
+  const [thakNotes, setThakNotes] = useState('');
+  const [thakEntryDate, setThakEntryDate] = useState(() => { const date = new Date(); return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10); });
   const [saleDate, setSaleDate] = useState(() => { const date = new Date(); return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10); });
 
   const fetchData = async (dateParams = {}) => {
@@ -38,13 +42,14 @@ export default function WasteRegisterPage() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      if (Number(weightSoldKg) > data.currentWasteInventory) {
-        alert('Cannot sell more waste than currently available in inventory.');
+      const availableStock = saleType === 'thak' ? data.currentThakInventory : data.currentWasteInventory;
+      if (Number(weightSoldKg) > availableStock) {
+        alert('Cannot sell more than the available ' + (saleType === 'thak' ? 'Thak' : 'scrap') + ' stock.');
         setSubmitting(false);
         return;
       }
 
-      await wasteService.recordSale({ buyerName, weightSoldKg, ratePerKg, saleDate });
+      await wasteService.recordSale({ buyerName, weightSoldKg, ratePerKg, saleDate, saleType });
       setBuyerName('');
       setWeightSoldKg('');
       setRatePerKg('');
@@ -56,13 +61,28 @@ export default function WasteRegisterPage() {
     }
   };
 
+  const handleThakSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      await wasteService.recordThakEntry({ entryDate: thakEntryDate, weightKg: thakWeightKg, notes: thakNotes });
+      setThakWeightKg('');
+      setThakNotes('');
+      await fetchData({ from, to, buyerName: buyerFilter });
+    } catch (error) {
+      alert(error.response?.data?.message || 'Error recording Thak stock');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   if (loading || !data) return <div className="flex h-64 items-center justify-center"><Loader2 className="animate-spin text-blue-600" size={32} /></div>;
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">Waste Register</h1>
-        <p className="mt-1 text-sm text-slate-500">Track corrugation machine waste and log scrap sales.</p>
+        <p className="mt-1 text-sm text-slate-500">Maintain normal scrap and moisture-damaged paper (Thak) as separate weighed stocks and record actual sales.</p>
       </div>
 
       <div className="flex flex-wrap items-end gap-3"><div className="min-w-56"><label className="mb-1 block text-xs font-medium text-slate-600">Scrap buyer</label><input value={buyerFilter} onChange={e => setBuyerFilter(e.target.value)} placeholder="All buyers" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" /></div><div className="flex-1"><DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => fetchData({ from, to, buyerName: buyerFilter })} onReset={() => { setFrom(''); setTo(''); setBuyerFilter(''); fetchData({}); }} loading={loading} label="Waste / scrap date range" /></div></div>
@@ -70,8 +90,12 @@ export default function WasteRegisterPage() {
       {/* Top Metrics */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-amber-800">Current Scrap Inventory</h2>
+          <h2 className="text-sm font-semibold text-amber-800">Available Normal Scrap</h2>
           <p className="mt-2 text-3xl font-bold text-amber-900">{Number(data.currentWasteInventory || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })} <span className="text-base font-medium">kg</span></p>
+        </div>
+        <div className="rounded-2xl border border-orange-200 bg-orange-50 p-5 shadow-sm">
+          <h2 className="text-sm font-semibold text-orange-800">Available Thak Stock</h2>
+          <p className="mt-2 text-3xl font-bold text-orange-900">{Number(data.currentThakInventory || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })} <span className="text-base font-medium">kg</span></p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-slate-600">Verified Scrap Generated</h2>
@@ -109,12 +133,25 @@ export default function WasteRegisterPage() {
         </div>
       )}
 
+      <form onSubmit={handleThakSubmit} className="rounded-2xl border border-orange-200 bg-orange-50/40 p-6 shadow-sm">
+        <h2 className="mb-4 text-sm font-semibold text-slate-900">Record Thak Stock (moisture-damaged paper)</h2>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+          <input type="date" required aria-label="Thak entry date" value={thakEntryDate} onChange={e => setThakEntryDate(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" />
+          <input type="number" min="0.01" step="0.01" required placeholder="Weighed Thak (kg)" value={thakWeightKg} onChange={e => setThakWeightKg(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" />
+          <input type="text" maxLength="500" placeholder="Notes (optional)" value={thakNotes} onChange={e => setThakNotes(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" />
+          <button type="submit" disabled={submitting} className="rounded-xl bg-orange-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60">{submitting ? 'Saving…' : 'Add Thak Stock'}</button>
+        </div>
+      </form>
+
       {/* Record Sale Form */}
       <form onSubmit={handleSaleSubmit} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="mb-4 text-sm font-semibold text-slate-900 flex items-center gap-2">
-          <IndianRupee size={18} className="text-emerald-600" /> Record Scrap Sale
+          <IndianRupee size={18} className="text-emerald-600" /> Record Scrap / Thak Sale
         </h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-5">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
+          <div>
+            <select aria-label="Sale stock type" value={saleType} onChange={e => setSaleType(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"><option value="scrap">Normal scrap</option><option value="thak">Thak</option></select>
+          </div>
           <div>
             <input type="date" required aria-label="Scrap sale date" value={saleDate} onChange={e => setSaleDate(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400" />
           </div>
@@ -128,8 +165,8 @@ export default function WasteRegisterPage() {
             <input type="number" step="0.01" required placeholder="Rate (₹ per kg)" value={ratePerKg} onChange={e => setRatePerKg(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400" />
           </div>
           <div>
-            <button type="submit" disabled={submitting || data.currentWasteInventory <= 0} className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-70">
-              {submitting ? <Loader2 className="animate-spin" size={16} /> : 'Sell Scrap'}
+            <button type="submit" disabled={submitting || (saleType === 'thak' ? data.currentThakInventory : data.currentWasteInventory) <= 0} className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-70">
+              {submitting ? <Loader2 className="animate-spin" size={16} /> : saleType === 'thak' ? 'Sell Thak' : 'Sell Scrap'}
             </button>
           </div>
         </div>
@@ -138,6 +175,7 @@ export default function WasteRegisterPage() {
       {/* Tabs */}
       <div className="flex gap-2 border-b border-slate-200 pb-2">
         <button onClick={() => setActiveTab('inventory')} className={`px-4 py-2 text-sm font-medium transition ${activeTab === 'inventory' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}>Verified Scrap Log</button>
+        <button onClick={() => setActiveTab('thak')} className={'px-4 py-2 text-sm font-medium transition ' + (activeTab === 'thak' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-800')}>Thak Stock Log</button>
         <button onClick={() => setActiveTab('sales')} className={`px-4 py-2 text-sm font-medium transition ${activeTab === 'sales' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}>Scrap Sales History</button>
       </div>
 
@@ -171,6 +209,11 @@ export default function WasteRegisterPage() {
               {data.productionWaste.length === 0 && (<tr><td colSpan={7} className="p-6 text-center text-slate-500">No measured recoverable scrap recorded yet.</td></tr>)}
             </tbody>
           </table>
+        ) : activeTab === 'thak' ? (
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-3">Date</th><th className="px-5 py-3 text-right">Thak Weighed (kg)</th><th className="px-5 py-3">Notes</th></tr></thead>
+            <tbody className="divide-y divide-slate-100">{(data.thakEntries || []).map(entry => <tr key={entry._id}><td className="px-5 py-4">{new Date(entry.entryDate || entry.createdAt).toLocaleDateString('en-IN')}</td><td className="px-5 py-4 text-right font-medium">{Number(entry.weightKg).toFixed(2)}</td><td className="px-5 py-4">{entry.notes || '—'}</td></tr>)}{!(data.thakEntries || []).length && <tr><td colSpan={3} className="p-6 text-center text-slate-500">No Thak stock entries recorded.</td></tr>}</tbody>
+          </table>
         ) : (
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
@@ -183,16 +226,16 @@ export default function WasteRegisterPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {data.scrapSales.map((sale) => (
+              {[...(data.scrapSales || []), ...(data.thakSales || [])].sort((a, b) => new Date(b.saleDate) - new Date(a.saleDate)).map((sale) => (
                 <tr key={sale._id} className="hover:bg-slate-50">
                   <td className="px-5 py-4 text-slate-600">{new Date(sale.saleDate || sale.createdAt).toLocaleDateString('en-IN')}</td>
-                  <td className="px-5 py-4 font-medium text-slate-900">{sale.buyerName}</td>
+                  <td className="px-5 py-4 font-medium text-slate-900">{sale.buyerName}<span className="ml-2 rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{sale.saleType === 'thak' ? 'Thak' : 'Normal scrap'}</span></td>
                   <td className="px-5 py-4 text-right text-slate-700">{sale.weightSoldKg.toFixed(1)} kg</td>
                   <td className="px-5 py-4 text-right text-slate-700">₹{sale.ratePerKg.toFixed(2)}</td>
                   <td className="px-5 py-4 text-right font-medium text-emerald-600">₹{sale.totalAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>
                 </tr>
               ))}
-              {data.scrapSales.length === 0 && (<tr><td colSpan={5} className="p-6 text-center text-slate-500">No scrap sales recorded yet.</td></tr>)}
+              {(data.scrapSales || []).length + (data.thakSales || []).length === 0 && (<tr><td colSpan={5} className="p-6 text-center text-slate-500">No scrap sales recorded yet.</td></tr>)}
             </tbody>
           </table>
         )}
