@@ -33,6 +33,7 @@ import ProductSpecificationPage from './pages/Products/ProductSpecificationPage'
 import ProductionIntelligencePage from './pages/Production/ProductionIntelligencePage';
 import FinancialHealthPage from './pages/Reports/FinancialHealthPage';
 import InventoryValuationPage from './pages/Reports/InventoryValuationPage';
+import SalesDispatchReconciliationPage from './pages/Reports/SalesDispatchReconciliationPage';
 import NSBOverviewPage from './pages/NSB/NSBOverviewPage';
 import RouteErrorBoundary from './components/RouteErrorBoundary';
 
@@ -58,6 +59,7 @@ function Sidebar() {
       { name: 'Customer & Supplier Dues', path: '/reports/financial-health', icon: Wallet },
       { name: 'Profit & Loss', path: '/reports/profit-loss', icon: ChartNoAxesCombined },
       { name: 'Daily & Monthly Reports', path: '/reports/activity', icon: ChartNoAxesCombined },
+      { name: 'Sales Reconciliation', path: '/reports/sales-reconciliation', icon: ClipboardCheck },
       { name: 'New GST Invoice', path: '/sales/new', icon: FilePlus2 }
     ] },
     { group: 'Stock', items: [
@@ -150,6 +152,7 @@ export default function App() {
           <Route path="reports/financial-health" element={<FinancialHealthPage />} />
           <Route path="reports/activity" element={<PeriodActivityPage />} />
           <Route path="reports/inventory-valuation" element={<InventoryValuationPage />} />
+          <Route path="reports/sales-reconciliation" element={<SalesDispatchReconciliationPage />} />
           <Route path="expenses" element={<ExpensesPage />} />
           <Route path="inventory/reels" element={<ReelStockPage />} />
           <Route path="inventory/inward" element={<StockInwardPage />} />
