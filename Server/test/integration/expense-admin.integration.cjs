@@ -402,10 +402,10 @@ test('payment allocations reverse atomically and production posting rolls back p
       recoverableWasteKg: 1,
       wasteBreakdown: [{ category: 'edge_trim', weightKg: 1 }],
       inputReels: [
-        { reelId: String(availableReel._id), requestedWidthInches: 24, weightConsumedKg: 20 },
-        { reelId: String(unavailableReel._id), requestedWidthInches: 24, weightConsumedKg: 1 }
+        { reelId: String(availableReel._id), reelRole: 'plain_surface', requestedWidthInches: 24, weightConsumedKg: 20 },
+        { reelId: String(unavailableReel._id), reelRole: 'flute', requestedWidthInches: 24, weightConsumedKg: 1 }
       ],
-      outputSheets: [{ ply: 3, lengthInches: 36, widthInches: 24, sheetCount: 100, totalWeightKg: 10 }]
+      outputSheets: [{ ply: 2, lengthInches: 36, widthInches: 24, sheetCount: 100, totalWeightKg: 10 }]
     }
   });
   assert.equal(failedRun.status, 409);
@@ -580,9 +580,9 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
   assert.equal(production.status, 201);
   const run = await ProductionRun.findOne({ runNumber: production.data.runNumber });
   assert.equal(Number(run.totalInputWeightKg.toString()), 100);
-  assert.equal(Number(run.totalOutputWeightKg.toString()), 60);
+  assert.equal(Number(run.totalOutputWeightKg.toString()), 90);
   assert.equal(Number(run.totalMaterialCost.toString()), 4400);
-  assert.equal(Number(run.materialCostPerOutputKg.toString()), 73.333333);
+  assert.equal(Number(run.materialCostPerOutputKg.toString()), 48.888889);
   assert.equal(Number(run.recoverableWasteKg.toString()), 5);
   assert.equal(run.machineName, 'Corrugation Line 1');
   assert.equal(run.wasteBreakdown.length, 2);
