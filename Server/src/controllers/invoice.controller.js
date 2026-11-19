@@ -18,7 +18,7 @@ function invoiceCompanyFilter(req) {
     ? { $or: [{ companyKey: 'sk-packaging' }, { companyKey: { $exists: false } }] }
     : { companyKey };
 }
-function getFinancialYear(date) {
+function companyStateCode(req) {\n  const env = currentCompanyKey(req) === 'nsb-industrial-solutions'\n    ? { GSTIN: process.env.NSB_GSTIN, GST_STATE_CODE: process.env.NSB_GST_STATE_CODE }\n    : { GSTIN: process.env.SK_GSTIN || process.env.GSTIN, GST_STATE_CODE: process.env.SK_GST_STATE_CODE || process.env.GST_STATE_CODE };\n  return getCompanyStateCode(env);\n}\nfunction getFinancialYear(date) {
   const year = date.getFullYear();
   const startYear = date.getMonth() >= 3 ? year : year - 1;
   return String(startYear).slice(-2) + '-' + String(startYear + 1).slice(-2);
@@ -69,9 +69,9 @@ exports.cancelInvoice = async (req, res) => {
       if ((target.payments || []).length || Math.abs(Number(target.balanceDue || 0) - Number(target.grandTotal || 0)) > 0.005) {
         throw Object.assign(new Error('This invoice has payment allocations. A credit-note/refund workflow is required; it cannot be cancelled directly.'), { statusCode: 409 });
       }
-      const dispatch = await Dispatch.findById(target.dispatchId).session(session);
+      const dispatch = await Dispatch.findOne({ _id: target.dispatchId, companyKey: currentCompanyKey(req) }).session(session);
       if (dispatch?.status === 'delivered') throw Object.assign(new Error('A delivered dispatch cannot be cancelled through this workflow.'), { statusCode: 409 });
-      const party = await Party.findById(target.customerId).session(session);
+      const party = await Party.findOne({ _id: target.customerId, companyKey: currentCompanyKey(req) }).session(session);
       if (!party) throw Object.assign(new Error('Linked customer ledger was not found. No changes were made.'), { statusCode: 409 });
       const ledgerEntry = party.ledger.find(entry => entry.type === 'Tax Invoice' && entry.ref === target.invoiceNumber);
       if (!ledgerEntry) throw Object.assign(new Error('Matching invoice entry was not found in the customer ledger. Reconcile the ledger before cancelling.'), { statusCode: 409 });
@@ -120,7 +120,7 @@ exports.getUninvoicedDispatches = async (req, res) => {
     }
 
     const [dispatches, billed] = await Promise.all([
-      Dispatch.find({ customerId, status: { $ne: 'cancelled' } }).populate('boxes.boxId').sort({ createdAt: -1 }).lean(),
+      Dispatch.find({ customerId, companyKey: currentCompanyKey(req), status: { $ne: 'cancelled' } }).populate('boxes.boxId').sort({ createdAt: -1 }).lean(),
       Invoice.find({ customerId, ...invoiceCompanyFilter(req) }).select('dispatchId').lean()
     ]);
     const billedIds = new Set(billed.map((invoice) => String(invoice.dispatchId)));
@@ -132,7 +132,7 @@ exports.getUninvoicedDispatches = async (req, res) => {
 };
 
 exports.getTaxContext = async (req, res) => {
-  const companyStateCode = getCompanyStateCode();
+  const stateCode = companyStateCode(req);
   return res.json({
     companyStateCode: companyStateCode || null,
     configured: Boolean(companyStateCode)
@@ -164,8 +164,8 @@ exports.createInvoice = async (req, res) => {
     }
     const date = new Date(invoiceDate + 'T00:00:00+05:30');
     const gst = Number(gstPercent);
-    const companyStateCode = getCompanyStateCode();
-    if (!companyStateCode) return res.status(503).json({ message: 'Company GST state is not configured. Set GST_STATE_CODE (or GSTIN) before creating invoices.' });
+    const supplierStateCode = companyStateCode(req);
+    if (!supplierStateCode) return res.status(503).json({ message: 'Company GST state is not configured. Set GST_STATE_CODE (or GSTIN) before creating invoices.' });
     if (!Number.isFinite(gst) || gst < 0 || gst > 40) {
       return res.status(400).json({ message: 'Invoice date or GST rate is invalid' });
     }
@@ -185,8 +185,8 @@ exports.createInvoice = async (req, res) => {
 
     await session.withTransaction(async () => {
       // Keep all operations on the transaction session sequential.
-      const customer = await Party.findById(customerId).session(session);
-      const dispatch = await Dispatch.findOne({ _id: dispatchId, customerId }).session(session);
+      const companyKey = currentCompanyKey(req);\n      const customer = await Party.findOne({ _id: customerId, companyKey }).session(session);
+      const dispatch = await Dispatch.findOne({ _id: dispatchId, customerId, companyKey }).session(session);
       const companyKey = currentCompanyKey(req);
       const existingInvoice = await Invoice.findOne({ dispatchId, ...invoiceCompanyFilter(req) }).session(session);
 
@@ -229,7 +229,7 @@ exports.createInvoice = async (req, res) => {
         invoicedByBox.set(key, (invoicedByBox.get(key) || 0) + item.quantity);
       }
 
-      const finishedBoxes = await FinishedBox.find({ _id: { $in: [...invoicedByBox.keys()] } }).session(session);
+      const finishedBoxes = await FinishedBox.find({ _id: { $in: [...invoicedByBox.keys()] }, companyKey }).session(session);
       const finishedBoxById = new Map(finishedBoxes.map((box) => [String(box._id), box]));
       const invoiceItems = cleanItems.map((item) => {
         const box = finishedBoxById.get(String(item.boxId));
@@ -256,7 +256,7 @@ exports.createInvoice = async (req, res) => {
         ? Number((invoiceItems.reduce((sum, item) => sum + item.taxableAmount, 0) - totalCostOfGoods).toFixed(2))
         : null;
       const subTotal = Number(invoiceItems.reduce((sum, item) => sum + item.taxableAmount, 0).toFixed(2));
-      const tax = calculateGstBreakdown({ taxableAmount: subTotal, gstPercent: gst, supplierStateCode: companyStateCode, placeOfSupplyStateCode });
+      const tax = calculateGstBreakdown({ taxableAmount: subTotal, gstPercent: gst, supplierStateCode, placeOfSupplyStateCode });
       const { cgstAmount, sgstAmount, igstAmount, taxType } = tax;
       const grandTotal = Number((subTotal + cgstAmount + sgstAmount + igstAmount).toFixed(2));
       const invoiceNumber = await nextInvoiceNumber(companyKey, date, session);
