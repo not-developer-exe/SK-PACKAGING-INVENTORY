@@ -1,13 +1,10 @@
 const Invoice = require('../models/Invoice.model');
 const ScrapSale = require('../models/ScrapSale.model');
-const ThakEntry = require('../models/ThakEntry.model');
 const ProductionRun = require('../models/ProductionRun.model');
 const Expense = require('../models/Expense.model');
 
 const { buildProfitLossGroups, isValidDateOnly } = require('../utils/profitLossAggregation');
 const { formatDateOnlyLocal } = require('../utils/dateFilters');
-
-const numeric = (value) => Number(value === null || value === undefined ? 0 : value.toString());
 
 exports.getProfitLoss = async (req, res) => {
   try {
