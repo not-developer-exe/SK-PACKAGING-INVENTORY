@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, Receipt, ArrowLeft, CheckCircle2 } from 'lucide-react';
-import { partiesService } from '../../services/partiesService';
 import { invoiceService } from '../../services/invoiceService';
 import axiosClient from '../../api/axiosClient';
 import { toLocalDateInput } from '../../lib/date';
 import { useDialogs } from '../../context/DialogContext';
 
-export default function CreateInvoicePage() {
+export default function CreateInvoicePage({ company = 'sk' }) {
   const navigate = useNavigate();
   const { alert } = useDialogs();
+  const apiBase = company === 'nsb' ? '/nsb/invoices' : '/invoices';
+  const partiesBase = company === 'nsb' ? '/nsb/parties' : '/parties';
+  const routeBase = company === 'nsb' ? '/nsb/sales' : '/sales';
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   
@@ -29,15 +31,15 @@ export default function CreateInvoicePage() {
   useEffect(() => {
     const fetchCustomers = async () => {
       try {
-        const data = await partiesService.getCustomers();
-        setCustomers(Array.isArray(data) ? data : (data?.data || []));
+        const { data } = await axiosClient.get(partiesBase + '?type=customer');
+        setCustomers(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error('Error fetching customers:', err);
         setCustomers([]);
       }
     };
     fetchCustomers();
-    axiosClient.get('/invoices/tax-context').then(({ data }) => {
+    axiosClient.get(apiBase + '/tax-context').then(({ data }) => {
       setCompanyStateCode(data.companyStateCode || '');
       setTaxContextConfigured(Boolean(data.configured));
     }).catch(() => setTaxContextConfigured(false));
@@ -55,7 +57,7 @@ export default function CreateInvoicePage() {
       }
       try {
         setLoading(true);
-        const data = await invoiceService.getUninvoicedDispatches(customerId);
+        const { data } = await axiosClient.get(apiBase + '/uninvoiced/' + encodeURIComponent(customerId));
         setUninvoicedChallans(Array.isArray(data) ? data : (data?.data || []));
         setDispatchId(''); 
         setItems([]);
@@ -112,7 +114,7 @@ export default function CreateInvoicePage() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await invoiceService.createInvoice({
+      await axiosClient.post(apiBase, {
         invoiceDate,
         customerId,
         dispatchId,
@@ -125,7 +127,7 @@ export default function CreateInvoicePage() {
         placeOfSupplyStateCode,
         grandTotal
       });
-      navigate('/sales');
+      navigate(routeBase);
     } catch (err) {
       await alert({ title: 'Invoice could not be created', message: err.response?.data?.message || 'Failed to generate GST Invoice' });
       setSubmitting(false);
