@@ -19,6 +19,9 @@ function reconcileSalesDispatch({ dispatches = [], invoices = [], parties = [] }
     totals.dispatchedBoxes += boxes;
     const invoice = invoiceByDispatch.get(String(dispatch._id));
     const issues = [];
+    if (dispatch.status === 'cancelled' && invoice && invoice.status !== 'Cancelled') {
+      issues.push('Cancelled dispatch still has an active invoice');
+    }
     if (!invoice || invoice.status === 'Cancelled') {
       if (dispatch.status !== 'cancelled') {
         totals.uninvoicedDispatches += 1;
@@ -66,6 +69,13 @@ function reconcileSalesDispatch({ dispatches = [], invoices = [], parties = [] }
     const ledgerEntry = party?.ledger?.find((entry) => entry.type === 'Tax Invoice' && entry.ref === invoice.invoiceNumber);
     if (!ledgerEntry && invoice.status !== 'Cancelled') issues.push('Customer ledger invoice debit not found');
     else if (ledgerEntry && Math.abs(Number(ledgerEntry.debit || 0) - Number(invoice.grandTotal || 0)) > 0.02) issues.push('Customer ledger debit differs from invoice total');
+    if (ledgerEntry && (invoice.payments || []).length) {
+      const allocatedPayments = round((party?.ledger || []).reduce((sum, entry) => {
+        const allocation = (entry.allocations || []).find((item) => String(item.billEntryId) === String(ledgerEntry._id));
+        return sum + Number(allocation?.amount || 0);
+      }, 0));
+      if (Math.abs(allocatedPayments - payments) > 0.02) issues.push('Invoice payments differ from customer-ledger allocations');
+    }
     if (String(dispatch.customerId?._id || dispatch.customerId) !== String(invoice.customerId?._id || invoice.customerId)) issues.push('Dispatch and invoice customer differ');
 
     const costed = invoice.costingStatus === 'available' && invoice.costOfGoods !== null && invoice.costOfGoods !== undefined;
