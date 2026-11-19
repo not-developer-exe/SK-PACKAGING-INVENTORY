@@ -24,13 +24,14 @@ function companyStateCode(req) {
     : { GSTIN: process.env.SK_GSTIN || process.env.GSTIN, GST_STATE_CODE: process.env.SK_GST_STATE_CODE || process.env.GST_STATE_CODE };
   return getCompanyStateCode(env);
 }
-function getFinancialYear(date) {
-  const year = date.getFullYear();
-  const startYear = date.getMonth() >= 3 ? year : year - 1;
+function getFinancialYear(dateOnly) {
+  const year = Number(String(dateOnly).slice(0, 4));
+  const month = Number(String(dateOnly).slice(5, 7));
+  const startYear = month >= 4 ? year : year - 1;
   return String(startYear).slice(-2) + '-' + String(startYear + 1).slice(-2);
 }
 async function nextInvoiceNumber(companyKey, invoiceDate, session) {
-  const financialYear = getFinancialYear(invoiceDate);
+  const financialYear = getFinancialYear(invoiceDate.toISOString().slice(0, 10));
   const sequence = await InvoiceSequence.findOneAndUpdate(
     { companyKey, financialYear },
     { $inc: { nextNumber: 1 }, $setOnInsert: { companyKey, financialYear } },
@@ -266,7 +267,7 @@ exports.createInvoice = async (req, res) => {
       const tax = calculateGstBreakdown({ taxableAmount: subTotal, gstPercent: gst, supplierStateCode, placeOfSupplyStateCode });
       const { cgstAmount, sgstAmount, igstAmount, taxType } = tax;
       const grandTotal = Number((subTotal + cgstAmount + sgstAmount + igstAmount).toFixed(2));
-      const invoiceNumber = await nextInvoiceNumber(companyKey, date, session);
+      const invoiceNumber = await nextInvoiceNumber(companyKey, invoiceDate, session);
 
       const [created] = await Invoice.create([{
         companyKey,
