@@ -16,7 +16,7 @@ const ensureGroup = (map, key) => {
     map.set(key, {
       key, invoiceCount: 0, revenue: 0, costOfGoods: 0, grossProfit: 0,
       costedInvoiceCount: 0, uncostedInvoiceCount: 0, balanceDue: 0,
-      productionRunCount: 0, scrapRevenue: 0, scrapSoldKg: 0,
+      scrapRevenue: 0, scrapSoldKg: 0,
       thakRevenue: 0, thakSoldKg: 0,
       operatingExpenses: 0, financeCosts: 0, stockLandedCosts: 0, expenseCount: 0
     });
@@ -38,11 +38,6 @@ const addToGroup = (map, key, invoice) => {
   } else {
     group.uncostedInvoiceCount += 1;
   }
-};
-
-const addRunToGroup = (map, key, run) => {
-  const group = ensureGroup(map, key);
-  group.productionRunCount += 1;
 };
 
 const addScrapSaleToGroup = (map, key, sale) => {
@@ -84,7 +79,7 @@ const normalize = (group) => ({
   netProfitBeforeTax: group.partyName ? null : Number((group.grossProfit + group.scrapRevenue + group.thakRevenue - group.operatingExpenses - group.financeCosts).toFixed(2))
 });
 
-function buildProfitLossGroups(invoices, productionRuns = [], scrapSales = [], expenses = [], thakSales = []) {
+function buildProfitLossGroups(invoices, scrapSales = [], expenses = [], thakSales = []) {
   const dailyMap = new Map();
   const monthlyMap = new Map();
   const partyMap = new Map();
@@ -95,10 +90,6 @@ function buildProfitLossGroups(invoices, productionRuns = [], scrapSales = [], e
     const partyName = invoice.customerId?.name || 'Unknown party';
     addToGroup(partyMap, partyId, invoice);
     partyMap.get(partyId).partyName = partyName;
-  }
-  for (const run of productionRuns) {
-    addRunToGroup(dailyMap, dateKey(run.runDate, 'daily'), run);
-    addRunToGroup(monthlyMap, dateKey(run.runDate, 'monthly'), run);
   }
   for (const sale of scrapSales) {
     addScrapSaleToGroup(dailyMap, dateKey(sale.saleDate, 'daily'), sale);
