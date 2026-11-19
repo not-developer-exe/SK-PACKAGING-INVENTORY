@@ -36,6 +36,7 @@ import InventoryValuationPage from './pages/Reports/InventoryValuationPage';
 import SalesDispatchReconciliationPage from './pages/Reports/SalesDispatchReconciliationPage';
 import NSBOverviewPage from './pages/NSB/NSBOverviewPage';
 import RouteErrorBoundary from './components/RouteErrorBoundary';
+import { DialogProvider } from './context/DialogContext';
 
 function RequireAuth() {
   const { user, loading } = useAuth();
