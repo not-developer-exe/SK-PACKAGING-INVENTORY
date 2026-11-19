@@ -103,6 +103,7 @@ export default function PartyMasterPage({ company = 'sk' }) {
   const lookupGstin = async () => {
     const code = String(partyForm.gstin || '').trim().toUpperCase();
     if (!/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(code)) { setError('Enter a valid 15-character GSTIN first.'); return; }
+    setPartyForm(old => ({ ...old, gstin: code, stateCode: code.slice(0, 2) }));
     setGstinLoading(true); setError('');
     try {
       const endpoint = company === 'nsb' ? '/nsb/lookups/gstin/' : '/lookups/gstin/';
