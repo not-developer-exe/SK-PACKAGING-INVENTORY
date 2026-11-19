@@ -40,7 +40,7 @@ export default function FinancePage({ company = 'sk' }) {
     } catch (e) { setError(e.response?.data?.message || 'Unable to fetch bank branch details.'); }
     finally { setIfscLoading(false); }
   };
-  const submitAccount = async (e) => { e.preventDefault(); setError(''); try { await axiosClient.post(base+'/accounts',form); setShowAccount(false); setForm({name:'',type:'bank',openingBalance:'0',bankName:'',accountHolder:'',accountNumber:'',ifsc:'',branch:'',upiId:'',isDefaultForInvoice:true}); await load(); } catch(e) { setError(e.response?.data?.message||'Unable to save account.'); } };
+  const submitAccount = async (e) => { e.preventDefault(); setError(''); try { await axiosClient.post(base+'/accounts',form); setShowAccount(false); setForm({name:'',type:'bank',openingBalance:'0',bankName:'',accountHolder:'',accountNumber:'',ifsc:'',branch:'',branchAddress:'',bankCity:'',bankState:'',upiId:'',isDefaultForInvoice:true}); await load(); } catch(e) { setError(e.response?.data?.message||'Unable to save account.'); } };
   const submitTx = async (e) => { e.preventDefault(); setError(''); try { await axiosClient.post(base+'/transactions',tx); setTx({...tx,amount:'',category:'',party:'',description:'',reference:''}); await load(); } catch(e) { setError(e.response?.data?.message||'Unable to save transaction.'); } };
   const updateTx = (key,value) => setTx(old=>({...old,[key]:value}));
   return <div className="mx-auto max-w-7xl space-y-6">
