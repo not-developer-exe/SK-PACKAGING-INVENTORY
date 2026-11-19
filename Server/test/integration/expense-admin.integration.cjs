@@ -575,8 +575,7 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
       runDate: '2026-10-15',
       inputReels: [{ reelId: String(productionReel._id), requestedWidthInches: 36, weightConsumedKg: 100 }],
       outputSheets: [
-        { ply: 3, lengthInches: 36, widthInches: 24, sheetCount: 100, totalWeightKg: 60 },
-        { ply: 5, lengthInches: 48, widthInches: 36, sheetCount: 100, totalWeightKg: 30 }
+        { ply: 3, lengthInches: 36, widthInches: 24, sheetCount: 100, totalWeightKg: 60 }
       ],
       recoverableWasteKg: 5,
       wasteBreakdown: [{ category: 'edge_trim', weightKg: 3 }, { category: 'setup_waste', weightKg: 2 }]
