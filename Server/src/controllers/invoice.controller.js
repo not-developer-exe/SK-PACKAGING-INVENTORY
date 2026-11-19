@@ -19,6 +19,21 @@ function invoiceCompanyFilter(req) {
     ? { $or: [{ companyKey: 'sk-packaging' }, { companyKey: { $exists: false } }] }
     : { companyKey };
 }
+async function buildSellerSnapshot(companyKey, session) {
+  const profile = await CompanyProfile.findOne({ companyKey }).session(session || null).lean();
+  if (!profile) return null;
+  return {
+    legalName: profile.legalName || profile.tradeName || '',
+    tradeName: profile.tradeName || '',
+    address: [profile.registeredAddress, profile.city, profile.stateName, profile.pincode].filter(Boolean).join(', '),
+    gstin: profile.gstin || '',
+    phone: profile.phone || '',
+    email: profile.email || '',
+    logoUrl: profile.logoUrl || '',
+    signatoryName: profile.signatoryName || '',
+    invoiceTerms: profile.invoiceTerms || ''
+  };
+}
 async function companyStateCode(req) {
   const key = currentCompanyKey(req);
   const profile = await CompanyProfile.findOne({ companyKey: key }).select('gstin stateCode').lean();
@@ -60,6 +75,9 @@ exports.getInvoiceById = async (req, res) => {
       .populate('items.boxId')
       .lean();
     if (!invoice) return res.status(404).json({ message: 'Invoice not found.' });
+    if (!invoice.sellerSnapshot || !invoice.sellerSnapshot.legalName) {
+      invoice.sellerSnapshot = await buildSellerSnapshot(currentCompanyKey(req));
+    }
     return res.json({ invoice });
   } catch (error) {
     console.error('[INVOICE] Detail fetch failed:', error.message);
@@ -277,6 +295,7 @@ exports.createInvoice = async (req, res) => {
       const [created] = await Invoice.create([{
         companyKey,
         invoiceNumber,
+        sellerSnapshot: await buildSellerSnapshot(companyKey, session),
         invoiceDate: date,
         customerId,
         dispatchId,
