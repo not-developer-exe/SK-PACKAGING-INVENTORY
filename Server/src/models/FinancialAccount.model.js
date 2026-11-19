@@ -5,6 +5,7 @@ const financialAccountSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true, maxlength: 100 },
   type: { type: String, enum: ['bank', 'cash'], required: true },
   openingBalance: { type: Number, required: true, min: 0, default: 0 },
+  currentBalance: { type: Number, required: true, min: 0, default: 0 },
   bankName: { type: String, trim: true, maxlength: 120, default: '' },
   accountHolder: { type: String, trim: true, maxlength: 120, default: '' },
   accountNumber: { type: String, trim: true, maxlength: 40, default: '' },
