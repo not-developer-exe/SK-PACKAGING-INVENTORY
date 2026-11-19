@@ -15,7 +15,7 @@ function reconcileSalesDispatch({ dispatches = [], invoices = [], parties = [] }
   for (const dispatch of dispatches) {
     if (dispatch.status === 'cancelled') totals.cancelledDispatches += 1;
     if (dispatch.status === 'delivered') totals.deliveredDispatches += 1;
-    const boxes = (dispatch.boxes || []).reduce((sum, line) => sum + Number(line.dispatchQuantity || 0), 0);
+    const boxes = dispatch.status === 'cancelled' ? 0 : (dispatch.boxes || []).reduce((sum, line) => sum + Number(line.dispatchQuantity || 0), 0);
     totals.dispatchedBoxes += boxes;
     const invoice = invoiceByDispatch.get(String(dispatch._id));
     const issues = [];
