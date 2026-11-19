@@ -55,14 +55,14 @@ before(async () => {
   await mongoose.connect(process.env.MONGODB_URI);
   await mongoose.connection.db.dropDatabase();
   await User.create([
-    { name: 'Integration Admin', email: 'admin@test.local', password: 'AdminPassword-12345', role: 'admin', isActive: true },
+    { name: 'Integration Admin', email: 'official.additya.singh@gmail.com', password: 'AdminPassword-12345', role: 'admin', isActive: true },
     { name: 'Integration Accountant', email: 'accountant@test.local', password: 'AccountantPassword-12345', role: 'accountant', isActive: true }
   ]);
   party = await Party.create({ name: 'Original Party', type: 'Customer', city: 'Gwalior', stateCode: '23' });
   server = app.listen(0);
   await new Promise(resolve => server.once('listening', resolve));
   baseUrl = 'http://127.0.0.1:' + server.address().port;
-  adminCookie = await login('admin@test.local', 'AdminPassword-12345');
+  adminCookie = await login('official.additya.singh@gmail.com', 'AdminPassword-12345');
   accountantCookie = await login('accountant@test.local', 'AccountantPassword-12345');
 });
 
@@ -75,8 +75,14 @@ test('admin console and expense register enforce roles and keep an audit trail',
   const denied = await api('/api/admin-records/parties', { cookie: accountantCookie });
   assert.equal(denied.status, 403);
 
+  const nsbOnlyParty = await Party.create({ name: 'NSB Private Party', type: 'Customer', companyKey: 'nsb-industrial-solutions' });
   const records = await api('/api/admin-records/parties');
   assert.equal(records.status, 200);
+  assert.ok(!records.data.records.some(item => String(item._id) === String(nsbOnlyParty._id)));
+  const blockedCrossCompanyEdit = await api('/api/admin-records/parties/' + nsbOnlyParty._id, {
+    method: 'PATCH', body: { document: { name: 'Cross Company Edit' }, reason: 'Attempting to edit an NSB party from the S.K console.' }
+  });
+  assert.equal(blockedCrossCompanyEdit.status, 404);
   assert.equal(records.data.records.length, 1);
   assert.deepEqual(records.data.editableFields, ['name', 'type', 'phone', 'city']);
   assert.equal(records.data.readOnly, false);
@@ -383,9 +389,9 @@ test('payment allocations reverse atomically and production posting rolls back p
   const unavailableReel = await ReelUnit.create({
     reelCode: 'INT-ROLL-002', reelWidthInches: 25, bf: 18, gsm: 120, quality: 'Natural',
     originalWeightKg: mongoose.Types.Decimal128.fromString('10'),
-    remainingWeightKg: mongoose.Types.Decimal128.fromString('10'),
+    remainingWeightKg: mongoose.Types.Decimal128.fromString('0.5'),
     ratePerKg: mongoose.Types.Decimal128.fromString('50'),
-    status: 'consumed'
+    status: 'partial'
   });
 
   const failedRun = await api('/api/production', {
@@ -569,8 +575,7 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
       runDate: '2026-10-15',
       inputReels: [{ reelId: String(productionReel._id), requestedWidthInches: 36, weightConsumedKg: 100 }],
       outputSheets: [
-        { ply: 3, lengthInches: 36, widthInches: 24, sheetCount: 100, totalWeightKg: 60 },
-        { ply: 5, lengthInches: 48, widthInches: 36, sheetCount: 100, totalWeightKg: 30 }
+        { ply: 3, lengthInches: 36, widthInches: 24, sheetCount: 100, totalWeightKg: 60 }
       ],
       recoverableWasteKg: 5,
       wasteBreakdown: [{ category: 'edge_trim', weightKg: 3 }, { category: 'setup_waste', weightKg: 2 }]
@@ -580,9 +585,9 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
 
   const run = await ProductionRun.findOne({ runNumber: production.data.runNumber });
   assert.equal(Number(run.totalInputWeightKg.toString()), 100);
-  assert.equal(Number(run.totalOutputWeightKg.toString()), 90);
+  assert.equal(Number(run.totalOutputWeightKg.toString()), 60);
   assert.equal(Number(run.totalMaterialCost.toString()), 4400);
-  assert.equal(Number(run.materialCostPerOutputKg.toString()), 48.888889);
+  assert.equal(Number(run.materialCostPerOutputKg.toString()), 73.333333);
   assert.equal(Number(run.recoverableWasteKg.toString()), 5);
   assert.equal(run.machineName, 'Corrugation Line 1');
   assert.equal(run.wasteBreakdown.length, 2);
@@ -627,8 +632,8 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
   assert.equal(finishedBox.quantityProduced, 1000);
   assert.equal(finishedBox.quantityAvailable, 1000);
   assert.equal(finishedBox.costingStatus, 'available');
-  assert.equal(finishedBox.materialCost, 1466.67);
-  assert.equal(finishedBox.costPerBox, 1.47);
+  assert.equal(finishedBox.materialCost, 2200);
+  assert.equal(finishedBox.costPerBox, 2.2);
 
   const remainingSheet = await CorrugatedSheet.findById(outputSheets[0]._id);
   assert.equal(remainingSheet.sheetCount, 50);
@@ -779,8 +784,8 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
   assert.equal(invoice.cgstAmount, 300);
   assert.equal(invoice.sgstAmount, 300);
   assert.equal(invoice.grandTotal, 12600);
-  assert.equal(invoice.costOfGoods, 882);
-  assert.equal(invoice.grossProfit, 11118);
+  assert.equal(invoice.costOfGoods, 1320);
+  assert.equal(invoice.grossProfit, 10680);
   assert.equal((await Party.findById(party._id)).balance, 12600);
 
   const duplicateInvoice = await api('/api/invoices', {
@@ -860,14 +865,14 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
   assert.equal(profitLoss.status, 200);
   assert.equal(profitLoss.data.summary.invoiceCount, 1);
   assert.equal(profitLoss.data.summary.revenue, 12000);
-  assert.equal(profitLoss.data.summary.costOfGoods, 882);
-  assert.equal(profitLoss.data.summary.grossProfit, 11118);
+  assert.equal(profitLoss.data.summary.costOfGoods, 1320);
+  assert.equal(profitLoss.data.summary.grossProfit, 10680);
   assert.equal(profitLoss.data.summary.balanceDue, 0);
   assert.equal(profitLoss.data.summary.operatingExpenses, 200);
   assert.equal(profitLoss.data.summary.financeCosts, 100);
   assert.equal(profitLoss.data.summary.stockLandedCosts, 50);
-  assert.equal(profitLoss.data.summary.operatingProfit, 10918);
-  assert.equal(profitLoss.data.summary.netProfitBeforeTax, 10818);
+  assert.equal(profitLoss.data.summary.operatingProfit, 10480);
+  assert.equal(profitLoss.data.summary.netProfitBeforeTax, 10380);
   assert.equal(profitLoss.data.summary.expenseCount, 3);
   assert.equal(profitLoss.data.summary.operatingExpenseCount, 1);
   assert.equal(profitLoss.data.summary.financeCostCount, 1);

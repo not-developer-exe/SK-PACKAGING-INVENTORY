@@ -28,6 +28,10 @@ const editableFieldsByEntity = {
   expenses: ['expenseDate', 'category', 'amount', 'vendor', 'paymentMode', 'reference', 'description', 'costTreatment']
 };
 
+const companyScopeFor = (Model) => Model.schema.path('companyKey')
+  ? { $or: [{ companyKey: 'sk-packaging' }, { companyKey: { $exists: false } }] }
+  : null;
+
 const workflowManagedEntities = new Set([
   'reels',
   'sheets',
@@ -70,6 +74,8 @@ exports.listAdminRecords = async (req, res) => {
     const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 50));
     const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 100) : '';
     const filter = {};
+    const companyScope = companyScopeFor(Model);
+    if (companyScope) filter.$and = [companyScope];
     if (req.params.entity === 'auditLogs') {
       for (const field of ['action', 'entityType', 'actorRole']) {
         const value = typeof req.query[field] === 'string' ? req.query[field].trim().slice(0, 100) : '';
@@ -98,7 +104,10 @@ exports.listAdminRecords = async (req, res) => {
           .filter(([, schema]) => schema.instance === 'Number')
           .map(([path]) => ({ [path]: numericSearch })));
       }
-      if (conditions.length) filter.$or = conditions;
+      if (conditions.length) {
+        filter.$and = filter.$and || [];
+        filter.$and.push({ $or: conditions });
+      }
     }
     const [records, total] = await Promise.all([
       Model.find(filter).sort(req.params.entity === 'auditLogs' ? { createdAt: -1, _id: -1 } : { updatedAt: -1, createdAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).lean(),
@@ -142,7 +151,10 @@ exports.updateAdminRecord = async (req, res) => {
   try {
     let result;
     await session.withTransaction(async () => {
-      const record = await Model.findById(req.params.id).session(session);
+      const scope = companyScopeFor(Model);
+      const record = await Model.findOne(scope
+        ? { $and: [{ _id: req.params.id }, scope] }
+        : { _id: req.params.id }).session(session);
       if (!record) throw Object.assign(new Error('Record not found.'), { statusCode: 404 });
       const before = serialize(record);
       const allowed = new Set(allowedFields);
