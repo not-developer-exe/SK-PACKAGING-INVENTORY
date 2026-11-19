@@ -906,16 +906,12 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
   assert.equal(finishedMovement.quantityChange, 1000);
 
   const tinyResidualReel = await ReelUnit.create({
-    reelCode: 'PHASE2-REEL-002',
-    reelWidthInches: 24,
-    bf: 18,
-    gsm: 120,
-    quality: 'Natural',
-    originalWeightKg: 100,
-    remainingWeightKg: 100,
-    ratePerKg: 10,
-    landedRatePerKg: 10,
-    status: 'available'
+    reelCode: 'PHASE2-REEL-003', reelWidthInches: 24, bf: 18, gsm: 120, quality: 'Natural',
+    originalWeightKg: 100, remainingWeightKg: 100, ratePerKg: 10, landedRatePerKg: 10, status: 'available'
+  });
+  const tinyFluteReel = await ReelUnit.create({
+    reelCode: 'PHASE2-REEL-004', reelWidthInches: 24, bf: 18, gsm: 100, quality: 'Natural',
+    originalWeightKg: 1, remainingWeightKg: 1, ratePerKg: 10, landedRatePerKg: 10, status: 'available'
   });
   const tinyResidualRun = await api('/api/production', {
     method: 'POST',
@@ -923,8 +919,11 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
       shift: 'Night',
       operatorName: 'Residual Stock Test',
       runDate: '2026-10-20',
-      inputReels: [{ reelId: String(tinyResidualReel._id), requestedWidthInches: 24, weightConsumedKg: 99.9995 }],
-      outputSheets: [{ ply: 3, lengthInches: 24, widthInches: 18, sheetCount: 10, totalWeightKg: 99 }],
+      inputReels: [
+        { reelId: String(tinyResidualReel._id), reelRole: 'plain_surface', requestedWidthInches: 24, weightConsumedKg: 99.9995 },
+        { reelId: String(tinyFluteReel._id), reelRole: 'flute', requestedWidthInches: 24, weightConsumedKg: 0.0005 }
+      ],
+      outputSheets: [{ ply: 2, lengthInches: 24, widthInches: 18, sheetCount: 10, totalWeightKg: 99.9 }],
       recoverableWasteKg: 0.1,
       wasteBreakdown: [{ category: 'edge_trim', weightKg: 0.1 }]
     }
