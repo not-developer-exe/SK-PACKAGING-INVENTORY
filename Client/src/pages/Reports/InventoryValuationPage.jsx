@@ -17,7 +17,7 @@ export default function InventoryValuationPage() {
   const load = async (params = {}) => {
     setLoading(true); setError('');
     try {
-      const response = await axiosClient.get('/reports/inventory-valuation', { params: { ...params, groupBy } });
+      const response = await axiosClient.get('/reports/inventory-valuation', { params: { ...params, groupBy: params.groupBy || groupBy } });
       setData(response.data);
     } catch (err) {
       setError(err.response?.data?.message || 'Unable to load inventory valuation.');
