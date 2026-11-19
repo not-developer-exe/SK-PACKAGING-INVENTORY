@@ -11,6 +11,23 @@ const { recalculatePartyLedger } = require('../utils/partyLedger');
 const { normalizeStateCode, getCompanyStateCode, calculateGstBreakdown } = require('../utils/gst');
 
 
+
+exports.getInvoiceById = async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid invoice ID.' });
+  try {
+    const invoice = await Invoice.findById(req.params.id)
+      .populate('customerId')
+      .populate('dispatchId')
+      .populate('items.boxId')
+      .lean();
+    if (!invoice) return res.status(404).json({ message: 'Invoice not found.' });
+    return res.json({ invoice });
+  } catch (error) {
+    console.error('[INVOICE] Detail fetch failed:', error.message);
+    return res.status(500).json({ message: 'Unable to fetch invoice details.' });
+  }
+};
+
 exports.cancelInvoice = async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid invoice ID.' });
   const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
