@@ -140,8 +140,9 @@ exports.getUninvoicedDispatches = async (req, res) => {
 exports.getTaxContext = async (req, res) => {
   const stateCode = companyStateCode(req);
   return res.json({
-    companyStateCode: companyStateCode || null,
-    configured: Boolean(companyStateCode)
+    companyStateCode: stateCode || null,
+    configured: Boolean(stateCode),
+    companyKey: currentCompanyKey(req)
   });
 };
 
@@ -194,7 +195,6 @@ exports.createInvoice = async (req, res) => {
       const companyKey = currentCompanyKey(req);
       const customer = await Party.findOne({ _id: customerId, companyKey }).session(session);
       const dispatch = await Dispatch.findOne({ _id: dispatchId, customerId, companyKey }).session(session);
-      const companyKey = currentCompanyKey(req);
       const existingInvoice = await Invoice.findOne({ dispatchId, ...invoiceCompanyFilter(req) }).session(session);
 
       if (!customer || customer.isActive === false || !['Customer', 'Both'].includes(customer.type)) {
