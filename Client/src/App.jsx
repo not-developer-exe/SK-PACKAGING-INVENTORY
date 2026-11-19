@@ -91,7 +91,8 @@ function Sidebar() {
     ...(user?.role === 'admin' ? [{ group: 'NSB Industrial Solutions', items: [
       { name: 'NSB Overview', path: '/nsb', icon: Building2 },
       { name: 'NSB Customers & Suppliers', path: '/nsb/parties', icon: Users },
-      { name: 'NSB Expenses', path: '/nsb/expenses', icon: Receipt }
+      { name: 'NSB Expenses', path: '/nsb/expenses', icon: Receipt },
+      { name: 'NSB Sales Invoices', path: '/nsb/sales', icon: FileText }
     ] }] : [])
   ];
 
@@ -146,6 +147,9 @@ export default function App() {
           <Route index element={<Overview />} />
           <Route path="nsb" element={user?.role === 'admin' ? <NSBOverviewPage /> : <Navigate to="/" replace />} />
           <Route path="nsb/expenses" element={user?.role === 'admin' ? <ExpensesPage company="nsb" /> : <Navigate to="/" replace />} />
+          <Route path="nsb/sales" element={user?.role === 'admin' ? <SalesInvoicesPage company="nsb" /> : <Navigate to="/" replace />} />
+          <Route path="nsb/sales/new" element={user?.role === 'admin' ? <CreateInvoicePage company="nsb" /> : <Navigate to="/" replace />} />
+          <Route path="nsb/sales/:id" element={user?.role === 'admin' ? <InvoiceDetailPage company="nsb" /> : <Navigate to="/" replace />} />
           <Route path="nsb/parties" element={user?.role === 'admin' ? <PartyMasterPage company="nsb" /> : <Navigate to="/" replace />} />
           <Route path="parties" element={<PartyMasterPage />} />
           <Route path="sales" element={<SalesInvoicesPage />} />
