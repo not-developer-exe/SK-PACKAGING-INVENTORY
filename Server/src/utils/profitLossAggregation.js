@@ -1,5 +1,3 @@
-const numeric = (value) => Number(value === null || value === undefined ? 0 : value.toString());
-
 const dateKey = (value, mode) => {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Kolkata',
