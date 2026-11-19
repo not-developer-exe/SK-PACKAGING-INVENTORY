@@ -6,23 +6,25 @@ import axiosClient from '../../api/axiosClient';
 const money = (value) => '₹' + Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const date = (value) => value ? new Date(value).toLocaleDateString('en-IN') : '—';
 
-export default function InvoiceDetailPage() {
+export default function InvoiceDetailPage({ company = 'sk' }) {
   const { id } = useParams();
   const navigate = useNavigate();
+  const apiBase = company === 'nsb' ? '/nsb/invoices' : '/invoices';
+  const routeBase = company === 'nsb' ? '/nsb/sales' : '/sales';
   const [invoice, setInvoice] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
     let active = true;
-    axiosClient.get('/invoices/' + id).then(({ data }) => { if (active) setInvoice(data.invoice); })
+    axiosClient.get(apiBase + '/' + id).then(({ data }) => { if (active) setInvoice(data.invoice); })
       .catch((err) => { if (active) setError(err.response?.data?.message || 'Unable to load invoice.'); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [id]);
 
   if (loading) return <div className="flex h-64 items-center justify-center text-slate-500"><Loader2 className="mr-2 animate-spin" />Loading invoice…</div>;
-  if (error || !invoice) return <div className="mx-auto max-w-3xl rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">{error || 'Invoice not found.'}<button onClick={() => navigate('/sales')} className="ml-3 underline">Back to invoices</button></div>;
+  if (error || !invoice) return <div className="mx-auto max-w-3xl rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">{error || 'Invoice not found.'}<button onClick={() => navigate(routeBase)} className="ml-3 underline">Back to invoices</button></div>;
 
   const party = invoice.customerId || {};
   const dispatch = invoice.dispatchId || {};

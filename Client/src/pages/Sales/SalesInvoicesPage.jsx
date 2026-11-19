@@ -4,15 +4,17 @@ import { Search, Plus, Filter, RefreshCw, Ban } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import axiosClient from '../../api/axiosClient';
 import DateRangeFilter from '../../components/DateRangeFilter';
-import { partiesService } from '../../services/partiesService';
 import { useDialogs } from '../../context/DialogContext';
 
 const money = (value) => '₹' + Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-export default function SalesInvoicesPage() {
+export default function SalesInvoicesPage({ company = 'sk' }) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { confirm, prompt } = useDialogs();
+  const apiBase = company === 'nsb' ? '/nsb/invoices' : '/invoices';
+  const partiesBase = company === 'nsb' ? '/nsb/parties' : '/parties';
+  const routeBase = company === 'nsb' ? '/nsb/sales' : '/sales';
   const [invoices, setInvoices] = useState([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -28,7 +30,7 @@ export default function SalesInvoicesPage() {
     setLoading(true);
     setError('');
     try {
-      const { data } = await axiosClient.get('/invoices', { params: dateParams });
+      const { data } = await axiosClient.get(apiBase, { params: dateParams });
       setInvoices(data.invoices || []);
     } catch (err) {
       setError(err.response?.data?.message || 'Unable to load invoices.');
@@ -37,7 +39,7 @@ export default function SalesInvoicesPage() {
     }
   };
 
-  useEffect(() => { loadInvoices(); partiesService.getCustomers().then(setCustomers).catch(() => setCustomers([])); }, []);
+  useEffect(() => { loadInvoices(); axiosClient.get(partiesBase + '?type=customer').then(({ data }) => setCustomers(Array.isArray(data) ? data : [])).catch(() => setCustomers([])); }, []);
 
   const filteredInvoices = useMemo(() => invoices.filter((invoice) => {
     const partyName = invoice.customerId?.name || '';
@@ -56,7 +58,7 @@ export default function SalesInvoicesPage() {
     if (!approved) return;
     setCancellingId(invoice._id); setError('');
     try {
-      await axiosClient.patch('/invoices/' + invoice._id + '/cancel', { reason: reason.trim() });
+      await axiosClient.patch(apiBase + '/' + invoice._id + '/cancel', { reason: reason.trim() });
       await loadInvoices({ from, to, customerId: customerFilter });
     } catch (err) { setError(err.response?.data?.message || 'Unable to cancel invoice.'); }
     finally { setCancellingId(''); }
@@ -85,7 +87,7 @@ export default function SalesInvoicesPage() {
         </div>
         <div className="flex gap-2">
           <button onClick={() => loadInvoices({ from, to, customerId: customerFilter })} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-600"><RefreshCw size={15} className="mr-1 inline" />Refresh</button>
-          <button onClick={() => navigate('/sales/new')} className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white"><Plus size={16} className="mr-1 inline" />New GST Invoice</button>
+          <button onClick={() => navigate(routeBase + '/new')} className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white"><Plus size={16} className="mr-1 inline" />New GST Invoice</button>
         </div>
       </div>
 
@@ -110,7 +112,7 @@ export default function SalesInvoicesPage() {
             <table className="w-full min-w-[760px] text-left text-sm">
               <thead className="border-b bg-white text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-4">Date</th><th className="px-5 py-4">Invoice No.</th><th className="px-5 py-4">Customer</th><th className="px-5 py-4">Challan</th><th className="px-5 py-4 text-right">Invoice Total</th><th className="px-5 py-4 text-right">Balance Due</th><th className="px-5 py-4 text-right">Gross Profit</th><th className="px-5 py-4 text-center">Status</th>{user?.role === "admin" && <th className="px-5 py-4 text-center">Action</th>}</tr></thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredInvoices.map((invoice) => <tr key={invoice._id} onClick={() => navigate("/sales/" + invoice._id)} onKeyDown={(event) => { if (event.key === "Enter") navigate("/sales/" + invoice._id); }} tabIndex={0} role="link" aria-label={"Open invoice " + invoice.invoiceNumber} className="cursor-pointer hover:bg-blue-50/40 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500">
+                {filteredInvoices.map((invoice) => <tr key={invoice._id} onClick={() => navigate(routeBase + "/" + invoice._id)} onKeyDown={(event) => { if (event.key === "Enter") navigate(routeBase + "/" + invoice._id); }} tabIndex={0} role="link" aria-label={"Open invoice " + invoice.invoiceNumber} className="cursor-pointer hover:bg-blue-50/40 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500">
                   <td className="px-5 py-4 text-slate-600">{new Date(invoice.invoiceDate).toLocaleDateString('en-IN')}</td>
                   <td className="px-5 py-4 font-semibold text-blue-700">{invoice.invoiceNumber}</td>
                   <td className="px-5 py-4 font-medium text-slate-900">{invoice.customerId?.name || '—'}</td>
