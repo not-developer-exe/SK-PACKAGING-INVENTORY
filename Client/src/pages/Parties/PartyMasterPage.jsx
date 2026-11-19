@@ -278,7 +278,7 @@ export default function PartyMasterPage({ company = 'sk' }) {
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <button onClick={openEdit} className="rounded-lg border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-700">Edit party details</button>
+              <button onClick={() => openEdit(selectedParty)} className="rounded-lg border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-700">Edit party details</button>
               <div className="text-right">
               <p className="text-xs uppercase text-slate-500">Current outstanding</p>
               <p className="text-2xl font-bold text-slate-900">{money(selectedParty.balance)}</p>
