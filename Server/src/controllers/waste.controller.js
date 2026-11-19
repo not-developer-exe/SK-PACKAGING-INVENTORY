@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const ProductionRun = require('../models/ProductionRun.model');
 const ScrapSale = require('../models/ScrapSale.model');
 const ThakEntry = require('../models/ThakEntry.model');
 const WasteInventory = require('../models/WasteInventory.model');
@@ -16,68 +15,32 @@ const sumField = (rows, field) => asNumber(rows[0] && rows[0][field]);
 
 exports.getWasteStats = async (req, res) => {
   try {
-    const productionFilter = {
-      recoverableWasteKg: { $gt: 0 },
-      ...buildDateRangeFilter(req.query.from, req.query.to, 'runDate')
-    };
     const salesFilter = buildDateRangeFilter(req.query.from, req.query.to, 'saleDate');
     if (req.query.buyerName) salesFilter.buyerName = String(req.query.buyerName).trim();
-
-    const [
-      productionWaste, scrapSales, thakSales, thakEntries, legacyRows,
-      allTimeGeneratedRows, allTimeScrapSoldRows, allTimeThakEnteredRows, allTimeThakSoldRows
-    ] = await Promise.all([
-      ProductionRun.find(productionFilter).sort({ runDate: -1, createdAt: -1 }).limit(1000)
-        .select('runNumber runDate createdAt recoverableWasteKg processLossKg operatorName totalMaterialCost totalInputWeightKg materialCostPerInputKg recoverableWasteMaterialCost processLossMaterialCost wasteCostingStatus wasteBreakdown').lean(),
+    const [scrapSales, thakSales, thakEntries, allTimeThakEnteredRows, allTimeThakSoldRows] = await Promise.all([
       ScrapSale.find({ ...salesFilter, saleType: { $ne: 'thak' } }).sort({ saleDate: -1, createdAt: -1 }).limit(1000).lean(),
       ScrapSale.find({ ...salesFilter, saleType: 'thak' }).sort({ saleDate: -1, createdAt: -1 }).limit(1000).lean(),
       ThakEntry.find(buildDateRangeFilter(req.query.from, req.query.to, 'entryDate')).sort({ entryDate: -1, createdAt: -1 }).limit(1000).lean(),
-      ProductionRun.aggregate([
-        { $match: { recoverableWasteKg: { $exists: false }, wasteGeneratedKg: { $gt: 0 } } },
-        { $group: { _id: null, total: { $sum: '$wasteGeneratedKg' } } }
-      ]),
-      ProductionRun.aggregate([{ $group: { _id: null, total: { $sum: { $ifNull: ['$recoverableWasteKg', 0] } } } }]),
-      ScrapSale.aggregate([{ $match: { saleType: { $ne: 'thak' } } }, { $group: { _id: null, total: { $sum: '$weightSoldKg' } } }]),
       ThakEntry.aggregate([{ $group: { _id: null, total: { $sum: '$weightKg' } } }]),
       ScrapSale.aggregate([{ $match: { saleType: 'thak' } }, { $group: { _id: null, total: { $sum: '$weightSoldKg' } } }])
     ]);
-
-    const totalWasteGenerated = productionWaste.reduce((sum, run) => sum + asNumber(run.recoverableWasteKg), 0);
-    const totalWasteSold = scrapSales.reduce((sum, sale) => sum + asNumber(sale.weightSoldKg), 0);
-    const allTimeGenerated = sumField(allTimeGeneratedRows, 'total');
-    const allTimeScrapSold = sumField(allTimeScrapSoldRows, 'total');
     const allTimeThakEntered = sumField(allTimeThakEnteredRows, 'total');
     const allTimeThakSold = sumField(allTimeThakSoldRows, 'total');
-    const legacyUnverifiedWasteKg = sumField(legacyRows, 'total');
-
-    const verifiedRuns = productionWaste.map((run) => ({
-      ...run,
-      recoverableWasteKg: asNumber(run.recoverableWasteKg),
-      processLossKg: asNumber(run.processLossKg),
-      materialCostPerInputKg: asNumber(run.materialCostPerInputKg),
-      recoverableWasteMaterialCost: asNumber(run.recoverableWasteMaterialCost),
-      processLossMaterialCost: asNumber(run.processLossMaterialCost),
-      wasteCostingStatus: run.wasteCostingStatus || 'pending',
-      wasteBreakdown: (run.wasteBreakdown || []).map((row) => ({ ...row, weightKg: asNumber(row.weightKg), materialCost: asNumber(row.materialCost) }))
-    }));
-    const totalWasteMaterialCost = verifiedRuns.reduce((sum, run) => sum + (run.wasteCostingStatus === 'available' ? run.recoverableWasteMaterialCost : 0), 0);
-    const pendingWasteCostingRuns = verifiedRuns.filter((run) => run.recoverableWasteKg > 0 && run.wasteCostingStatus !== 'available').length;
+    const totalScrapSold = scrapSales.reduce((sum, sale) => sum + asNumber(sale.weightSoldKg), 0);
+    const totalScrapSalesAmount = Number(scrapSales.reduce((sum, sale) => sum + asNumber(sale.totalAmount), 0).toFixed(2));
+    const totalThakEntered = thakEntries.reduce((sum, entry) => sum + asNumber(entry.weightKg), 0);
+    const totalThakSold = thakSales.reduce((sum, sale) => sum + asNumber(sale.weightSoldKg), 0);
+    const totalThakSalesAmount = Number(thakSales.reduce((sum, sale) => sum + asNumber(sale.totalAmount), 0).toFixed(2));
 
     return res.json({
-      currentWasteInventory: calculateScrapAvailability(allTimeGenerated, allTimeScrapSold),
       currentThakInventory: calculateScrapAvailability(allTimeThakEntered, allTimeThakSold),
-      totalWasteGenerated,
-      totalWasteSold,
-      totalThakEntered: thakEntries.reduce((sum, entry) => sum + asNumber(entry.weightKg), 0),
-      totalThakSold: thakSales.reduce((sum, sale) => sum + asNumber(sale.weightSoldKg), 0),
-      totalWasteMaterialCost: Number(totalWasteMaterialCost.toFixed(2)),
-      pendingWasteCostingRuns,
-      allTimeWasteGenerated: allTimeGenerated,
-      allTimeWasteSold: allTimeScrapSold,
+      totalScrapSold,
+      totalScrapSalesAmount,
+      totalThakEntered,
+      totalThakSold,
+      totalThakSalesAmount,
       allTimeThakEntered,
       allTimeThakSold,
-      legacyUnverifiedWasteKg,
-      productionWaste: verifiedRuns,
       scrapSales,
       thakEntries,
       thakSales,
@@ -153,25 +116,17 @@ exports.recordScrapSale = async (req, res) => {
         { upsert: true, new: true, setDefaultsOnInsert: true, session }
       );
 
-      let generated = 0;
-      let sold = 0;
+      // Normal scrap is recorded only when sold; the factory does not maintain
+      // production-stage scrap stock. Thak is weighed into its own stock ledger.
       if (saleType === 'thak') {
         const enteredRows = await ThakEntry.aggregate([{ $group: { _id: null, total: { $sum: '$weightKg' } } }]).session(session);
         const soldRows = await ScrapSale.aggregate([{ $match: { saleType: 'thak' } }, { $group: { _id: null, total: { $sum: '$weightSoldKg' } } }]).session(session);
-        generated = sumField(enteredRows, 'total');
-        sold = sumField(soldRows, 'total');
-      } else {
-        const generatedRows = await ProductionRun.aggregate([{ $group: { _id: null, total: { $sum: { $ifNull: ['$recoverableWasteKg', 0] } } } }]).session(session);
-        const soldRows = await ScrapSale.aggregate([{ $match: { saleType: { $ne: 'thak' } } }, { $group: { _id: null, total: { $sum: '$weightSoldKg' } } }]).session(session);
-        generated = sumField(generatedRows, 'total');
-        sold = sumField(soldRows, 'total');
-      }
-      const available = calculateScrapAvailability(generated, sold);
-      if (weightSoldKg > available) {
-        const label = saleType === 'thak' ? 'Thak' : 'verified scrap';
-        const error = new Error('Insufficient ' + label + ' stock. Available: ' + available.toFixed(2) + ' kg; requested: ' + weightSoldKg.toFixed(2) + ' kg.');
-        error.statusCode = 409;
-        throw error;
+        const available = calculateScrapAvailability(sumField(enteredRows, 'total'), sumField(soldRows, 'total'));
+        if (weightSoldKg > available) {
+          const error = new Error('Insufficient Thak stock. Available: ' + available.toFixed(2) + ' kg; requested: ' + weightSoldKg.toFixed(2) + ' kg.');
+          error.statusCode = 409;
+          throw error;
+        }
       }
 
       const totalAmount = Math.round(weightSoldKg * ratePerKg * 100) / 100;
