@@ -16,6 +16,7 @@ const invoiceSchema = new mongoose.Schema({
   invoiceDate: { type: Date, required: true },
   customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Party', required: true },
   dispatchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Dispatch', required: true }, // Links directly to Delivery Challan
+  sellerSnapshot: { type: mongoose.Schema.Types.Mixed, default: null },
   
   items: [{
     boxId: { type: mongoose.Schema.Types.ObjectId, ref: 'FinishedBox' },
