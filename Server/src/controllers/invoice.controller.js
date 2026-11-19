@@ -31,7 +31,7 @@ function getFinancialYear(dateOnly) {
   return String(startYear).slice(-2) + '-' + String(startYear + 1).slice(-2);
 }
 async function nextInvoiceNumber(companyKey, invoiceDate, session) {
-  const financialYear = getFinancialYear(invoiceDate.toISOString().slice(0, 10));
+  const financialYear = getFinancialYear(invoiceDate);
   const sequence = await InvoiceSequence.findOneAndUpdate(
     { companyKey, financialYear },
     { $inc: { nextNumber: 1 }, $setOnInsert: { companyKey, financialYear } },
