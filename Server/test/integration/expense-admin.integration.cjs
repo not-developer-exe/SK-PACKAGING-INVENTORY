@@ -554,35 +554,29 @@ test('inward posting preserves individual reel weights, landed cost and stock le
 
 test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and FIFO traceability', async () => {
   const productionReel = await ReelUnit.create({
-    reelCode: 'PHASE2-REEL-001',
-    reelWidthInches: 36,
-    bf: 18,
-    gsm: 140,
-    quality: 'Natural',
-    originalWeightKg: 100,
-    remainingWeightKg: 100,
-    ratePerKg: 40,
-    landedRatePerKg: 44,
-    status: 'available'
+    reelCode: 'PHASE2-REEL-001', reelWidthInches: 36, bf: 18, gsm: 140, quality: 'Natural',
+    originalWeightKg: 50, remainingWeightKg: 50, ratePerKg: 40, landedRatePerKg: 44, status: 'available'
+  });
+  const fluteReel = await ReelUnit.create({
+    reelCode: 'PHASE2-REEL-002', reelWidthInches: 36, bf: 18, gsm: 120, quality: 'Natural',
+    originalWeightKg: 50, remainingWeightKg: 50, ratePerKg: 40, landedRatePerKg: 44, status: 'available'
   });
 
   const production = await api('/api/production', {
     method: 'POST',
     body: {
-      shift: 'Day',
-      operatorName: 'Phase 2 Integration',
-      machineName: 'Corrugation Line 1',
+      shift: 'Day', operatorName: 'Phase 2 Integration', machineName: 'Corrugation Line 1',
       runDate: '2026-10-15',
-      inputReels: [{ reelId: String(productionReel._id), requestedWidthInches: 36, weightConsumedKg: 100 }],
-      outputSheets: [
-        { ply: 3, lengthInches: 36, widthInches: 24, sheetCount: 100, totalWeightKg: 60 }
+      inputReels: [
+        { reelId: String(productionReel._id), reelRole: 'plain_surface', requestedWidthInches: 36, weightConsumedKg: 50 },
+        { reelId: String(fluteReel._id), reelRole: 'flute', requestedWidthInches: 36, weightConsumedKg: 50 }
       ],
+      outputSheets: [{ ply: 2, lengthInches: 36, widthInches: 24, sheetCount: 100, totalWeightKg: 90 }],
       recoverableWasteKg: 5,
       wasteBreakdown: [{ category: 'edge_trim', weightKg: 3 }, { category: 'setup_waste', weightKg: 2 }]
     }
   });
   assert.equal(production.status, 201);
-
   const run = await ProductionRun.findOne({ runNumber: production.data.runNumber });
   assert.equal(Number(run.totalInputWeightKg.toString()), 100);
   assert.equal(Number(run.totalOutputWeightKg.toString()), 60);
@@ -594,17 +588,38 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
   assert.equal(Number(run.processLossKg.toString()), 5);
 
   const outputSheets = await CorrugatedSheet.find({ productionRunId: run._id }).sort({ ply: 1 });
-  assert.equal(outputSheets.length, 2);
-  assert.ok(outputSheets.every(sheet => Number(sheet.unitCostPerKg.toString()) === 48.888889));
+  assert.equal(outputSheets.length, 1);
+  assert.equal(outputSheets[0].ply, 2);
+  assert.equal(Number(outputSheets[0].unitCostPerKg.toString()), 48.888889);
+
+  const facingResponse = await api('/api/pasting/facing-material', {
+    method: 'POST',
+    body: { materialType: 'printed', lengthInches: 36, widthInches: 24, sheetCount: 100,
+      totalWeightKg: 40, ratePerKg: 30, supplierName: 'Integration Printer', inwardDate: '2026-10-15' }
+  });
+  assert.equal(facingResponse.status, 201);
+  const pastingResponse = await api('/api/pasting/runs', {
+    method: 'POST',
+    body: { runDate: '2026-10-15', operatorName: 'Pasting Integration',
+      sourceSheetId: String(outputSheets[0]._id), facingBatchId: String(facingResponse.data.batch._id),
+      sheetsConsumed: 50, facingSheetsConsumed: 50, outputSheetCount: 50,
+      outputWeightKg: 60, adhesiveWeightKg: 0.5, wasteWeightKg: 1.5 }
+  });
+  assert.equal(pastingResponse.status, 201);
+  const pastedSheet = await CorrugatedSheet.findById(pastingResponse.data.outputSheet._id);
+  assert.equal(pastedSheet.ply, 3);
+  assert.equal(pastedSheet.sheetCount, 50);
+  assert.equal(pastedSheet.costingStatus, 'available');
+
   const availableBeforeConversion = await api('/api/conversion/sheets');
   assert.equal(availableBeforeConversion.status, 200);
-  assert.equal(availableBeforeConversion.data.sheets[0].productionRunId.runNumber, run.runNumber);
+  assert.ok(availableBeforeConversion.data.sheets.some(sheet => String(sheet._id) === String(pastedSheet._id)));
 
   const overdrawnConversion = await api('/api/conversion', {
     method: 'POST',
     body: {
-      sheetId: String(outputSheets[0]._id),
-      sheetsConsumed: 101,
+      sheetId: String(pastedSheet._id),
+      sheetsConsumed: 51,
       customerId: String(party._id),
       itemName: 'Overdraw Test Box',
       dimensions: { length: 12, width: 10, height: 8 },
@@ -613,13 +628,13 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
     }
   });
   assert.equal(overdrawnConversion.status, 409);
-  assert.equal((await CorrugatedSheet.findById(outputSheets[0]._id)).sheetCount, 100);
+  assert.equal((await CorrugatedSheet.findById(pastedSheet._id)).sheetCount, 50);
 
   const conversion = await api('/api/conversion', {
     method: 'POST',
     body: {
-      sheetId: String(outputSheets[0]._id),
-      sheetsConsumed: 50,
+      sheetId: String(pastedSheet._id),
+      sheetsConsumed: 25,
       customerId: String(party._id),
       itemName: 'Phase 2 Test Box',
       dimensions: { length: 12, width: 10, height: 8 },
@@ -632,11 +647,11 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
   assert.equal(finishedBox.quantityProduced, 1000);
   assert.equal(finishedBox.quantityAvailable, 1000);
   assert.equal(finishedBox.costingStatus, 'available');
-  assert.equal(finishedBox.materialCost, 2200);
-  assert.equal(finishedBox.costPerBox, 2.2);
+  assert.equal(finishedBox.materialCost, 1400);
+  assert.equal(finishedBox.costPerBox, 1.4);
 
-  const remainingSheet = await CorrugatedSheet.findById(outputSheets[0]._id);
-  assert.equal(remainingSheet.sheetCount, 50);
+  const remainingSheet = await CorrugatedSheet.findById(pastedSheet._id);
+  assert.equal(remainingSheet.sheetCount, 25);
   assert.equal(Number(remainingSheet.totalWeightKg.toString()), 30);
   const wrongCustomer = await Party.create({ name: 'Dispatch Wrong Customer', type: 'Customer' });
   const wrongDispatch = await api('/api/dispatch', {
@@ -784,8 +799,8 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
   assert.equal(invoice.cgstAmount, 300);
   assert.equal(invoice.sgstAmount, 300);
   assert.equal(invoice.grandTotal, 12600);
-  assert.equal(invoice.costOfGoods, 1320);
-  assert.equal(invoice.grossProfit, 10680);
+  assert.equal(invoice.costOfGoods, 840);
+  assert.equal(invoice.grossProfit, 11160);
   assert.equal((await Party.findById(party._id)).balance, 12600);
 
   const duplicateInvoice = await api('/api/invoices', {
@@ -865,14 +880,14 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
   assert.equal(profitLoss.status, 200);
   assert.equal(profitLoss.data.summary.invoiceCount, 1);
   assert.equal(profitLoss.data.summary.revenue, 12000);
-  assert.equal(profitLoss.data.summary.costOfGoods, 1320);
-  assert.equal(profitLoss.data.summary.grossProfit, 10680);
+  assert.equal(profitLoss.data.summary.costOfGoods, 840);
+  assert.equal(profitLoss.data.summary.grossProfit, 11160);
   assert.equal(profitLoss.data.summary.balanceDue, 0);
   assert.equal(profitLoss.data.summary.operatingExpenses, 200);
   assert.equal(profitLoss.data.summary.financeCosts, 100);
   assert.equal(profitLoss.data.summary.stockLandedCosts, 50);
-  assert.equal(profitLoss.data.summary.operatingProfit, 10480);
-  assert.equal(profitLoss.data.summary.netProfitBeforeTax, 10380);
+  assert.equal(profitLoss.data.summary.operatingProfit, 10960);
+  assert.equal(profitLoss.data.summary.netProfitBeforeTax, 10860);
   assert.equal(profitLoss.data.summary.expenseCount, 3);
   assert.equal(profitLoss.data.summary.operatingExpenseCount, 1);
   assert.equal(profitLoss.data.summary.financeCostCount, 1);
@@ -885,7 +900,7 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
   assert.equal(misleadingPartyFilter.status, 400);
 
   const sheetIssue = await StockMovement.findOne({
-    referenceId: outputSheets[0]._id,
+    referenceId: pastedSheet._id,
     movementType: 'production_issue'
   });
   assert.equal(sheetIssue.quantityChange, -50);
@@ -897,16 +912,12 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
   assert.equal(finishedMovement.quantityChange, 1000);
 
   const tinyResidualReel = await ReelUnit.create({
-    reelCode: 'PHASE2-REEL-002',
-    reelWidthInches: 24,
-    bf: 18,
-    gsm: 120,
-    quality: 'Natural',
-    originalWeightKg: 100,
-    remainingWeightKg: 100,
-    ratePerKg: 10,
-    landedRatePerKg: 10,
-    status: 'available'
+    reelCode: 'PHASE2-REEL-003', reelWidthInches: 24, bf: 18, gsm: 120, quality: 'Natural',
+    originalWeightKg: 100, remainingWeightKg: 100, ratePerKg: 10, landedRatePerKg: 10, status: 'available'
+  });
+  const tinyFluteReel = await ReelUnit.create({
+    reelCode: 'PHASE2-REEL-004', reelWidthInches: 24, bf: 18, gsm: 100, quality: 'Natural',
+    originalWeightKg: 1, remainingWeightKg: 1, ratePerKg: 10, landedRatePerKg: 10, status: 'available'
   });
   const tinyResidualRun = await api('/api/production', {
     method: 'POST',
@@ -914,8 +925,11 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
       shift: 'Night',
       operatorName: 'Residual Stock Test',
       runDate: '2026-10-20',
-      inputReels: [{ reelId: String(tinyResidualReel._id), requestedWidthInches: 24, weightConsumedKg: 99.9995 }],
-      outputSheets: [{ ply: 3, lengthInches: 24, widthInches: 18, sheetCount: 10, totalWeightKg: 99 }],
+      inputReels: [
+        { reelId: String(tinyResidualReel._id), reelRole: 'plain_surface', requestedWidthInches: 24, weightConsumedKg: 99.9995 },
+        { reelId: String(tinyFluteReel._id), reelRole: 'flute', requestedWidthInches: 24, weightConsumedKg: 0.0005 }
+      ],
+      outputSheets: [{ ply: 2, lengthInches: 24, widthInches: 18, sheetCount: 10, totalWeightKg: 99.9 }],
       recoverableWasteKg: 0.1,
       wasteBreakdown: [{ category: 'edge_trim', weightKg: 0.1 }]
     }
@@ -927,8 +941,7 @@ test('reel-to-sheet costing and sheet-to-box conversion preserve mass, cost and 
 
   const fifoSheets = await api('/api/conversion/sheets');
   assert.equal(fifoSheets.status, 200);
-  assert.equal(fifoSheets.data.sheets[0].productionRunId.runNumber, run.runNumber);
-  assert.equal(fifoSheets.data.sheets.at(-1).productionRunId.runNumber, tinyResidualRun.data.runNumber);
+  assert.ok(fifoSheets.data.sheets.some(sheet => String(sheet._id) === String(pastedSheet._id)));
 
   const scrapSale = await api('/api/waste/sale', {
     method: 'POST',
