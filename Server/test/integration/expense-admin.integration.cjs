@@ -3,8 +3,6 @@ const assert = require('node:assert/strict');
 
 process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = 'integration-test-secret-that-is-long-enough';
-// The integration admin is a test-only owner identity; production still uses the configured owner email.
-process.env.ADMIN_EMAIL = 'admin@test.local';
 process.env.GST_STATE_CODE = process.env.GST_STATE_CODE || '23';
 if (!process.env.MONGODB_URI) throw new Error('MONGODB_URI must point to a MongoDB replica set');
 
@@ -57,14 +55,14 @@ before(async () => {
   await mongoose.connect(process.env.MONGODB_URI);
   await mongoose.connection.db.dropDatabase();
   await User.create([
-    { name: 'Integration Admin', email: 'admin@test.local', password: 'AdminPassword-12345', role: 'admin', isActive: true },
+    { name: 'Integration Admin', email: 'official.additya.singh@gmail.com', password: 'AdminPassword-12345', role: 'admin', isActive: true },
     { name: 'Integration Accountant', email: 'accountant@test.local', password: 'AccountantPassword-12345', role: 'accountant', isActive: true }
   ]);
   party = await Party.create({ name: 'Original Party', type: 'Customer', city: 'Gwalior', stateCode: '23' });
   server = app.listen(0);
   await new Promise(resolve => server.once('listening', resolve));
   baseUrl = 'http://127.0.0.1:' + server.address().port;
-  adminCookie = await login('admin@test.local', 'AdminPassword-12345');
+  adminCookie = await login('official.additya.singh@gmail.com', 'AdminPassword-12345');
   accountantCookie = await login('accountant@test.local', 'AccountantPassword-12345');
 });
 
@@ -391,9 +389,9 @@ test('payment allocations reverse atomically and production posting rolls back p
   const unavailableReel = await ReelUnit.create({
     reelCode: 'INT-ROLL-002', reelWidthInches: 25, bf: 18, gsm: 120, quality: 'Natural',
     originalWeightKg: mongoose.Types.Decimal128.fromString('10'),
-    remainingWeightKg: mongoose.Types.Decimal128.fromString('10'),
+    remainingWeightKg: mongoose.Types.Decimal128.fromString('0.5'),
     ratePerKg: mongoose.Types.Decimal128.fromString('50'),
-    status: 'consumed'
+    status: 'partial'
   });
 
   const failedRun = await api('/api/production', {
