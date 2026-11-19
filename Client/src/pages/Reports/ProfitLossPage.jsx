@@ -38,7 +38,7 @@ export default function ProfitLossPage() {
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Profit & Loss Overview</h1>
-          <p className="mt-1 text-sm text-slate-500">Manufacturing material cost, invoiced sales, receivables and scrap proceeds.</p>
+          <p className="mt-1 text-sm text-slate-500">Material gross profit, actual scrap and Thak sale proceeds, expenses and receivables.</p>
         </div>
         <button onClick={loadReport} disabled={loading} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 disabled:opacity-60"><RefreshCw size={15} className="mr-2 inline" />Refresh report</button>
       </div>
@@ -59,10 +59,10 @@ export default function ProfitLossPage() {
             <div className="rounded-2xl border border-slate-200 bg-white p-5"><p className="text-sm text-slate-500"><TrendingUp size={15} className="mr-1 inline" />Material gross profit on costed invoices</p><p className="mt-2 text-2xl font-bold text-slate-900">{money(report.summary.grossProfit)}</p><p className="mt-1 text-xs text-slate-500">{report.summary.grossProfitCoveragePercent}% costing coverage</p></div>
             <div className="rounded-2xl border border-slate-200 bg-white p-5"><p className="text-sm text-slate-500">Operating expenses</p><p className="mt-2 text-2xl font-bold text-slate-900">{money(report.summary.operatingExpenses)}</p><p className="mt-1 text-xs text-slate-500">{report.summary.operatingExpenseCount || 0} operating expense records in period</p></div>
             <div className="rounded-2xl border border-slate-200 bg-white p-5"><p className="text-sm text-slate-500">Stock landed costs</p><p className="mt-2 text-2xl font-bold text-slate-900">{money(report.summary.stockLandedCosts)}</p><p className="mt-1 text-xs text-slate-500">{report.summary.stockLandedCostCount || 0} entries excluded from operating expenses; include freight in reel landed rates</p></div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-5"><p className="text-sm text-slate-500"><Landmark size={15} className="mr-1 inline" />Operating profit*</p><p className="mt-2 text-2xl font-bold text-slate-900">{money(report.summary.operatingProfit)}</p><p className="mt-1 text-xs text-slate-500">Material gross profit + scrap proceeds − operating expenses</p></div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5"><p className="text-sm text-slate-500"><Landmark size={15} className="mr-1 inline" />Operating profit*</p><p className="mt-2 text-2xl font-bold text-slate-900">{money(report.summary.operatingProfit)}</p><p className="mt-1 text-xs text-slate-500">Material gross profit + scrap and Thak sale proceeds − operating expenses</p></div>
             <div className="rounded-2xl border border-slate-200 bg-white p-5"><p className="text-sm text-slate-500">Net profit before tax*</p><p className="mt-2 text-2xl font-bold text-slate-900">{money(report.summary.netProfitBeforeTax)}</p><p className="mt-1 text-xs text-slate-500">After finance costs of {money(report.summary.financeCosts)}</p></div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-5"><p className="text-sm text-slate-500">Process loss (unrecovered)</p><p className="mt-2 text-2xl font-bold text-slate-900">{Number(report.summary.processLossKg || 0).toFixed(2)} kg</p><p className="mt-1 text-xs text-slate-500">Estimated material value: {money(report.summary.processLossCostEstimate)}</p></div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-5"><p className="text-sm text-slate-500">Scrap proceeds / stock</p><p className="mt-2 text-2xl font-bold text-slate-900">{money(report.summary.scrapRevenue)}</p><p className="mt-1 text-xs text-slate-500">Current verified scrap: {Number(report.summary.currentVerifiedScrapInventoryKg || 0).toFixed(2)} kg</p></div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5"><p className="text-sm text-slate-500">Normal scrap sale proceeds</p><p className="mt-2 text-2xl font-bold text-slate-900">{money(report.summary.scrapRevenue)}</p><p className="mt-1 text-xs text-slate-500">Actual normal scrap sales in this period · {Number(report.summary.scrapWeightKg || 0).toFixed(2)} kg</p></div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5"><p className="text-sm text-slate-500">Thak sale proceeds</p><p className="mt-2 text-2xl font-bold text-slate-900">{money(report.summary.thakRevenue)}</p><p className="mt-1 text-xs text-slate-500">Actual moisture-damaged paper sales · {Number(report.summary.thakWeightKg || 0).toFixed(2)} kg</p></div>
             <div className="rounded-2xl border border-slate-200 bg-white p-5"><p className="text-sm text-slate-500"><Wallet size={15} className="mr-1 inline" />Receivables outstanding</p><p className="mt-2 text-2xl font-bold text-slate-900">{money(report.summary.balanceDue)}</p><p className="mt-1 text-xs text-slate-500">Period scrap sold: {Number(report.summary.scrapWeightKg || 0).toFixed(2)} kg</p></div>
           </div>
 
@@ -77,7 +77,7 @@ export default function ProfitLossPage() {
             </div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[720px] text-left text-sm">
-                <thead className="border-b text-xs uppercase text-slate-500"><tr><th className="py-3 pr-4">{group === 'party' ? 'Customer' : 'Period'}</th><th className="px-4 py-3 text-right">Invoices</th><th className="px-4 py-3 text-right">Sales</th><th className="px-4 py-3 text-right">Cost</th><th className="px-4 py-3 text-right">Material gross profit*</th><th className="px-4 py-3 text-right">Operating expenses</th><th className="px-4 py-3 text-right">Operating profit*</th><th className="px-4 py-3 text-right">Process loss kg</th><th className="px-4 py-3 text-right">Scrap sales</th><th className="px-4 py-3 text-right">Balance due</th></tr></thead>
+                <thead className="border-b text-xs uppercase text-slate-500"><tr><th className="py-3 pr-4">{group === 'party' ? 'Customer' : 'Period'}</th><th className="px-4 py-3 text-right">Invoices</th><th className="px-4 py-3 text-right">Sales</th><th className="px-4 py-3 text-right">Cost</th><th className="px-4 py-3 text-right">Material gross profit*</th><th className="px-4 py-3 text-right">Operating expenses</th><th className="px-4 py-3 text-right">Operating profit*</th><th className="px-4 py-3 text-right">Scrap proceeds</th><th className="px-4 py-3 text-right">Thak proceeds</th><th className="px-4 py-3 text-right">Balance due</th></tr></thead>
                 <tbody className="divide-y">
                   {rows.map((row) => <tr key={row.key}>
                     <td className="py-3 pr-4 font-medium text-slate-800">{row.partyName || row.key}</td>
@@ -87,8 +87,8 @@ export default function ProfitLossPage() {
                     <td className="px-4 py-3 text-right font-semibold">{money(row.grossProfit)}</td>
                     <td className="px-4 py-3 text-right">{money(row.operatingExpenses)}</td>
                     <td className="px-4 py-3 text-right font-semibold">{row.operatingProfit === null ? "—" : money(row.operatingProfit)}</td>
-                    <td className="px-4 py-3 text-right">{Number(row.processLossKg || 0).toFixed(2)}</td>
                     <td className="px-4 py-3 text-right">{money(row.scrapRevenue)}</td>
+                    <td className="px-4 py-3 text-right">{money(row.thakRevenue)}</td>
                     <td className="px-4 py-3 text-right">{money(row.balanceDue)}</td>
                   </tr>)}
                   {!rows.length && <tr><td colSpan="10" className="p-8 text-center text-slate-500">No activity in this period.</td></tr>}
@@ -108,7 +108,7 @@ export default function ProfitLossPage() {
             <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-amber-900">
               {report.notes.map((note, index) => <li key={index}>{note}</li>)}
             </ul>
-            <p className="mt-2 text-xs text-amber-900">Scrap generated in period: {Number(report.summary.recoverableScrapGeneratedKg || 0).toFixed(2)} kg · Scrap sold in period: {Number(report.summary.scrapWeightKg || 0).toFixed(2)} kg. Current verified stock: {Number(report.summary.currentVerifiedScrapInventoryKg || 0).toFixed(2)} kg.</p>
+            <p className="mt-2 text-xs text-amber-900">Normal scrap sold in period: {Number(report.summary.scrapWeightKg || 0).toFixed(2)} kg · Thak sold in period: {Number(report.summary.thakWeightKg || 0).toFixed(2)} kg. Only actual sale proceeds from either category contribute to operating profit.</p>
           </section>
         </>
       )}
