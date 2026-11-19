@@ -24,12 +24,13 @@ exports.getWasteStats = async (req, res) => {
     if (req.query.buyerName) salesFilter.buyerName = String(req.query.buyerName).trim();
 
     const [
-      productionWaste, scrapSales, thakEntries, legacyRows,
+      productionWaste, scrapSales, thakSales, thakEntries, legacyRows,
       allTimeGeneratedRows, allTimeScrapSoldRows, allTimeThakEnteredRows, allTimeThakSoldRows
     ] = await Promise.all([
       ProductionRun.find(productionFilter).sort({ runDate: -1, createdAt: -1 }).limit(1000)
         .select('runNumber runDate createdAt recoverableWasteKg processLossKg operatorName totalMaterialCost totalInputWeightKg materialCostPerInputKg recoverableWasteMaterialCost processLossMaterialCost wasteCostingStatus wasteBreakdown').lean(),
       ScrapSale.find({ ...salesFilter, saleType: { $ne: 'thak' } }).sort({ saleDate: -1, createdAt: -1 }).limit(1000).lean(),
+      ScrapSale.find({ ...salesFilter, saleType: 'thak' }).sort({ saleDate: -1, createdAt: -1 }).limit(1000).lean(),
       ThakEntry.find(buildDateRangeFilter(req.query.from, req.query.to, 'entryDate')).sort({ entryDate: -1, createdAt: -1 }).limit(1000).lean(),
       ProductionRun.aggregate([
         { $match: { recoverableWasteKg: { $exists: false }, wasteGeneratedKg: { $gt: 0 } } },
@@ -68,7 +69,7 @@ exports.getWasteStats = async (req, res) => {
       totalWasteGenerated,
       totalWasteSold,
       totalThakEntered: thakEntries.reduce((sum, entry) => sum + asNumber(entry.weightKg), 0),
-      totalThakSold: allTimeThakSold,
+      totalThakSold: thakSales.reduce((sum, sale) => sum + asNumber(sale.weightSoldKg), 0),
       totalWasteMaterialCost: Number(totalWasteMaterialCost.toFixed(2)),
       pendingWasteCostingRuns,
       allTimeWasteGenerated: allTimeGenerated,
@@ -79,7 +80,7 @@ exports.getWasteStats = async (req, res) => {
       productionWaste: verifiedRuns,
       scrapSales,
       thakEntries,
-      thakSales: await ScrapSale.find({ ...salesFilter, saleType: 'thak' }).sort({ saleDate: -1, createdAt: -1 }).limit(1000).lean(),
+      thakSales,
       period: { from: req.query.from || null, to: req.query.to || null }
     });
   } catch (error) {
@@ -152,17 +153,13 @@ exports.recordScrapSale = async (req, res) => {
       let generated = 0;
       let sold = 0;
       if (saleType === 'thak') {
-        const [enteredRows, soldRows] = await Promise.all([
-          ThakEntry.aggregate([{ $group: { _id: null, total: { $sum: '$weightKg' } } }]).session(session),
-          ScrapSale.aggregate([{ $match: { saleType: 'thak' } }, { $group: { _id: null, total: { $sum: '$weightSoldKg' } } }]).session(session)
-        ]);
+        const enteredRows = await ThakEntry.aggregate([{ $group: { _id: null, total: { $sum: '$weightKg' } } }]).session(session);
+        const soldRows = await ScrapSale.aggregate([{ $match: { saleType: 'thak' } }, { $group: { _id: null, total: { $sum: '$weightSoldKg' } } }]).session(session);
         generated = sumField(enteredRows, 'total');
         sold = sumField(soldRows, 'total');
       } else {
-        const [generatedRows, soldRows] = await Promise.all([
-          ProductionRun.aggregate([{ $group: { _id: null, total: { $sum: { $ifNull: ['$recoverableWasteKg', 0] } } } }]).session(session),
-          ScrapSale.aggregate([{ $match: { saleType: { $ne: 'thak' } } }, { $group: { _id: null, total: { $sum: '$weightSoldKg' } } }]).session(session)
-        ]);
+        const generatedRows = await ProductionRun.aggregate([{ $group: { _id: null, total: { $sum: { $ifNull: ['$recoverableWasteKg', 0] } } } }]).session(session);
+        const soldRows = await ScrapSale.aggregate([{ $match: { saleType: { $ne: 'thak' } } }, { $group: { _id: null, total: { $sum: '$weightSoldKg' } } }]).session(session);
         generated = sumField(generatedRows, 'total');
         sold = sumField(soldRows, 'total');
       }
