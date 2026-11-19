@@ -8,22 +8,9 @@ const dateOnly = (value) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.t
 const money = (value) => Number(Number(value).toFixed(2));
 
 async function accountBalances(key) {
-  const accounts = await FinancialAccount.find({ companyKey: key }).sort({ type: 1, name: 1 }).lean();
-  const totals = await FinancialTransaction.aggregate([
-    { $match: { companyKey: key } },
-    { $group: {
-      _id: null,
-      incoming: { $sum: { $cond: [{ $in: ['$kind', ['income', 'transfer']] }, '$amount', 0] } },
-      outgoing: { $sum: { $cond: [{ $in: ['$kind', ['expense', 'transfer']] }, '$amount', 0] } }
-    } }
-  ]);
-  const txs = await FinancialTransaction.find({ companyKey: key }).select('kind amount fromAccountId toAccountId').lean();
-  const movement = new Map();
-  for (const tx of txs) {
-    if (tx.kind === 'income' || tx.kind === 'transfer') movement.set(String(tx.toAccountId), (movement.get(String(tx.toAccountId)) || 0) + tx.amount);
-    if (tx.kind === 'expense' || tx.kind === 'transfer') movement.set(String(tx.fromAccountId), (movement.get(String(tx.fromAccountId)) || 0) - tx.amount);
-  }
-  return accounts.map((account) => ({ ...account, balance: money(account.openingBalance + (movement.get(String(account._id)) || 0)) }));
+  return FinancialAccount.find({ companyKey: key }).sort({ type: 1, name: 1 }).lean().then((accounts) =>
+    accounts.map((account) => ({ ...account, balance: money(account.currentBalance ?? account.openingBalance) }))
+  );
 }
 
 exports.listAccounts = async (req, res) => {
@@ -43,7 +30,7 @@ exports.createAccount = async (req, res) => {
     const key = companyKey(req);
     if (body.isDefaultForInvoice && type !== 'bank') return res.status(400).json({ message: 'Only a bank account can be selected for invoices.' });
     const account = await FinancialAccount.create({
-      companyKey: key, name: body.name.trim(), type, openingBalance: money(openingBalance),
+      companyKey: key, name: body.name.trim(), type, openingBalance: money(openingBalance), currentBalance: money(openingBalance),
       bankName: body.bankName || '', accountHolder: body.accountHolder || '', accountNumber: body.accountNumber || '',
       ifsc: String(body.ifsc || '').toUpperCase(), branch: body.branch || '', upiId: body.upiId || '',
       isDefaultForInvoice: Boolean(body.isDefaultForInvoice), createdBy: req.user._id
@@ -69,11 +56,17 @@ exports.createTransaction = async (req, res) => {
       const ids = [body.fromAccountId, body.toAccountId].filter(Boolean);
       const accounts = await FinancialAccount.find({ _id: { $in: ids }, companyKey: key, isActive: true }).session(session);
       if (accounts.length !== ids.length) throw Object.assign(new Error('One of the selected accounts is unavailable in this company.'), { statusCode: 422 });
-      if (body.kind === 'expense' || body.kind === 'transfer') {
-        const from = accounts.find((account) => String(account._id) === String(body.fromAccountId));
-        const balanceData = await accountBalances(key);
-        const current = balanceData.find((account) => String(account._id) === String(from._id));
-        if (!current || current.balance < amount) throw Object.assign(new Error('Insufficient balance in the selected source account.'), { statusCode: 422 });
+      if (body.kind === 'income') {
+        await FinancialAccount.updateOne({ _id: body.toAccountId, companyKey: key, isActive: true }, { $inc: { currentBalance: money(amount) } }, { session });
+      } else {
+        const debited = await FinancialAccount.updateOne(
+          { _id: body.fromAccountId, companyKey: key, isActive: true, currentBalance: { $gte: money(amount) } },
+          { $inc: { currentBalance: -money(amount) } }, { session }
+        );
+        if (!debited.modifiedCount) throw Object.assign(new Error('Insufficient balance in the selected source account.'), { statusCode: 422 });
+        if (body.kind === 'transfer') {
+          await FinancialAccount.updateOne({ _id: body.toAccountId, companyKey: key, isActive: true }, { $inc: { currentBalance: money(amount) } }, { session });
+        }
       }
       [transaction] = await FinancialTransaction.create([{
         companyKey: key, date: new Date(body.date + 'T00:00:00+05:30'), kind: body.kind, amount: money(amount),
