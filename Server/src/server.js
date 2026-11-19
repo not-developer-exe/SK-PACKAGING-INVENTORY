@@ -21,6 +21,7 @@ const controlRoutes = require('./routes/control.routes');
 const usersRoutes = require('./routes/users.routes');
 const reportsRoutes = require('./routes/reports.routes');
 const expenseRoutes = require('./routes/expense.routes');
+const financeRoutes = require('./routes/finance.routes');
 const adminRecordsRoutes = require('./routes/adminRecords.routes');
 const productSpecificationRoutes = require('./routes/productSpecification.routes');
 const productionPlanRoutes = require('./routes/productionPlan.routes');
@@ -80,6 +81,7 @@ app.use('/api/waste', (req, res, next) => { req.companyKey = 'sk-packaging'; nex
 app.use('/api/invoices', (req, res, next) => { req.companyKey = 'sk-packaging'; next(); }, invoiceRoutes);
 app.use('/api/reports', (req, res, next) => { req.companyKey = 'sk-packaging'; next(); }, reportsRoutes);
 app.use('/api/expenses', (req, res, next) => { req.companyKey = 'sk-packaging'; next(); }, expenseRoutes);
+app.use('/api/finance', (req, res, next) => { req.companyKey = 'sk-packaging'; next(); }, financeRoutes);
 app.use('/api/nsb', nsbRoutes);
 app.use('/api/admin-records', adminRecordsRoutes);
 app.use('/api/product-specifications', (req, res, next) => { req.companyKey = 'sk-packaging'; next(); }, productSpecificationRoutes);
