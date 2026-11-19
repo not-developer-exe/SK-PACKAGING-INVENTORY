@@ -43,7 +43,7 @@ test('validates real calendar dates instead of accepting rolled dates', () => {
 test('groups operating, finance and landed-stock expenses into daily and monthly profit', () => {
   const groups = buildProfitLossGroups([
     { invoiceDate: '2026-11-14T10:00:00.000Z', customerId: { _id: 'a', name: 'Customer A' }, subTotal: 1000, costOfGoods: 600, grossProfit: 400, costingStatus: 'available', balanceDue: 0 }
-  ], [], [
+  ], [
     { saleDate: '2026-11-14T13:00:00.000Z', weightSoldKg: 1, totalAmount: 50 }
   ], [
     { expenseDate: '2026-11-14T06:00:00.000Z', amount: 100, costTreatment: 'operating_expense' },
