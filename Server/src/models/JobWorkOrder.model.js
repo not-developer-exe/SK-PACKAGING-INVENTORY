@@ -20,6 +20,8 @@ const jobWorkOrderSchema = new mongoose.Schema({
   wastageSheets: { type: Number, default: 0 },
   wastageWeightKg: { type: Number, default: 0 },
   jobCharges: { type: Number, default: 0 },
+  allocatedInputMaterialCost: { type: Number, default: 0 },
+  allocatedWastageMaterialCost: { type: Number, default: 0 },
   issueDate: { type: Date, required: true },
   expectedReturnDate: { type: Date },
   status: { type: String, enum: ['issued', 'partial_return', 'completed', 'cancelled'], default: 'issued' },
@@ -32,6 +34,7 @@ const jobWorkOrderSchema = new mongoose.Schema({
     charges: { type: Number, default: 0 },
     allocatedMaterialCost: { type: Number, default: 0 },
     allocatedJobCharges: { type: Number, default: 0 },
+    allocatedWastageMaterialCost: { type: Number, default: 0 },
     outputBatchId: { type: mongoose.Schema.Types.ObjectId, ref: 'FacingMaterialBatch' },
     notes: { type: String, default: '' }
   }],

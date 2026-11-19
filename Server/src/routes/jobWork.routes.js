@@ -1,8 +1,9 @@
 const express=require('express');
 const router=express.Router();
 const {protect}=require('../middlewares/auth.middleware');
-const {listOrders,issueToJobWorker,receiveFromJobWorker}=require('../controllers/jobWork.controller');
+const {listOrders,getProcessorReconciliation,issueToJobWorker,receiveFromJobWorker}=require('../controllers/jobWork.controller');
 router.use(protect);
+router.get('/reconciliation',getProcessorReconciliation);
 router.get('/',listOrders);
 router.post('/issue',issueToJobWorker);
 router.post('/return',receiveFromJobWorker);
