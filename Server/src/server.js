@@ -80,7 +80,8 @@ app.use('/api/ledger', (req, res, next) => { req.companyKey = 'sk-packaging'; ne
 app.use('/api/dispatch', (req, res, next) => { req.companyKey = 'sk-packaging'; next(); }, dispatchRoutes);
 app.use('/api/dashboard', (req, res, next) => { req.companyKey = 'sk-packaging'; next(); }, dashboardRoutes);
 app.use('/api/waste', (req, res, next) => { req.companyKey = 'sk-packaging'; next(); }, wasteRoutes);
-app.use('/api/invoices', (req, res, next) => { req.companyKey = 'sk-packaging'; next(); }, invoiceRoutes);
+app.use('/api/invoices', (req, res, next) => { req.companyKey = 'sk-packaging'; req.salesWorkspace = 'regular'; next(); }, invoiceRoutes);
+app.use('/api/b-sales/invoices', (req, res, next) => { req.companyKey = 'sk-packaging'; req.salesWorkspace = 'sk-b-sales'; next(); }, invoiceRoutes);
 app.use('/api/reports', (req, res, next) => { req.companyKey = 'sk-packaging'; next(); }, reportsRoutes);
 app.use('/api/expenses', (req, res, next) => { req.companyKey = 'sk-packaging'; next(); }, expenseRoutes);
 app.use('/api/finance', (req, res, next) => { req.companyKey = 'sk-packaging'; next(); }, financeRoutes);
