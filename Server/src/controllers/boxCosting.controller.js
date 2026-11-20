@@ -135,6 +135,11 @@ async function buildSnapshot() {
   };
 }
 
+exports.checkAccess = async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  return res.status(204).end();
+};
+
 exports.getSnapshot = async (req, res) => {
   try {
     res.set('Cache-Control', 'no-store');
