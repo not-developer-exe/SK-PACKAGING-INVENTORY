@@ -13,7 +13,7 @@ const invoicePaymentSchema = new mongoose.Schema({
 const invoiceSchema = new mongoose.Schema({
   companyKey: { type: String, enum: ['sk-packaging', 'nsb-industrial-solutions'], default: 'sk-packaging', required: true, index: true },
   workspaceKey: { type: String, enum: ['regular', 'sk-b-sales'], default: 'regular', required: true, index: true },
-  invoiceNumber: { type: String, default: undefined, trim: true },
+  invoiceNumber: { type: String, required: true, unique: true },
   invoiceDate: { type: Date, required: true },
   customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Party', required: true },
   dispatchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Dispatch', required: true }, // Links directly to Delivery Challan
@@ -48,8 +48,7 @@ const invoiceSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 invoiceSchema.index({ invoiceDate: -1, customerId: 1, companyKey: 1, workspaceKey: 1 });
-invoiceSchema.index({ invoiceNumber: 1 }, { unique: true, sparse: true });
-invoiceSchema.index({ dispatchId: 1 }, { unique: true, sparse: true });
+invoiceSchema.index({ dispatchId: 1 }, { unique: true });
 
 invoicePaymentSchema.plugin(companyScopePlugin);
 invoiceSchema.plugin(companyScopePlugin);
