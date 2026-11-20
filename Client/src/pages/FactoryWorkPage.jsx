@@ -4,6 +4,7 @@ import { Factory, Layers, Printer, Scissors, PackageCheck, Truck, Recycle, Clipb
 
 const steps = [
   { title: 'Corrugation & Sheet Cutting', detail: 'Use reels to make corrugated sheets and record sheet sizes and quantities.', path: '/operations/production', icon: Factory },
+  { title: 'Reel-to-Sheet Cutting', detail: 'Record separate sheet cutting from reel stock.', path: '/operations/reel-cutting', icon: Scissors },
   { title: 'Printing & Pasting', detail: 'Record in-house pasting and receive pre-cut facing or duplex material.', path: '/operations/pasting', icon: Layers },
   { title: 'Outside Printing', detail: 'Send duplex or other sheets to an outside printer and record returned quantities.', path: '/operations/job-work', icon: Printer },
   { title: 'Sheet Cutting & Box Making', detail: 'Record final sheet conversion and finished box production.', path: '/operations/conversion', icon: Scissors },
