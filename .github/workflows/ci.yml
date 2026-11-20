@@ -90,3 +90,20 @@ jobs:
         run: docker build -t sk-packaging-api:ci ./Server
       - name: Build frontend image
         run: docker build -t sk-packaging-client:ci ./Client
+
+  compose-box-costing:
+    name: Validate same-origin calculator deployment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out ERP repository
+        uses: actions/checkout@v4
+      - name: Check out separate calculator repository
+        uses: actions/checkout@v4
+        with:
+          repository: not-developer-exe/BOX-RATE-CALCULATOR
+          ref: b3bb78e67c6a156338ae08dd7f86de2023c21915
+          path: BOX-RATE-CALCULATOR
+      - name: Validate Docker Compose configuration
+        run: BOX_COSTING_CONTEXT=BOX-RATE-CALCULATOR docker compose config --quiet
+      - name: Build separate calculator container
+        run: BOX_COSTING_CONTEXT=BOX-RATE-CALCULATOR docker compose build box-costing
