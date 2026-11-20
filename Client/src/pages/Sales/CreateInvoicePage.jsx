@@ -5,12 +5,12 @@ import axiosClient from '../../api/axiosClient';
 import { toLocalDateInput } from '../../lib/date';
 import { useDialogs } from '../../context/DialogContext';
 
-export default function CreateInvoicePage({ company = 'sk' }) {
+export default function CreateInvoicePage({ company = 'sk', workspace = 'regular' }) {
   const navigate = useNavigate();
   const { alert } = useDialogs();
-  const apiBase = company === 'nsb' ? '/nsb/invoices' : '/invoices';
+  const apiBase = company === 'nsb' ? '/nsb/invoices' : workspace === 'sk-b-sales' ? '/b-sales/invoices' : '/invoices';
   const partiesBase = company === 'nsb' ? '/nsb/parties' : '/parties';
-  const routeBase = company === 'nsb' ? '/nsb/sales' : '/sales';
+  const routeBase = company === 'nsb' ? '/nsb/sales' : workspace === 'sk-b-sales' ? '/b-sales' : '/sales';
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   
@@ -140,7 +140,7 @@ export default function CreateInvoicePage({ company = 'sk' }) {
           <ArrowLeft size={20} />
         </button>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Create GST Invoice</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">{workspace === 'sk-b-sales' ? 'Create B Sales Invoice' : 'Create GST Invoice'}</h1>
           <p className="mt-1 text-sm text-slate-500">Convert an existing Delivery Challan into a Tax Invoice.</p>
         </div>
       </div>

@@ -8,13 +8,13 @@ import { useDialogs } from '../../context/DialogContext';
 
 const money = (value) => '₹' + Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-export default function SalesInvoicesPage({ company = 'sk' }) {
+export default function SalesInvoicesPage({ company = 'sk', workspace = 'regular' }) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { confirm, prompt } = useDialogs();
-  const apiBase = company === 'nsb' ? '/nsb/invoices' : '/invoices';
+  const apiBase = company === 'nsb' ? '/nsb/invoices' : workspace === 'sk-b-sales' ? '/b-sales/invoices' : '/invoices';
   const partiesBase = company === 'nsb' ? '/nsb/parties' : '/parties';
-  const routeBase = company === 'nsb' ? '/nsb/sales' : '/sales';
+  const routeBase = company === 'nsb' ? '/nsb/sales' : workspace === 'sk-b-sales' ? '/b-sales' : '/sales';
   const [invoices, setInvoices] = useState([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -82,12 +82,12 @@ export default function SalesInvoicesPage({ company = 'sk' }) {
     <div className="space-y-6">
       <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Sales Invoices</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">{workspace === 'sk-b-sales' ? 'SK Packaging – B Sales' : 'Sales Invoices'}</h1>
           <p className="mt-1 text-sm text-slate-500">Live invoices, receipts allocated and customer receivables.</p>
         </div>
         <div className="flex gap-2">
           <button onClick={() => loadInvoices({ from, to, customerId: customerFilter })} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-600"><RefreshCw size={15} className="mr-1 inline" />Refresh</button>
-          <button onClick={() => navigate(routeBase + '/new')} className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white"><Plus size={16} className="mr-1 inline" />New GST Invoice</button>
+          <button onClick={() => navigate(routeBase + '/new')} className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white"><Plus size={16} className="mr-1 inline" />{workspace === 'sk-b-sales' ? 'New B Sales Invoice' : 'New GST Invoice'}</button>
         </div>
       </div>
 

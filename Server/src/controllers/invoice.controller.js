@@ -13,11 +13,18 @@ const { normalizeStateCode, getCompanyStateCode, calculateGstBreakdown } = requi
 
 const VALID_COMPANIES = ['sk-packaging', 'nsb-industrial-solutions'];
 function currentCompanyKey(req) { return VALID_COMPANIES.includes(req.companyKey) ? req.companyKey : 'sk-packaging'; }
-function invoiceCompanyFilter(req) {
+function invoiceBusinessFilter(req) {
   const companyKey = currentCompanyKey(req);
   return companyKey === 'sk-packaging'
     ? { $or: [{ companyKey: 'sk-packaging' }, { companyKey: { $exists: false } }] }
     : { companyKey };
+}
+function currentWorkspaceKey(req) { return req.salesWorkspace === 'sk-b-sales' ? 'sk-b-sales' : 'regular'; }
+function invoiceCompanyFilter(req) {
+  const workspaceKey = currentWorkspaceKey(req);
+  return { $and: [invoiceBusinessFilter(req), workspaceKey === 'regular'
+    ? { $or: [{ workspaceKey: 'regular' }, { workspaceKey: { $exists: false } }] }
+    : { workspaceKey }] };
 }
 async function buildSellerSnapshot(companyKey, session) {
   const profile = await CompanyProfile.findOne({ companyKey }).session(session || null).lean();
@@ -49,17 +56,21 @@ function getFinancialYear(dateOnly) {
   const startYear = month >= 4 ? year : year - 1;
   return String(startYear).slice(-2) + '-' + String(startYear + 1).slice(-2);
 }
-async function nextInvoiceNumber(companyKey, invoiceDate, session) {
+async function nextInvoiceNumber(companyKey, workspaceKey, invoiceDate, session) {
   const financialYear = getFinancialYear(invoiceDate);
+  const sequencePeriod = workspaceKey === 'sk-b-sales' ? 'B-' + financialYear : financialYear;
+  const sequenceFilter = workspaceKey === 'regular'
+    ? { companyKey, financialYear: sequencePeriod, $or: [{ workspaceKey: 'regular' }, { workspaceKey: { $exists: false } }] }
+    : { companyKey, workspaceKey, financialYear: sequencePeriod };
   const sequence = await InvoiceSequence.findOneAndUpdate(
-    { companyKey, financialYear },
-    { $inc: { nextNumber: 1 }, $setOnInsert: { companyKey, financialYear } },
+    sequenceFilter,
+    { $inc: { nextNumber: 1 }, $setOnInsert: { companyKey, workspaceKey, financialYear: sequencePeriod } },
     { new: true, upsert: true, setDefaultsOnInsert: true, session }
   );
   const profile = await CompanyProfile.findOne({ companyKey }).select('invoicePrefix').lean();
-  const prefix = profile?.invoicePrefix || (companyKey === 'nsb-industrial-solutions'
+  const prefix = workspaceKey === 'sk-b-sales' ? (process.env.SK_B_SALES_INVOICE_PREFIX || 'SKB') : (profile?.invoicePrefix || (companyKey === 'nsb-industrial-solutions'
     ? (process.env.NSB_INVOICE_PREFIX || 'NSB')
-    : (process.env.SK_INVOICE_PREFIX || 'SK'));
+    : (process.env.SK_INVOICE_PREFIX || 'SK')));
   return prefix + '/' + financialYear + '/' + String(sequence.nextNumber).padStart(4, '0');
 }
 
@@ -103,7 +114,7 @@ exports.cancelInvoice = async (req, res) => {
       if (dispatch?.status === 'delivered') throw Object.assign(new Error('A delivered dispatch cannot be cancelled through this workflow.'), { statusCode: 409 });
       const party = await Party.findOne({ _id: target.customerId, companyKey: currentCompanyKey(req) }).session(session);
       if (!party) throw Object.assign(new Error('Linked customer ledger was not found. No changes were made.'), { statusCode: 409 });
-      const ledgerEntry = party.ledger.find(entry => entry.type === 'Tax Invoice' && entry.ref === target.invoiceNumber);
+      const ledgerEntry = party.ledger.find(entry => entry.type === 'Tax Invoice' && entry.ref === target.invoiceNumber && (entry.workspaceKey || 'regular') === (target.workspaceKey || 'regular'));
       if (!ledgerEntry) throw Object.assign(new Error('Matching invoice entry was not found in the customer ledger. Reconcile the ledger before cancelling.'), { statusCode: 409 });
       party.ledger.pull({ _id: ledgerEntry._id });
       party.balance = recalculatePartyLedger(party.ledger);
@@ -151,7 +162,7 @@ exports.getUninvoicedDispatches = async (req, res) => {
 
     const [dispatches, billed] = await Promise.all([
       Dispatch.find({ customerId, companyKey: currentCompanyKey(req), status: { $ne: 'cancelled' } }).populate('boxes.boxId').sort({ createdAt: -1 }).lean(),
-      Invoice.find({ customerId, ...invoiceCompanyFilter(req) }).select('dispatchId').lean()
+      Invoice.find({ customerId, ...invoiceBusinessFilter(req) }).select('dispatchId').lean()
     ]);
     const billedIds = new Set(billed.map((invoice) => String(invoice.dispatchId)));
     return res.json(dispatches.filter((dispatch) => !billedIds.has(String(dispatch._id))));
@@ -219,7 +230,7 @@ exports.createInvoice = async (req, res) => {
       const companyKey = currentCompanyKey(req);
       const customer = await Party.findOne({ _id: customerId, companyKey }).session(session);
       const dispatch = await Dispatch.findOne({ _id: dispatchId, customerId, companyKey }).session(session);
-      const existingInvoice = await Invoice.findOne({ dispatchId, ...invoiceCompanyFilter(req) }).session(session);
+      const existingInvoice = await Invoice.findOne({ dispatchId, ...invoiceBusinessFilter(req) }).session(session);
 
       if (!customer || customer.isActive === false || !['Customer', 'Both'].includes(customer.type)) {
         const error = new Error('Selected customer was not found or is not a customer');
@@ -290,10 +301,12 @@ exports.createInvoice = async (req, res) => {
       const tax = calculateGstBreakdown({ taxableAmount: subTotal, gstPercent: gst, supplierStateCode, placeOfSupplyStateCode });
       const { cgstAmount, sgstAmount, igstAmount, taxType } = tax;
       const grandTotal = Number((subTotal + cgstAmount + sgstAmount + igstAmount).toFixed(2));
-      const invoiceNumber = await nextInvoiceNumber(companyKey, invoiceDate, session);
+      const workspaceKey = currentWorkspaceKey(req);
+      const invoiceNumber = await nextInvoiceNumber(companyKey, workspaceKey, invoiceDate, session);
 
       const [created] = await Invoice.create([{
         companyKey,
+        workspaceKey,
         invoiceNumber,
         sellerSnapshot: await buildSellerSnapshot(companyKey, session),
         invoiceDate: date,
@@ -317,6 +330,7 @@ exports.createInvoice = async (req, res) => {
       customer.ledger.push({
         date,
         type: 'Tax Invoice',
+        workspaceKey,
         ref: invoiceNumber,
         debit: grandTotal,
         credit: 0,
@@ -324,7 +338,7 @@ exports.createInvoice = async (req, res) => {
       });
       customer.balance = recalculatePartyLedger(customer.ledger);
       await customer.save({ session });
-      await writeAuditLog(req, { action: 'invoice.created', entityType: 'Invoice', entityId: created._id, entityLabel: invoiceNumber, summary: 'Sales invoice created: ' + invoiceNumber, metadata: { customerId: String(customerId), dispatchId: String(dispatchId), subTotal, gstPercent: gst, taxType, placeOfSupplyStateCode, grandTotal, costOfGoods: totalCostOfGoods, grossProfit, costingStatus: costingAvailable ? 'available' : 'unavailable' } }, session);
+      await writeAuditLog(req, { action: 'invoice.created', entityType: 'Invoice', entityId: created._id, entityLabel: invoiceNumber, summary: 'Sales invoice created: ' + invoiceNumber, metadata: { workspaceKey, customerId: String(customerId), dispatchId: String(dispatchId), subTotal, gstPercent: gst, taxType, placeOfSupplyStateCode, grandTotal, costOfGoods: totalCostOfGoods, grossProfit, costingStatus: costingAvailable ? 'available' : 'unavailable' } }, session);
       createdInvoice = created;
     });
 

@@ -6,11 +6,11 @@ import axiosClient from '../../api/axiosClient';
 const money = (value) => '₹' + Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const date = (value) => value ? new Date(value).toLocaleDateString('en-IN') : '—';
 
-export default function InvoiceDetailPage({ company = 'sk' }) {
+export default function InvoiceDetailPage({ company = 'sk', workspace = 'regular' }) {
   const { id } = useParams();
   const navigate = useNavigate();
-  const apiBase = company === 'nsb' ? '/nsb/invoices' : '/invoices';
-  const routeBase = company === 'nsb' ? '/nsb/sales' : '/sales';
+  const apiBase = company === 'nsb' ? '/nsb/invoices' : workspace === 'sk-b-sales' ? '/b-sales/invoices' : '/invoices';
+  const routeBase = company === 'nsb' ? '/nsb/sales' : workspace === 'sk-b-sales' ? '/b-sales' : '/sales';
   const [invoice, setInvoice] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
