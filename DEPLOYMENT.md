@@ -1,6 +1,6 @@
 # Production deployment
 
-This repository includes Dockerfiles and Compose configuration for a single-host deployment. The ERP frontend is served by Nginx and proxies `/api` to the Express API. The separate `BOX-RATE-CALCULATOR` repository is built as its own static container and reverse-proxied at `/box-costing/` on the same ERP origin. This keeps the calculator source separate while allowing the browser to use the ERP's HTTP-only owner session cookie.
+This repository includes Dockerfiles and Compose configuration for a single-host deployment. The ERP frontend is served by Nginx and proxies `/api` to the Express API. The separate `BOX-RATE-CALCULATOR` repository is built as its own static container and reverse-proxied at `/box-costing/` on the same ERP origin. Nginx uses the owner-only `/api/box-costing/v1/access` probe to gate the static calculator route: unauthenticated users are sent to `/login`, and accountant sessions receive HTTP 403. This keeps the calculator source separate while allowing the browser to use the ERP's HTTP-only owner session cookie.
 
 ## 1. Prepare the two application repositories
 
@@ -56,7 +56,7 @@ On first startup, the API creates the configured owner account if it does not ex
 ## 6. Verify deployment
 
 - Open `https://your-domain/` and sign in.
-- Open `https://your-domain/box-costing/` in the same browser session. The calculator should load under the same origin.
+- Open `https://your-domain/box-costing/` in the same browser session. The calculator should load only for the signed-in owner under the same origin; unauthenticated users are redirected to `/login`, and accountants are denied.
 - In the calculator, choose Refresh ERP. Confirm the owner session returns paper rates, reel stock and (after the Duplex API extension is merged) Duplex batches.
 - Confirm an accountant session cannot access `/api/box-costing/v1/*` (HTTP 403).
 - Check `https://your-domain/api/health` returns HTTP 200 with database connected.
