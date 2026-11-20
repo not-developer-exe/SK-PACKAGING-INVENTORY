@@ -40,7 +40,7 @@ exports.recordManualChallan = async (req, res) => {
         dispatchDate: new Date(body.dispatchDate + 'T00:00:00+05:30'),
         vehicleNumber: typeof body.vehicleNumber === 'string' ? body.vehicleNumber.trim().slice(0, 40) : '',
         driverName: typeof body.driverName === 'string' ? body.driverName.trim().slice(0, 120) : '',
-        sourceType: 'manual', manualItems, boxes: [], recordedBy: req.user._id
+        sourceType: 'manual', manualItems: items, boxes: [], recordedBy: req.user._id
       }], { session });
       await writeAuditLog(req, { action: 'dispatch.manual_challan_recorded', entityType: 'Dispatch', entityId: challan._id, entityLabel: challanNumber, summary: 'Manual delivery challan recorded: ' + challanNumber, metadata: { customerId: String(customer._id), lineCount: items.length, inventoryImpact: false } }, session);
     });
