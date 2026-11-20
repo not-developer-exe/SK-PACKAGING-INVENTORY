@@ -109,6 +109,8 @@ export default function DispatchPage() {
       setCustomerId(''); setVehicleNumber(''); setDriverName(''); setDispatchDate(toLocalDateInput());
       setManualItems([{ itemName: '', description: '', quantity: '1', unit: 'Nos' }]);
       await fetchData({ from, to, customerId: customerFilter });
+      const history = await dispatchService.getDispatches({ from, to, customerId: customerFilter });
+      setSelectedChallan(history.find(d => d.challanNumber === res.challanNumber) || null);
       setActiveTab('history');
       window.alert('Manual challan ' + res.challanNumber + ' recorded. Inventory was not changed.');
     } catch (err) { window.alert(err.response?.data?.message || 'Unable to record manual challan.'); }
@@ -307,7 +309,7 @@ export default function DispatchPage() {
                   <td className="px-5 py-4 font-medium text-slate-900">{dispatch.customerId?.name}</td>
                   <td className="px-5 py-4 text-slate-700">
                     <ul className="list-disc pl-4 space-y-1">
-                      {dispatch.boxes.map((b, i) => (
+                      {dispatch.sourceType === 'manual' ? (dispatch.manualItems || []).map((line, i) => <li key={i}><span className="font-medium">{line.quantity} {line.unit}</span> x {line.itemName}</li>) : (dispatch.boxes || []).map((b, i) => (
                         <li key={i}><span className="font-medium">{b.dispatchQuantity}</span> x {b.boxId?.itemName || 'Finished Box'}</li>
                       ))}
                     </ul>
@@ -376,7 +378,9 @@ export default function DispatchPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
-                    {selectedChallan.boxes.map((b, i) => (
+                    {selectedChallan.sourceType === 'manual' ? (selectedChallan.manualItems || []).map((line, i) => (
+                      <tr key={i}><td className="py-4 text-slate-700">{i + 1}</td><td className="py-4 font-semibold text-slate-900">{line.itemName}<div className="text-xs font-normal text-slate-500 mt-0.5">{line.description}</div></td><td className="py-4 text-slate-600">Manual entry</td><td className="py-4 text-right text-lg font-bold text-slate-900">{line.quantity} {line.unit}</td></tr>
+                    )) : (selectedChallan.boxes || []).map((b, i) => (
                       <tr key={i}>
                         <td className="py-4 text-slate-700">{i + 1}</td>
                         <td className="py-4 font-semibold text-slate-900">
