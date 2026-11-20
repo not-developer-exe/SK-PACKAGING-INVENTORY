@@ -14,7 +14,7 @@ git clone https://github.com/not-developer-exe/BOX-RATE-CALCULATOR.git
 cd SK-PACKAGING-INVENTORY
 ```
 
-The default Compose build context for the calculator is `../BOX-RATE-CALCULATOR`. If you keep it elsewhere, set `BOX_COSTING_CONTEXT` to its path. Keep the calculator source in its separate repository; do not copy it into the ERP source tree. If you later make the calculator repository private, give the deployment host read-only GitHub access (for example, a deploy key) so it can clone and update the second repository; never commit that credential.
+The default Compose build context for the calculator is `../BOX-RATE-CALCULATOR`. If you keep it elsewhere, set `BOX_COSTING_CONTEXT` to its path. Keep the calculator source in its separate repository; do not copy it into the ERP source tree. If you later make the calculator repository private, give the deployment host read-only GitHub access (for example, a deploy key) so it can clone and update the second repository. Also configure the ERP repository's Actions secret `BOX_COSTING_READ_TOKEN` with read-only access for the CI checkout. Never commit either credential.
 
 ## 2. Prepare MongoDB
 
