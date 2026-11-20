@@ -230,7 +230,7 @@ exports.markDelivered = async (req, res) => {
 
 exports.getAvailableBoxes = async (req, res) => {
   try {
-    const boxes = await FinishedBox.find({ quantityAvailable: { $gt: 0 } })
+    const boxes = await FinishedBox.find({ quantityAvailable: { $gt: 0 }, qualityStatus: 'approved' })
       .populate('customerId', 'name')
       .sort({ createdAt: 1 })
       .lean();
