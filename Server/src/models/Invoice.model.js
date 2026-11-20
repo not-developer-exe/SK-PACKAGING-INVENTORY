@@ -16,11 +16,14 @@ const invoiceSchema = new mongoose.Schema({
   invoiceNumber: { type: String, required: true, unique: true },
   invoiceDate: { type: Date, required: true },
   customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Party', required: true },
-  dispatchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Dispatch', required: true }, // Links directly to Delivery Challan
+  dispatchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Dispatch', default: null }, // Null for standalone manual invoices
+  sourceType: { type: String, enum: ['challan', 'manual'], default: 'challan', index: true },
   sellerSnapshot: { type: mongoose.Schema.Types.Mixed, default: null },
   
   items: [{
     boxId: { type: mongoose.Schema.Types.ObjectId, ref: 'FinishedBox' },
+    itemName: { type: String, trim: true },
+    unit: { type: String, trim: true, default: 'Nos' },
     quantity: { type: Number, required: true },
     rate: { type: Number, required: true },
     taxableAmount: { type: Number, required: true },
@@ -48,7 +51,7 @@ const invoiceSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 invoiceSchema.index({ invoiceDate: -1, customerId: 1, companyKey: 1, workspaceKey: 1 });
-invoiceSchema.index({ dispatchId: 1 }, { unique: true });
+invoiceSchema.index({ dispatchId: 1 }, { unique: true, partialFilterExpression: { dispatchId: { $type: 'objectId' } } });
 
 invoicePaymentSchema.plugin(companyScopePlugin);
 invoiceSchema.plugin(companyScopePlugin);

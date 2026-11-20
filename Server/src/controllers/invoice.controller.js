@@ -398,3 +398,72 @@ exports.deleteDraftInvoice = async (req, res) => {
     return res.status(500).json({ message: 'Unable to delete invoice draft.' });
   }
 };
+
+
+exports.createManualInvoice = async (req, res) => {
+  const { invoiceDate, customerId, items, gstPercent, placeOfSupplyStateCode, saveAsDraft = false } = req.body || {};
+  if (!mongoose.isValidObjectId(customerId)) return res.status(400).json({ message: 'Select a valid customer.' });
+  if (!isValidDateOnly(invoiceDate)) return res.status(400).json({ message: 'Invoice date must be a real calendar date in YYYY-MM-DD format.' });
+  if (!Array.isArray(items) || !items.length || items.length > 100) return res.status(400).json({ message: 'Add between 1 and 100 invoice items.' });
+  const gst = Number(gstPercent);
+  if (!Number.isFinite(gst) || gst < 0 || gst > 40) return res.status(400).json({ message: 'GST rate must be between 0 and 40.' });
+  const supplierStateCode = await companyStateCode(req);
+  if (!supplierStateCode) return res.status(503).json({ message: 'Company GST state is not configured. Set GST_STATE_CODE (or GSTIN) before creating invoices.' });
+  const cleanItems = items.map((item) => ({
+    itemName: String(item.itemName || '').trim(),
+    unit: String(item.unit || 'Nos').trim().slice(0, 20) || 'Nos',
+    quantity: Number(item.quantity),
+    rate: Number(item.rate)
+  }));
+  if (cleanItems.some((item) => !item.itemName || item.itemName.length > 200 || !Number.isFinite(item.quantity) || item.quantity <= 0 || !Number.isFinite(item.rate) || item.rate < 0)) {
+    return res.status(400).json({ message: 'Each line needs a description, positive quantity and non-negative rate.' });
+  }
+  const date = new Date(invoiceDate + 'T00:00:00+05:30');
+  const session = await mongoose.startSession();
+  let createdInvoice;
+  try {
+    await session.withTransaction(async () => {
+      const companyKey = currentCompanyKey(req);
+      const workspaceKey = currentWorkspaceKey(req);
+      const customer = await Party.findOne({ _id: customerId, companyKey }).session(session);
+      if (!customer || customer.isActive === false || !['Customer', 'Both'].includes(customer.type)) {
+        throw Object.assign(new Error('Selected customer was not found or is not an active customer.'), { statusCode: 400 });
+      }
+      const supplyCode = normalizeStateCode(placeOfSupplyStateCode || customer.stateCode);
+      if (!supplyCode) throw Object.assign(new Error('Customer state code is missing. Update Party Master before invoicing.'), { statusCode: 422 });
+      const invoiceItems = cleanItems.map((item) => ({
+        itemName: item.itemName, unit: item.unit, quantity: item.quantity, rate: item.rate,
+        taxableAmount: Number((item.quantity * item.rate).toFixed(2)),
+        costPerBox: null, costOfGoods: null, grossProfit: null, costingStatus: 'unavailable'
+      }));
+      const subTotal = Number(invoiceItems.reduce((sum, item) => sum + item.taxableAmount, 0).toFixed(2));
+      const tax = calculateGstBreakdown({ taxableAmount: subTotal, gstPercent: gst, supplierStateCode, placeOfSupplyStateCode: supplyCode });
+      const grandTotal = Number((subTotal + tax.cgstAmount + tax.sgstAmount + tax.igstAmount).toFixed(2));
+      const invoiceNumber = saveAsDraft ? 'DRAFT-' + new mongoose.Types.ObjectId().toString() : await nextInvoiceNumber(companyKey, workspaceKey, invoiceDate, session);
+      const [created] = await Invoice.create([{
+        companyKey, workspaceKey, sourceType: 'manual', invoiceNumber,
+        sellerSnapshot: await buildSellerSnapshot(companyKey, session),
+        invoiceDate: date, customerId, items: invoiceItems, subTotal, gstPercent: gst,
+        cgstAmount: tax.cgstAmount, sgstAmount: tax.sgstAmount, igstAmount: tax.igstAmount,
+        taxType: tax.taxType, placeOfSupplyStateCode: supplyCode, grandTotal, balanceDue: grandTotal,
+        status: saveAsDraft ? 'Draft' : 'Pending', costingStatus: 'unavailable', costOfGoods: null, grossProfit: null
+      }], { session });
+      if (!saveAsDraft) {
+        customer.ledger.push({ date, type: 'Tax Invoice', workspaceKey, ref: invoiceNumber, debit: grandTotal, credit: 0, balance: 0 });
+        customer.balance = recalculatePartyLedger(customer.ledger);
+        await customer.save({ session });
+      }
+      await writeAuditLog(req, {
+        action: saveAsDraft ? 'invoice.manual_draft_created' : 'invoice.manual_created',
+        entityType: 'Invoice', entityId: created._id, entityLabel: invoiceNumber,
+        summary: saveAsDraft ? 'Manual GST invoice draft saved' : 'Standalone manual GST invoice created: ' + invoiceNumber,
+        metadata: { workspaceKey, customerId: String(customerId), sourceType: 'manual', subTotal, gstPercent: gst, taxType: tax.taxType, placeOfSupplyStateCode: supplyCode, grandTotal, stockImpact: false }
+      }, session);
+      createdInvoice = created;
+    });
+    return res.status(201).json(createdInvoice);
+  } catch (error) {
+    console.error('[INVOICE] Manual creation failed:', error.message);
+    return res.status(error.statusCode || (error.name === 'ValidationError' ? 400 : 500)).json({ message: error.message || 'Unable to create manual invoice.' });
+  } finally { await session.endSession(); }
+};
