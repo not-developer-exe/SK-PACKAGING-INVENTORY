@@ -13,7 +13,15 @@ const paperRatesPipeline = [
     $group: {
       _id: { width: '$reelWidthInches', bf: '$bf', gsm: '$gsm', quality: '$quality' },
       latestPurchaseRatePerKg: { $first: { $toDouble: '$ratePerKg' } },
-      latestLandedRatePerKg: { $first: { $toDouble: '$landedRatePerKg' } },
+      latestLandedRatePerKg: {
+        $first: {
+          $cond: [
+            { $gt: [{ $toDouble: { $ifNull: ['$landedRatePerKg', 0] } }, 0] },
+            { $toDouble: '$landedRatePerKg' },
+            { $toDouble: '$ratePerKg' }
+          ]
+        }
+      },
       purchaseDate: { $first: '$receipt.receiptDate' },
       supplierId: { $first: '$supplierId' },
       receiptNumber: { $first: '$receipt.receiptNumber' },
@@ -50,7 +58,13 @@ const reelStockPipeline = [
         $sum: {
           $multiply: [
             { $toDouble: '$remainingWeightKg' },
-            { $toDouble: { $ifNull: ['$landedRatePerKg', '$ratePerKg'] } }
+            {
+              $cond: [
+                { $gt: [{ $toDouble: { $ifNull: ['$landedRatePerKg', 0] } }, 0] },
+                { $toDouble: '$landedRatePerKg' },
+                { $toDouble: '$ratePerKg' }
+              ]
+            }
           ]
         }
       },
