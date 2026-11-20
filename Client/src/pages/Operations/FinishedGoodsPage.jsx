@@ -44,11 +44,44 @@ export default function FinishedGoodsPage() {
   };
 
   const visible = rows.filter(row => filter === 'all' || (row.qualityStatus || 'pending') === filter);
-  const counts = rows.reduce((acc, row) => {
+  const totals = rows.reduce((acc, row) => {
     const status = row.qualityStatus || 'pending';
-    acc[status] = (acc[status] || 0) + 1;
+    const available = Math.max(0, Number(row.quantityAvailable) || 0);
+    const produced = Math.max(0, Number(row.quantityProduced) || 0);
+    acc.batches += 1;
+    acc.produced += produced;
+    acc.available += available;
+    acc[status] = (acc[status] || 0) + available;
     return acc;
-  }, {});
+  }, { batches: 0, produced: 0, available: 0, pending: 0, approved: 0, rejected: 0 });
+
+  const productTotals = Object.values(rows.reduce((acc, row) => {
+    const dimensions = row.dimensions || {};
+    const key = [row.customerId?._id || row.customerId || '', row.itemName || '', row.ply || '', dimensions.length || '', dimensions.width || '', dimensions.height || ''].join('|');
+    if (!acc[key]) acc[key] = {
+      key,
+      customer: row.customerId?.name || '—',
+      itemName: row.itemName || 'Unnamed item',
+      ply: row.ply || '—',
+      dimensions: [dimensions.length, dimensions.width, dimensions.height].filter(value => value !== undefined && value !== null).join(' × '),
+      batches: 0,
+      produced: 0,
+      available: 0,
+      ready: 0,
+      pending: 0,
+      rejected: 0
+    };
+    const item = acc[key];
+    const available = Math.max(0, Number(row.quantityAvailable) || 0);
+    item.batches += 1;
+    item.produced += Math.max(0, Number(row.quantityProduced) || 0);
+    item.available += available;
+    const status = row.qualityStatus || 'pending';
+    if (status === 'approved') item.ready += available;
+    else if (status === 'pending') item.pending += available;
+    else if (status === 'rejected') item.rejected += available;
+    return acc;
+  }, {})).sort((a, b) => a.itemName.localeCompare(b.itemName));
 
   const statusLabel = status => status === 'approved' ? 'Quality approved' : status === 'rejected' ? 'Rejected' : 'Awaiting inspection';
 
@@ -62,11 +95,25 @@ export default function FinishedGoodsPage() {
         <button onClick={load} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700"><RefreshCw size={16}/> Refresh</button>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">Awaiting inspection</p><p className="mt-1 text-2xl font-semibold">{counts.pending || 0}</p></div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">Quality approved</p><p className="mt-1 text-2xl font-semibold text-emerald-700">{counts.approved || 0}</p></div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">Rejected</p><p className="mt-1 text-2xl font-semibold text-red-700">{counts.rejected || 0}</p></div>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <div className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">Total produced</p><p className="mt-1 text-2xl font-semibold tabular-nums">{totals.produced.toLocaleString('en-IN')}</p></div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">Physical stock</p><p className="mt-1 text-2xl font-semibold tabular-nums">{totals.available.toLocaleString('en-IN')}</p></div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">Ready to dispatch</p><p className="mt-1 text-2xl font-semibold text-emerald-700 tabular-nums">{totals.approved.toLocaleString('en-IN')}</p></div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">Awaiting QC</p><p className="mt-1 text-2xl font-semibold text-amber-700 tabular-nums">{totals.pending.toLocaleString('en-IN')}</p></div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">Rejected stock</p><p className="mt-1 text-2xl font-semibold text-red-700 tabular-nums">{totals.rejected.toLocaleString('en-IN')}</p></div>
       </div>
+      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <div className="border-b border-slate-100 px-4 py-3"><h2 className="font-semibold text-slate-900">Product-wise stock summary</h2><p className="text-xs text-slate-500">Quantities are boxes, grouped by customer and box specification.</p></div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] text-left text-sm">
+            <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Customer / Product</th><th className="px-4 py-3">Specification</th><th className="px-4 py-3 text-right">Batches</th><th className="px-4 py-3 text-right">Produced</th><th className="px-4 py-3 text-right">Physical stock</th><th className="px-4 py-3 text-right">Ready</th><th className="px-4 py-3 text-right">Pending QC</th></tr></thead>
+            <tbody className="divide-y divide-slate-100">
+              {productTotals.map(item => <tr key={item.key}><td className="px-4 py-3"><div className="font-medium text-slate-900">{item.itemName}</div><div className="text-xs text-slate-500">{item.customer}</div></td><td className="px-4 py-3">{item.ply} ply · {item.dimensions || '—'}</td><td className="px-4 py-3 text-right tabular-nums">{item.batches}</td><td className="px-4 py-3 text-right tabular-nums">{item.produced.toLocaleString('en-IN')}</td><td className="px-4 py-3 text-right font-semibold tabular-nums">{item.available.toLocaleString('en-IN')}</td><td className="px-4 py-3 text-right text-emerald-700 tabular-nums">{item.ready.toLocaleString('en-IN')}</td><td className="px-4 py-3 text-right text-amber-700 tabular-nums">{item.pending.toLocaleString('en-IN')}</td></tr>)}
+              {productTotals.length === 0 && <tr><td colSpan="7" className="px-4 py-8 text-center text-slate-500">No finished-goods quantities to summarise.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       <div className="flex flex-wrap items-center gap-2">
         {['all', 'pending', 'approved', 'rejected'].map(value => <button key={value} onClick={() => setFilter(value)} className={'rounded-full px-3 py-1.5 text-sm ' + (filter === value ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-600')}>{value === 'all' ? 'All batches' : value === 'pending' ? 'Awaiting inspection' : value === 'approved' ? 'Approved' : 'Rejected'}</button>)}
