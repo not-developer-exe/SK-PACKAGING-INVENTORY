@@ -23,8 +23,6 @@ export default function ProductionPage() {
   const [operatorName, setOperatorName] = useState('');
   const [machineName, setMachineName] = useState('');
   const [fluteProfile, setFluteProfile] = useState('narrow');
-  const [recoverableWasteKg, setRecoverableWasteKg] = useState('');
-  const [wasteBreakdown, setWasteBreakdown] = useState([{ category: 'edge_trim', weightKg: '', notes: '' }]);
   
   const [inputReels, setInputReels] = useState([
     { reelRole: 'plain_surface', reelId: '', requestedWidthInches: '', weightConsumedKg: '' },
@@ -57,39 +55,11 @@ export default function ProductionPage() {
   const totalInputWeight = inputReels.reduce((sum, r) => sum + Number(r.weightConsumedKg || 0), 0);
   const totalOutputWeight = outputSheets.reduce((sum, s) => sum + Number(s.totalWeightKg || 0), 0);
   const massDifference = totalInputWeight - totalOutputWeight;
-  const measuredScrap = Number(recoverableWasteKg || 0);
-  const calculatedProcessLoss = massDifference - measuredScrap;
-  const classifiedWasteTotal = wasteBreakdown.reduce((sum, row) => sum + Number(row.weightKg || 0), 0);
-  const wasteCategoryLabels = {
-    edge_trim: 'Edge trim',
-    setup_waste: 'Machine setup',
-    quality_rejection: 'Quality rejection',
-    moisture_damage: 'Moisture damage',
-    handling_damage: 'Handling damage',
-    other: 'Other'
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
-
-    if (massDifference < 0) {
-      setError('Output weight cannot be greater than input weight. Check your measurements.');
-      return;
-    }
-    if (recoverableWasteKg === '') {
-      setError('Enter the measured recoverable scrap weight, or enter 0 if no recoverable scrap was produced.');
-      return;
-    }
-    if (!Number.isFinite(measuredScrap) || measuredScrap < 0 || measuredScrap > massDifference) {
-      setError('Measured recoverable scrap must be non-negative and cannot exceed the input-output weight difference.');
-      return;
-    }
-    if (Math.abs(Number(classifiedWasteTotal.toFixed(3)) - Number(measuredScrap.toFixed(3))) > 0.005) {
-      setError('Classified waste weights must add up to the measured recoverable scrap total.');
-      return;
-    }
 
     try {
       setSubmitting(true);
@@ -99,8 +69,8 @@ export default function ProductionPage() {
         operatorName,
         machineName,
         fluteProfile,
-        recoverableWasteKg: measuredScrap,
-        wasteBreakdown: wasteBreakdown.filter(row => Number(row.weightKg) > 0).map(row => ({ ...row, weightKg: Number(row.weightKg) })),
+        recoverableWasteKg: 0,
+        wasteBreakdown: [],
         inputReels: inputReels.map(r => ({ ...r, requestedWidthInches: r.requestedWidthInches === '' ? undefined : Number(r.requestedWidthInches), weightConsumedKg: Number(r.weightConsumedKg) })),
         rawMaterialConsumptions: rawMaterialConsumptions.filter(x => x.materialId && Number(x.quantity) > 0).map(x => ({ materialId: x.materialId, quantity: Number(x.quantity) })),
         outputSheets: outputSheets.map(s => ({
@@ -113,14 +83,12 @@ export default function ProductionPage() {
         }))
       });
 
-      setSuccess(`Success! ${res.runNumber} recorded. Verified scrap: ${Number(res.recoverableWasteKg || 0).toFixed(2)}kg; process loss: ${Number(res.processLossKg || 0).toFixed(2)}kg.`);
+      setSuccess(`Success! ${res.runNumber} recorded. Sheet stock has been updated.`);
       
       // Reset form
       setOperatorName('');
       setMachineName('');
       setFluteProfile('narrow');
-      setRecoverableWasteKg('');
-      setWasteBreakdown([{ category: 'edge_trim', weightKg: '', notes: '' }]);
       setInputReels([{ reelRole: 'plain_surface', reelId: '', requestedWidthInches: '', weightConsumedKg: '' }, { reelRole: 'flute', reelId: '', requestedWidthInches: '', weightConsumedKg: '' }]);
       setOutputSheets([{ ply: 2, lengthInches: '', widthInches: '', sheetCount: '', totalWeightKg: '' }]);
       setRawMaterialConsumptions([]);
@@ -303,34 +271,8 @@ export default function ProductionPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-5 space-y-4">
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div>
-              <label className="mb-2 block text-sm font-semibold text-amber-900">Measured Recoverable Scrap (kg)</label>
-              <input type="number" required min="0" max={Math.max(0, massDifference)} step="0.001" value={recoverableWasteKg} onChange={e => setRecoverableWasteKg(e.target.value)} placeholder="Only physically weighed scrap" className="w-full rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm outline-none focus:border-amber-400" />
-              <p className="mt-2 text-xs text-amber-800">Moisture loss, dust and unaccounted process variance are not saleable scrap.</p>
-              <p className="mt-1 text-sm font-medium text-slate-700">Remaining process loss / variance: {Number.isFinite(calculatedProcessLoss) ? calculatedProcessLoss.toFixed(2) : '—'} kg</p>
-            </div>
-            <div>
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <label className="text-sm font-semibold text-amber-900">Classify recoverable scrap</label>
-                <button type="button" onClick={() => setWasteBreakdown([...wasteBreakdown, { category: 'other', weightKg: '', notes: '' }])} className="text-xs font-semibold text-amber-800 hover:text-amber-950">+ Add category</button>
-              </div>
-              <div className="space-y-2">
-                {wasteBreakdown.map((row, index) => (
-                  <div key={index} className="grid grid-cols-12 gap-2">
-                    <select value={row.category} onChange={e => { const next = [...wasteBreakdown]; next[index].category = e.target.value; setWasteBreakdown(next); }} className="col-span-5 rounded-lg border border-amber-200 bg-white px-2 py-2 text-xs">
-                      {Object.entries(wasteCategoryLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                    </select>
-                    <input type="number" min="0" step="0.001" placeholder="kg" value={row.weightKg} onChange={e => { const next = [...wasteBreakdown]; next[index].weightKg = e.target.value; setWasteBreakdown(next); }} className="col-span-3 min-w-0 rounded-lg border border-amber-200 bg-white px-2 py-2 text-xs" />
-                    <input type="text" maxLength="250" placeholder="Notes (optional)" value={row.notes} onChange={e => { const next = [...wasteBreakdown]; next[index].notes = e.target.value; setWasteBreakdown(next); }} className="col-span-3 min-w-0 rounded-lg border border-amber-200 bg-white px-2 py-2 text-xs" />
-                    <button type="button" disabled={wasteBreakdown.length === 1} onClick={() => setWasteBreakdown(wasteBreakdown.filter((_, i) => i !== index))} className="col-span-1 text-red-600 disabled:opacity-30"><Trash2 size={15}/></button>
-                  </div>
-                ))}
-              </div>
-              <p className="mt-2 text-xs text-slate-600">Classified: {classifiedWasteTotal.toFixed(3)} kg / Measured: {measuredScrap.toFixed(3)} kg</p>
-            </div>
-          </div>
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+          Scrap is not recorded during each production run. Record scrap and Thak together when a lot is sold in the Scrap & Thak Sale section.
         </div>
 
         {/* Footer Summary & Submit */}
