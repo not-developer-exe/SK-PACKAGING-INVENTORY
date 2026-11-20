@@ -103,6 +103,8 @@ jobs:
           repository: not-developer-exe/BOX-RATE-CALCULATOR
           ref: b3bb78e67c6a156338ae08dd7f86de2023c21915
           path: BOX-RATE-CALCULATOR
+      - name: Create empty CI-only server env file
+        run: touch Server/.env
       - name: Validate Docker Compose configuration
         run: BOX_COSTING_CONTEXT=BOX-RATE-CALCULATOR docker compose config --quiet
       - name: Build separate calculator and ERP frontend containers
