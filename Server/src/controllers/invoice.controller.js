@@ -58,9 +58,13 @@ function getFinancialYear(dateOnly) {
 }
 async function nextInvoiceNumber(companyKey, workspaceKey, invoiceDate, session) {
   const financialYear = getFinancialYear(invoiceDate);
+  const sequencePeriod = workspaceKey === 'sk-b-sales' ? 'B-' + financialYear : financialYear;
+  const sequenceFilter = workspaceKey === 'regular'
+    ? { companyKey, financialYear: sequencePeriod, $or: [{ workspaceKey: 'regular' }, { workspaceKey: { $exists: false } }] }
+    : { companyKey, workspaceKey, financialYear: sequencePeriod };
   const sequence = await InvoiceSequence.findOneAndUpdate(
-    { companyKey, workspaceKey, financialYear },
-    { $inc: { nextNumber: 1 }, $setOnInsert: { companyKey, workspaceKey, financialYear } },
+    sequenceFilter,
+    { $inc: { nextNumber: 1 }, $setOnInsert: { companyKey, workspaceKey, financialYear: sequencePeriod } },
     { new: true, upsert: true, setDefaultsOnInsert: true, session }
   );
   const profile = await CompanyProfile.findOne({ companyKey }).select('invoicePrefix').lean();
