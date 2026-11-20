@@ -16,6 +16,7 @@ import ReelStockPage from './pages/ReelStock/ReelStockPage';
 import StockInwardPage from './pages/StockInward/StockInwardPage';
 import RawMaterialPage from './pages/StockInward/RawMaterialPage';
 import ProductionPage from './pages/Production/ProductionPage';
+import FactoryWorkPage from './pages/FactoryWorkPage';
 import ConversionPage from './pages/Conversion/ConversionPage';
 import SheetPastingPage from './pages/Production/SheetPastingPage';
 import DispatchPage from './pages/Operations/DispatchPage';
@@ -84,15 +85,8 @@ function Sidebar() {
       ...(user?.role === 'admin' ? [{ name: 'Data Console', path: '/admin/data', icon: Database }] : []),
       { name: 'Product Details', path: '/admin/products', icon: ClipboardCheck }
     ] },
-    { group: 'Factory Work', items: [
-      { name: 'Corrugation Production', path: '/operations/production', icon: Factory },
-      { name: 'Sheet Cutting & Pasting', path: '/operations/pasting', icon: Scissors },
-      { name: 'Box Manufacturing', path: '/operations/conversion', icon: Scissors },
-      { name: 'Production Plan & Reports', path: '/operations/production-intelligence', icon: ChartNoAxesCombined },
-      { name: 'Reel-to-Sheet Cutting', path: '/operations/reel-cutting', icon: Scissors },
-      { name: 'External Job Work', path: '/operations/job-work', icon: Truck },
-      { name: 'Dispatch', path: '/operations/dispatch', icon: Truck },
-      { name: 'Scrap Register', path: '/operations/waste', icon: Trash2 }
+    { group: 'Factory', items: [
+      { name: 'Factory Work', path: '/factory', icon: Factory }
     ] },
     ...(user?.role === 'admin' ? [{ group: 'NSB Industrial Solutions', items: [
       { name: 'NSB Overview', path: '/nsb', icon: Building2 },
@@ -154,6 +148,7 @@ export default function App() {
       <Route element={<RequireAuth />}>
         <Route element={<AppLayout />}>
           <Route index element={<Overview />} />
+          <Route path="factory" element={<FactoryWorkPage />} />
           <Route path="nsb" element={user?.role === 'admin' ? <NSBOverviewPage /> : <Navigate to="/" replace />} />
           <Route path="nsb/expenses" element={user?.role === 'admin' ? <ExpensesPage company="nsb" /> : <Navigate to="/" replace />} />
           <Route path="nsb/finance" element={user?.role === 'admin' ? <FinancePage company="nsb" /> : <Navigate to="/" replace />} />
