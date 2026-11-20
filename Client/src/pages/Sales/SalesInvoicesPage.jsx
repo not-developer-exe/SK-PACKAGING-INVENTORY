@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Filter, RefreshCw, Ban } from 'lucide-react';
+import { Search, Plus, Filter, RefreshCw, Ban, FilePlus2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import axiosClient from '../../api/axiosClient';
 import DateRangeFilter from '../../components/DateRangeFilter';
@@ -106,7 +106,7 @@ export default function SalesInvoicesPage({ company = 'sk', workspace = 'regular
         </div>
         <div className="flex gap-2">
           <button onClick={() => loadInvoices({ from, to, customerId: customerFilter })} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-600"><RefreshCw size={15} className="mr-1 inline" />Refresh</button>
-          <button onClick={() => navigate(routeBase + '/new')} className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white"><Plus size={16} className="mr-1 inline" />{workspace === 'sk-b-sales' ? 'New B Sales Invoice' : 'New GST Invoice'}</button>
+          <button onClick={() => navigate(routeBase + '/manual-new')} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700"><FilePlus2 size={15} className="mr-1 inline"/>Manual Invoice</button><button onClick={() => navigate(routeBase + '/new')} className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white"><Plus size={16} className="mr-1 inline" />{workspace === 'sk-b-sales' ? 'New B Sales Invoice' : 'New GST Invoice'}</button>
         </div>
       </div>
 
@@ -135,7 +135,7 @@ export default function SalesInvoicesPage({ company = 'sk', workspace = 'regular
                   <td className="px-5 py-4 text-slate-600">{new Date(invoice.invoiceDate).toLocaleDateString('en-IN')}</td>
                   <td className="px-5 py-4 font-semibold text-blue-700">{invoice.status === 'Draft' ? 'Not issued' : invoice.invoiceNumber}</td>
                   <td className="px-5 py-4 font-medium text-slate-900">{invoice.customerId?.name || '—'}</td>
-                  <td className="px-5 py-4 text-slate-600">{invoice.dispatchId?.challanNumber || '—'}</td>
+                  <td className="px-5 py-4 text-slate-600">{invoice.dispatchId?.challanNumber || (invoice.sourceType === 'manual' ? 'Manual' : '—')}</td>
                   <td className="px-5 py-4 text-right font-medium">{money(invoice.grandTotal)}</td>
                   <td className="px-5 py-4 text-right font-semibold text-amber-700">{money(invoice.balanceDue)}</td>
                   <td className="px-5 py-4 text-right font-semibold">{invoice.costingStatus === 'available' ? money(invoice.grossProfit) : 'Cost pending'}</td>
