@@ -41,6 +41,57 @@ exports.createAccount = async (req, res) => {
   } catch (error) { res.status(error.code === 11000 ? 409 : 400).json({ message: error.code === 11000 ? 'An account with this name already exists.' : 'Unable to create account.' }); }
 };
 
+
+exports.updateAccount = async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid account ID.' });
+  const body = req.body || {};
+  const openingBalance = Number(body.openingBalance);
+  if (!['bank', 'cash'].includes(body.type) || !body.name?.trim() || !Number.isFinite(openingBalance) || openingBalance < 0) return res.status(400).json({ message: 'Enter a valid account name, type and opening balance.' });
+  if (body.type === 'bank' && (!body.bankName?.trim() || !body.accountNumber?.trim() || !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(String(body.ifsc || '').toUpperCase()))) return res.status(400).json({ message: 'For bank accounts, enter bank name, account number and a valid IFSC.' });
+  if (body.isDefaultForInvoice && body.type !== 'bank') return res.status(400).json({ message: 'Only a bank account can be selected for invoices.' });
+  try {
+    const key = companyKey(req);
+    const account = await FinancialAccount.findOne({ _id: req.params.id, companyKey: key });
+    if (!account) return res.status(404).json({ message: 'Account not found.' });
+    const transactionCount = await FinancialTransaction.countDocuments({ companyKey: key, $or: [{ fromAccountId: account._id }, { toAccountId: account._id }] });
+    if (transactionCount && (account.type !== body.type || Math.abs(Number(account.openingBalance) - openingBalance) > 0.005)) {
+      return res.status(409).json({ message: 'Account type and opening balance cannot be changed after transactions exist. Edit the account details only; use an adjustment transaction for balance corrections.' });
+    }
+    const duplicate = await FinancialAccount.findOne({ companyKey: key, name: body.name.trim(), _id: { $ne: account._id } }).lean();
+    if (duplicate) return res.status(409).json({ message: 'An account with this name already exists.' });
+    if (body.isDefaultForInvoice) await FinancialAccount.updateMany({ companyKey: key, _id: { $ne: account._id } }, { $set: { isDefaultForInvoice: false } });
+    Object.assign(account, {
+      name: body.name.trim(), type: body.type,
+      openingBalance: money(openingBalance),
+      currentBalance: transactionCount ? account.currentBalance : money(openingBalance),
+      bankName: body.type === 'bank' ? (body.bankName || '').trim() : '',
+      accountHolder: body.accountHolder || '', accountNumber: body.accountNumber || '',
+      ifsc: String(body.ifsc || '').toUpperCase(), branch: body.branch || '',
+      branchAddress: body.branchAddress || '', bankCity: body.bankCity || '',
+      bankState: body.bankState || '', upiId: body.upiId || '',
+      isDefaultForInvoice: Boolean(body.isDefaultForInvoice)
+    });
+    await account.save();
+    await writeAuditLog(req, { action: 'finance.account.updated', entityType: 'FinancialAccount', entityId: account._id, entityLabel: account.name, summary: 'Financial account updated: ' + account.name, metadata: { transactionCount } });
+    return res.json({ account });
+  } catch (error) { return res.status(error.code === 11000 ? 409 : 400).json({ message: error.code === 11000 ? 'An account with this name already exists.' : (error.message || 'Unable to update account.') }); }
+};
+
+exports.deactivateAccount = async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid account ID.' });
+  try {
+    const key = companyKey(req);
+    const account = await FinancialAccount.findOne({ _id: req.params.id, companyKey: key });
+    if (!account) return res.status(404).json({ message: 'Account not found.' });
+    if (Number(account.currentBalance || 0) > 0.005) return res.status(409).json({ message: 'This account has a remaining balance. Transfer or reconcile it before deactivating.' });
+    account.isActive = false;
+    account.isDefaultForInvoice = false;
+    await account.save();
+    await writeAuditLog(req, { action: 'finance.account.deactivated', entityType: 'FinancialAccount', entityId: account._id, entityLabel: account.name, summary: 'Financial account deactivated: ' + account.name });
+    return res.json({ message: 'Account deactivated. Transaction history has been preserved.' });
+  } catch (error) { return res.status(400).json({ message: 'Unable to deactivate account.' }); }
+};
+
 exports.createTransaction = async (req, res) => {
   const body = req.body || {};
   const amount = Number(body.amount);
