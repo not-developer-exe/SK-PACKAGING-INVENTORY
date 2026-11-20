@@ -7,7 +7,7 @@ const { requireRole } = require('../middlewares/role.middleware');
 router.use(protect);
 
 router.get('/boxes', getAvailableBoxes);
-router.patch('/finished-goods/:id/quality', updateFinishedGoodsQuality);
+router.patch('/finished-goods/:id/quality', requireRole('admin'), updateFinishedGoodsQuality);
 router.get('/', getDispatches)
 router.post('/', recordDispatch);
 router.patch('/:id/cancel', requireRole('admin'), cancelDispatch);
