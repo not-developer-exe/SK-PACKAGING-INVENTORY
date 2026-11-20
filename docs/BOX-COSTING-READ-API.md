@@ -2,7 +2,7 @@
 
 Version: `v1`
 
-These endpoints provide the separate Box Costing calculator with read-only SK Packaging paper pricing and reel stock data. They do not create, update, reserve or consume stock.
+These endpoints provide the separate Box Costing calculator with read-only SK Packaging paper pricing, reel stock and Duplex facing-sheet stock data. They do not create, update, reserve or consume stock.
 
 ## Access control
 
