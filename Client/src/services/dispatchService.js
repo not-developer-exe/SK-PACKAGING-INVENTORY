@@ -17,6 +17,10 @@ export const dispatchService = {
     const { data } = await axiosClient.patch(`/dispatch/${id}/cancel`, { reason });
     return data;
   },
+  async recordManualChallan(payload) {
+    const { data } = await axiosClient.post("/dispatch/manual", payload);
+    return data;
+  },
   async recordDispatch(payload) {
     const { data } = await axiosClient.post("/dispatch", payload);
     return data;
