@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const companyScopePlugin = require('../utils/companyScope');
 const ledgerSchema = new mongoose.Schema({
+  workspaceKey: { type: String, enum: ['regular', 'sk-b-sales'], default: 'regular' },
   date: { type: Date, default: Date.now },
   type: { type: String, required: true }, // e.g., 'Tax Invoice', 'Payment Received'
   ref: { type: String },
