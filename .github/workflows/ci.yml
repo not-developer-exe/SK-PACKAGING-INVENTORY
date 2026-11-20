@@ -102,6 +102,7 @@ jobs:
         with:
           repository: not-developer-exe/BOX-RATE-CALCULATOR
           ref: 0ffa359415b9e407e0a79cbbd371b65d002de208
+          token: ${{ secrets.BOX_COSTING_READ_TOKEN || github.token }}
           path: BOX-RATE-CALCULATOR
       - name: Create empty CI-only server env file
         run: touch Server/.env
