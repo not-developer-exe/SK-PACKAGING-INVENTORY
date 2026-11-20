@@ -1,8 +1,22 @@
 # Production deployment
 
-This repository includes Dockerfiles and Compose configuration for a single-host deployment. The frontend is served by Nginx and proxies `/api` to the Express API, so the browser uses same-origin HTTP-only authentication cookies.
+This repository includes Dockerfiles and Compose configuration for a single-host deployment. The ERP frontend is served by Nginx and proxies `/api` to the Express API. The separate `BOX-RATE-CALCULATOR` repository runs in its own static container and is reverse-proxied at `/box-costing/` on the same ERP origin. Nginx gates that route through the owner-only `/api/box-costing/v1/access` endpoint: unauthenticated users are redirected to `/login`, and accountant sessions receive HTTP 403.
 
-## 1. Prepare MongoDB
+## 1. Prepare the two application repositories
+
+Clone both repositories as sibling directories on the deployment host:
+
+```bash
+mkdir -p /opt/sk-packaging
+cd /opt/sk-packaging
+git clone https://github.com/not-developer-exe/SK-PACKAGING-INVENTORY.git
+git clone https://github.com/not-developer-exe/BOX-RATE-CALCULATOR.git
+cd SK-PACKAGING-INVENTORY
+```
+
+The default Compose build context for the calculator is `../BOX-RATE-CALCULATOR`. If you keep it elsewhere, set `BOX_COSTING_CONTEXT` to its path. Keep the calculator source in its separate repository; do not copy it into the ERP source tree.
+
+## 8. Prepare MongoDB
 
 Use MongoDB Atlas or another managed MongoDB replica set. The application requires transaction support; do not use a standalone MongoDB instance.
 
@@ -42,6 +56,9 @@ On first startup, the API creates the configured owner account if it does not ex
 ## 5. Verify deployment
 
 - Open `https://your-domain/` and sign in.
+- Use the admin-only **Box Costing Workspace** sidebar link or open `https://your-domain/box-costing/`.
+- Confirm unauthenticated visitors are redirected to `/login` and accountant sessions receive HTTP 403.
+- In the calculator, choose Refresh ERP and verify paper rates, reel stock and Duplex batches (after the corresponding API extension is merged).
 - Check `https://your-domain/api/health` returns HTTP 200 with database connected.
 - Verify the owner account is an active admin.
 - Verify login persists after refresh (HTTP-only secure cookie).
