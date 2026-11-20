@@ -1,0 +1,11 @@
+{
+  "name": "SK Packaging - Box Costing & Specification Workspace",
+  "short_name": "SK Box Costing",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#0b1120",
+  "description": "Offline-first corrugated box sheet sizing and layer-wise costing workspace.",
+  "icons": []
+}
