@@ -108,6 +108,17 @@ export default function CreateInvoicePage({ company = 'sk', workspace = 'regular
   const igstAmount = taxReady && !isIntraState ? Number((subTotal * gstPercent / 100).toFixed(2)) : 0;
   const grandTotal = Number((subTotal + cgstAmount + sgstAmount + igstAmount).toFixed(2));
 
+  const saveDraft = async () => {
+    setSubmitting(true);
+    try {
+      await axiosClient.post(apiBase, { invoiceDate, customerId, dispatchId, items, gstPercent, placeOfSupplyStateCode, saveAsDraft: true });
+      navigate(routeBase);
+    } catch (err) {
+      await alert({ title: 'Draft could not be saved', message: err.response?.data?.message || 'Unable to save draft.' });
+      setSubmitting(false);
+    }
+  };
+
   // Execute Live Transaction
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -271,8 +282,9 @@ export default function CreateInvoicePage({ company = 'sk', workspace = 'regular
               disabled={submitting || !taxReady || !items || items.length === 0 || items.some(i => !i.rate)} 
               className="mt-8 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500"
             >
-              {submitting ? <Loader2 className="animate-spin" size={18} /> : <><CheckCircle2 size={18} /> Generate Invoice</>}
+              {submitting ? <Loader2 className="animate-spin" size={18} /> : <><CheckCircle2 size={18} /> Issue Invoice</>}
             </button>
+            <button type="button" onClick={saveDraft} disabled={submitting || !customerId || !dispatchId || !taxReady || !items.length || items.some(i => !i.rate)} className="mt-3 w-full rounded-xl border border-slate-600 px-4 py-3 text-sm font-semibold text-slate-200 disabled:opacity-40">Save as Draft</button>
           </div>
         </div>
       </form>
