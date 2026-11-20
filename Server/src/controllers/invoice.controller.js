@@ -303,12 +303,12 @@ exports.createInvoice = async (req, res) => {
       const { cgstAmount, sgstAmount, igstAmount, taxType } = tax;
       const grandTotal = Number((subTotal + cgstAmount + sgstAmount + igstAmount).toFixed(2));
       const workspaceKey = currentWorkspaceKey(req);
-      const invoiceNumber = saveAsDraft ? undefined : await nextInvoiceNumber(companyKey, workspaceKey, invoiceDate, session);
+      const invoiceNumber = saveAsDraft ? 'DRAFT-' + new mongoose.Types.ObjectId().toString() : await nextInvoiceNumber(companyKey, workspaceKey, invoiceDate, session);
 
       const [created] = await Invoice.create([{
         companyKey,
         workspaceKey,
-        ...(invoiceNumber ? { invoiceNumber } : {}),
+        invoiceNumber,
         sellerSnapshot: await buildSellerSnapshot(companyKey, session),
         invoiceDate: date,
         customerId,
@@ -368,7 +368,7 @@ exports.issueDraftInvoice = async (req, res) => {
       const companyKey = currentCompanyKey(req);
       const customer = await Party.findOne({ _id: invoice.customerId, companyKey }).session(session);
       if (!customer) throw Object.assign(new Error('Customer ledger was not found.'), { statusCode: 409 });
-      const dateOnly = new Date(invoice.invoiceDate).toISOString().slice(0, 10);
+      const dateOnly = new Date(new Date(invoice.invoiceDate).getTime() + 330 * 60000).toISOString().slice(0, 10);
       const invoiceNumber = await nextInvoiceNumber(companyKey, invoice.workspaceKey || 'regular', dateOnly, session);
       invoice.invoiceNumber = invoiceNumber;
       invoice.status = 'Pending';
