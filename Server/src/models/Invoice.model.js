@@ -12,6 +12,7 @@ const invoicePaymentSchema = new mongoose.Schema({
 
 const invoiceSchema = new mongoose.Schema({
   companyKey: { type: String, enum: ['sk-packaging', 'nsb-industrial-solutions'], default: 'sk-packaging', required: true, index: true },
+  workspaceKey: { type: String, enum: ['regular', 'sk-b-sales'], default: 'regular', required: true, index: true },
   invoiceNumber: { type: String, required: true, unique: true },
   invoiceDate: { type: Date, required: true },
   customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Party', required: true },
