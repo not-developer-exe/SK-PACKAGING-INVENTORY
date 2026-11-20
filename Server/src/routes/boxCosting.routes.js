@@ -2,12 +2,14 @@ const express = require('express');
 const router = express.Router();
 const { protect } = require('../middlewares/auth.middleware');
 const { requireRole } = require('../middlewares/role.middleware');
-const { getSnapshot, getPaperRates, getReelStock } = require('../controllers/boxCosting.controller');
+const { checkAccess, getSnapshot, getPaperRates, getReelStock, getDuplexStock } = require('../controllers/boxCosting.controller');
 
 // Owner-only, read-only integration endpoints. No mutations are exposed here.
 router.use(protect, requireRole('admin'));
+router.get('/access', checkAccess);
 router.get('/snapshot', getSnapshot);
 router.get('/paper-rates', getPaperRates);
 router.get('/reel-stock', getReelStock);
+router.get('/duplex-stock', getDuplexStock);
 
 module.exports = router;
