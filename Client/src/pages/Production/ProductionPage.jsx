@@ -54,8 +54,7 @@ export default function ProductionPage() {
   // Calculations
   const totalInputWeight = inputReels.reduce((sum, r) => sum + Number(r.weightConsumedKg || 0), 0);
   const totalOutputWeight = outputSheets.reduce((sum, s) => sum + Number(s.totalWeightKg || 0), 0);
-  const massDifference = totalInputWeight - totalOutputWeight;
-
+  
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -286,14 +285,6 @@ export default function ProductionPage() {
               <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Net Output</p>
               <p className="text-lg font-bold text-blue-600">{totalOutputWeight.toFixed(2)} kg</p>
             </div>
-            <div className="text-center border-l border-slate-200 pl-6">
-              <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Verified Scrap</p>
-              <p className="text-lg font-bold text-amber-700">{measuredScrap.toFixed(2)} kg</p>
-            </div>
-            <div className="text-center border-l border-slate-200 pl-6">
-              <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Process Loss</p>
-              <p className="text-lg font-bold text-slate-800">{calculatedProcessLoss.toFixed(2)} kg</p>
-            </div>
           </div>
 
           <button type="submit" disabled={submitting} className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-blue-700 px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-800 disabled:opacity-70">
@@ -325,7 +316,7 @@ export default function ProductionPage() {
                   <span className={run.widthSubstitutions?.length ? "rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800" : "rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800"}>{run.widthSubstitutions?.length || 0} width substitutions</span>
                 </summary>
                 <div className="mt-2 text-xs text-slate-500">Operator: {run.operatorName || '—'} · Machine: {run.machineName || 'Not recorded'}</div>
-                {(run.wasteBreakdown || []).length > 0 && <div className="mt-3 rounded-lg bg-amber-50 p-3 text-sm"><p className="mb-2 font-semibold text-amber-900">Recoverable waste classification</p>{run.wasteBreakdown.map((waste, index) => <p key={waste._id || index} className="text-xs text-amber-900">{wasteCategoryLabels[waste.category] || waste.category}: {Number(waste.weightKg?.$numberDecimal || waste.weightKg || 0).toFixed(3)} kg {waste.notes ? '· ' + waste.notes : ''}</p>)}</div>}
+
                 <div className="mt-4 grid gap-4 lg:grid-cols-2">
                   <div>
                     <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Reels consumed</h3>
