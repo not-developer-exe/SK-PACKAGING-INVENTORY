@@ -32,6 +32,7 @@ const nsbRoutes = require('./routes/nsb.routes');
 const rawMaterialRoutes = require('./routes/rawMaterial.routes');
 const jobWorkRoutes = require('./routes/jobWork.routes');
 const reelCuttingRoutes = require('./routes/reelCutting.routes');
+const boxCostingRoutes = require('./routes/boxCosting.routes');
 
 const app = express();
 const allowedOrigins = (process.env.CLIENT_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174')
@@ -92,6 +93,7 @@ app.use('/api/admin-records', adminRecordsRoutes);
 app.use('/api/product-specifications', (req, res, next) => { req.companyKey = 'sk-packaging'; next(); }, productSpecificationRoutes);
 app.use('/api/production-plans', (req, res, next) => { req.companyKey = 'sk-packaging'; next(); }, productionPlanRoutes);
 app.use('/api/production-intelligence', productionIntelligenceRoutes);
+app.use('/api/box-costing/v1', boxCostingRoutes);
 
 app.get('/api/health', (req, res) => {
   const databaseReady = mongoose.connection.readyState === 1;
