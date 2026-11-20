@@ -58,6 +58,7 @@ function Sidebar() {
     { group: 'Accounts & Sales', items: [
       { name: 'Customers & Suppliers', path: '/parties', icon: Users },
       { name: 'Sales Invoices', path: '/sales', icon: FileText },
+      { name: 'SK B Sales', path: '/b-sales', icon: Receipt },
       { name: 'Purchase & Stock Inward', path: '/inventory/inward', icon: ArrowDownToLine },
       { name: 'Expenses', path: '/expenses', icon: Receipt },
       { name: 'Bank & Cash', path: '/finance', icon: Wallet },
@@ -164,6 +165,9 @@ export default function App() {
           <Route path="sales" element={<SalesInvoicesPage />} />
           <Route path="sales/new" element={<CreateInvoicePage />} />
           <Route path="sales/:id" element={<InvoiceDetailPage />} />
+          <Route path="b-sales" element={<SalesInvoicesPage workspace="sk-b-sales" />} />
+          <Route path="b-sales/new" element={<CreateInvoicePage workspace="sk-b-sales" />} />
+          <Route path="b-sales/:id" element={<InvoiceDetailPage workspace="sk-b-sales" />} />
           <Route path="reports/profit-loss" element={<ProfitLossPage />} />
           <Route path="reports/financial-health" element={<FinancialHealthPage />} />
           <Route path="reports/activity" element={<PeriodActivityPage />} />
