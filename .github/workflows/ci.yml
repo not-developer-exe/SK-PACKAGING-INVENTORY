@@ -110,4 +110,4 @@ jobs:
       - name: Build separate calculator and ERP frontend containers
         run: BOX_COSTING_CONTEXT=BOX-RATE-CALCULATOR docker compose build box-costing client
       - name: Validate ERP Nginx routes and owner auth gate
-        run: BOX_COSTING_CONTEXT=BOX-RATE-CALCULATOR docker compose run --rm --no-deps client nginx -t
+        run: BOX_COSTING_CONTEXT=BOX-RATE-CALCULATOR docker compose run --rm --no-deps --add-host server:127.0.0.1 --add-host box-costing:127.0.0.1 client nginx -t
