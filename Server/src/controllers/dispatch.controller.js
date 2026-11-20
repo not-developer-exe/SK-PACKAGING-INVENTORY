@@ -266,20 +266,38 @@ exports.updateFinishedGoodsQuality = async (req, res) => {
   const { qualityStatus, qualityNotes = '' } = req.body || {};
   if (!['approved', 'rejected'].includes(qualityStatus)) return res.status(400).json({ message: 'Quality status must be approved or rejected.' });
   if (typeof qualityNotes !== 'string' || qualityNotes.trim().length > 500) return res.status(400).json({ message: 'Quality notes must be 500 characters or fewer.' });
+  if (qualityStatus === 'rejected' && !qualityNotes.trim()) return res.status(400).json({ message: 'A rejection reason is required.' });
   if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid finished-goods batch ID.' });
+
+  const session = await mongoose.startSession();
   try {
-    const box = await FinishedBox.findOne({ _id: req.params.id });
-    if (!box) return res.status(404).json({ message: 'Finished-goods batch not found.' });
-    if (box.status === 'dispatched' || box.quantityAvailable !== box.quantityProduced) return res.status(409).json({ message: 'Quality status cannot be changed after any quantity has been dispatched.' });
-    box.qualityStatus = qualityStatus;
-    box.qualityNotes = qualityNotes.trim();
-    box.qualityCheckedAt = new Date();
-    box.qualityCheckedBy = req.user._id;
-    await box.save();
-    await writeAuditLog(req, { action: 'finished_goods.quality_checked', entityType: 'FinishedBox', entityId: box._id, entityLabel: box.batchNumber, summary: 'Finished goods quality marked ' + qualityStatus + ': ' + box.batchNumber, metadata: { qualityStatus, qualityNotes: box.qualityNotes } });
-    return res.json({ message: 'Finished-goods quality status updated.', box });
+    let updatedBox;
+    await session.withTransaction(async () => {
+      const box = await FinishedBox.findById(req.params.id).session(session);
+      if (!box) throw Object.assign(new Error('Finished-goods batch not found.'), { statusCode: 404 });
+      if (box.status === 'dispatched' || box.quantityAvailable !== box.quantityProduced) {
+        throw Object.assign(new Error('Quality status cannot be changed after any quantity has been dispatched.'), { statusCode: 409 });
+      }
+      box.qualityStatus = qualityStatus;
+      box.qualityNotes = qualityNotes.trim();
+      box.qualityCheckedAt = new Date();
+      box.qualityCheckedBy = req.user._id;
+      await box.save({ session });
+      await writeAuditLog(req, {
+        action: 'finished_goods.quality_checked',
+        entityType: 'FinishedBox',
+        entityId: box._id,
+        entityLabel: box.batchNumber,
+        summary: 'Finished goods quality marked ' + qualityStatus + ': ' + box.batchNumber,
+        metadata: { qualityStatus, qualityNotes: box.qualityNotes }
+      }, session);
+      updatedBox = box;
+    });
+    return res.json({ message: 'Finished-goods quality status updated.', box: updatedBox });
   } catch (error) {
     console.error('[FINISHED GOODS] Quality update failed:', error.message);
-    return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Unable to update finished-goods quality status.' });
+    return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Unable to update finished-goods quality status. No changes were committed.' });
+  } finally {
+    await session.endSession();
   }
 };
