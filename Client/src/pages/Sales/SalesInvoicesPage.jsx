@@ -131,9 +131,9 @@ export default function SalesInvoicesPage({ company = 'sk', workspace = 'regular
             <table className="w-full min-w-[760px] text-left text-sm">
               <thead className="border-b bg-white text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-4">Date</th><th className="px-5 py-4">Invoice No.</th><th className="px-5 py-4">Customer</th><th className="px-5 py-4">Challan</th><th className="px-5 py-4 text-right">Invoice Total</th><th className="px-5 py-4 text-right">Balance Due</th><th className="px-5 py-4 text-right">Gross Profit</th><th className="px-5 py-4 text-center">Status</th><th className="px-5 py-4 text-center">Action</th></tr></thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredInvoices.map((invoice) => <tr key={invoice._id} onClick={() => navigate(routeBase + "/" + invoice._id)} onKeyDown={(event) => { if (event.key === "Enter") navigate(routeBase + "/" + invoice._id); }} tabIndex={0} role="link" aria-label={"Open invoice " + invoice.invoiceNumber} className="cursor-pointer hover:bg-blue-50/40 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500">
+                {filteredInvoices.map((invoice) => <tr key={invoice._id} onClick={() => navigate(routeBase + "/" + invoice._id)} onKeyDown={(event) => { if (event.key === "Enter") navigate(routeBase + "/" + invoice._id); }} tabIndex={0} role="link" aria-label={"Open invoice " + (invoice.status === "Draft" ? "draft" : invoice.invoiceNumber)} className="cursor-pointer hover:bg-blue-50/40 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500">
                   <td className="px-5 py-4 text-slate-600">{new Date(invoice.invoiceDate).toLocaleDateString('en-IN')}</td>
-                  <td className="px-5 py-4 font-semibold text-blue-700">{invoice.invoiceNumber}</td>
+                  <td className="px-5 py-4 font-semibold text-blue-700">{invoice.status === 'Draft' ? 'Not issued' : invoice.invoiceNumber}</td>
                   <td className="px-5 py-4 font-medium text-slate-900">{invoice.customerId?.name || '—'}</td>
                   <td className="px-5 py-4 text-slate-600">{invoice.dispatchId?.challanNumber || '—'}</td>
                   <td className="px-5 py-4 text-right font-medium">{money(invoice.grandTotal)}</td>
