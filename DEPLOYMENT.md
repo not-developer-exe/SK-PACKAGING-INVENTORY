@@ -16,13 +16,13 @@ cd SK-PACKAGING-INVENTORY
 
 The default Compose build context for the calculator is `../BOX-RATE-CALCULATOR`. If you keep it elsewhere, set `BOX_COSTING_CONTEXT` to its path. Keep the calculator source in its separate repository; do not copy it into the ERP source tree.
 
-## 8. Prepare MongoDB
+## 2. Prepare MongoDB
 
 Use MongoDB Atlas or another managed MongoDB replica set. The application requires transaction support; do not use a standalone MongoDB instance.
 
 Create a database user with access only to the ERP database. Add the deployment host's outbound IP to the database network allowlist. Keep the connection string private.
 
-## 2. Configure the API environment
+## 3. Configure the API environment
 
 Copy `Server/.env.example` to `Server/.env` and set:
 
@@ -36,7 +36,7 @@ Copy `Server/.env.example` to `Server/.env` and set:
 
 Do not use angle-bracket placeholders or commit `Server/.env`. Use a password manager or hosting secret store for credentials.
 
-## 3. Build and start
+## 4. Build and start
 
 Install Docker Engine and the Docker Compose plugin on the host. From the repository root:
 
@@ -49,11 +49,11 @@ docker compose logs -f server
 
 The frontend is exposed on port `8080` by default. Set `APP_PORT` in the shell or Compose environment to change it. Put a TLS reverse proxy (for example, Caddy or a managed load balancer) in front of this port and terminate HTTPS there. Do not expose the API container port directly.
 
-## 4. Owner account
+## 5. Owner account
 
 On first startup, the API creates the configured owner account if it does not exist. If it already exists as a compatible password account, it is ensured to remain an active administrator; its password is not reset. If migrating a legacy external-auth account, follow the server seed instructions and preserve a database backup first.
 
-## 5. Verify deployment
+## 6. Verify deployment
 
 - Open `https://your-domain/` and sign in.
 - Use the admin-only **Box Costing Workspace** sidebar link or open `https://your-domain/box-costing/`.
@@ -66,7 +66,7 @@ On first startup, the API creates the configured owner account if it does not ex
 - Confirm archive/restore and cancellation workflows on test parties and batches.
 - Verify daily/monthly reports and physical stock reconciliation.
 
-## 6. Backups and operations
+## 7. Backups and operations
 
 - Enable automated MongoDB backups and point-in-time recovery where available.
 - Restrict database network access and rotate credentials if exposed.
@@ -74,10 +74,11 @@ On first startup, the API creates the configured owner account if it does not ex
 - Back up before schema or migration work.
 - Never store production database data or secrets in Git.
 
-## 7. Update and rollback
+## 8. Update and rollback
 
 ```bash
 git pull origin main
+cd ../BOX-RATE-CALCULATOR && git pull origin main && cd ../SK-PACKAGING-INVENTORY
 docker compose build
 docker compose up -d
 docker compose ps
