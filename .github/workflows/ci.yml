@@ -110,4 +110,4 @@ jobs:
       - name: Build separate calculator and ERP frontend containers
         run: BOX_COSTING_CONTEXT=BOX-RATE-CALCULATOR docker compose build box-costing client
       - name: Validate ERP Nginx routes and owner auth gate
-        run: BOX_COSTING_CONTEXT=BOX-RATE-CALCULATOR docker compose run --rm --no-deps --add-host server:127.0.0.1 --add-host box-costing:127.0.0.1 client nginx -t
+        run: docker run --rm --add-host server:127.0.0.1 --add-host box-costing:127.0.0.1 -v "$PWD/Client/nginx.conf:/etc/nginx/conf.d/default.conf:ro" nginx:1.27-alpine nginx -t
