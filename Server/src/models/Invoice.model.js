@@ -46,7 +46,7 @@ const invoiceSchema = new mongoose.Schema({
   status: { type: String, enum: ['Paid', 'Pending', 'Overdue', 'Cancelled'], default: 'Pending' }
 }, { timestamps: true });
 
-invoiceSchema.index({ invoiceDate: -1, customerId: 1, companyKey: 1 });
+invoiceSchema.index({ invoiceDate: -1, customerId: 1, companyKey: 1, workspaceKey: 1 });
 invoiceSchema.index({ dispatchId: 1 }, { unique: true });
 
 invoicePaymentSchema.plugin(companyScopePlugin);
