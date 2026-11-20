@@ -5,8 +5,6 @@ const dispatchSchema = new mongoose.Schema({
   companyKey: { type: String, enum: ['sk-packaging', 'nsb-industrial-solutions'], default: 'sk-packaging', index: true },
   challanNumber: { type: String, required: true, unique: true, trim: true },
   customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Party', required: true },
-  sourceType: { type: String, enum: ['production', 'manual'], default: 'production', index: true },
-  manualItems: [{ itemName: { type: String, required: true, trim: true, maxlength: 180 }, description: { type: String, trim: true, maxlength: 500, default: '' }, quantity: { type: Number, required: true, min: 0.001 }, unit: { type: String, required: true, trim: true, maxlength: 30 } }],
   dispatchDate: { type: Date, required: true, default: Date.now },
   
   boxes: [{

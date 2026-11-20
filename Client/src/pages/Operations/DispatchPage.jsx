@@ -30,7 +30,6 @@ export default function DispatchPage() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [customerFilter, setCustomerFilter] = useState('');
-  const [manualItems, setManualItems] = useState([{ itemName: '', description: '', quantity: '1', unit: 'Nos' }]);
 
   const fetchData = async (dateParams = {}) => {
     try {
@@ -95,26 +94,6 @@ export default function DispatchPage() {
     } finally {
       setSubmitting(false);
     }
-  };
-
-
-  const handleManualSubmit = async (e) => {
-    e.preventDefault();
-    setSubmitting(true);
-    try {
-      const res = await dispatchService.recordManualChallan({
-        dispatchDate, customerId, vehicleNumber: vehicleNumber.trim(), driverName: driverName.trim(),
-        items: manualItems.map(line => ({ ...line, quantity: Number(line.quantity) }))
-      });
-      setCustomerId(''); setVehicleNumber(''); setDriverName(''); setDispatchDate(toLocalDateInput());
-      setManualItems([{ itemName: '', description: '', quantity: '1', unit: 'Nos' }]);
-      await fetchData({ from, to, customerId: customerFilter });
-      const history = await dispatchService.getDispatches({ from, to, customerId: customerFilter });
-      setSelectedChallan(history.find(d => d.challanNumber === res.challanNumber) || null);
-      setActiveTab('history');
-      window.alert('Manual challan ' + res.challanNumber + ' recorded. Inventory was not changed.');
-    } catch (err) { window.alert(err.response?.data?.message || 'Unable to record manual challan.'); }
-    finally { setSubmitting(false); }
   };
 
   const handleCancelDispatch = async (dispatch) => {
@@ -182,31 +161,7 @@ export default function DispatchPage() {
       <div className="flex gap-2 border-b border-slate-200 pb-2">
         <button onClick={() => setActiveTab('new')} className={`px-4 py-2 text-sm font-medium transition ${activeTab === 'new' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}>New Dispatch</button>
         <button onClick={() => setActiveTab('history')} className={`px-4 py-2 text-sm font-medium transition ${activeTab === 'history' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}>Challan History</button>
-        <button onClick={() => setActiveTab('manual')} className={`px-4 py-2 text-sm font-medium transition ${activeTab === 'manual' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}>Manual Challan</button>
       </div>
-
-
-      {activeTab === 'manual' ? (
-        <form onSubmit={handleManualSubmit} className="space-y-5 rounded-2xl border bg-white p-6 shadow-sm">
-          <div><h2 className="text-lg font-semibold">Manual Delivery Challan</h2><p className="mt-1 text-sm text-amber-700">For trading, outside purchases or other outward movements not linked to production. This entry does not deduct finished-goods stock.</p></div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="text-sm">Date *<input required type="date" value={dispatchDate} onChange={e=>setDispatchDate(e.target.value)} className="mt-1 w-full rounded-lg border p-2"/></label>
-            <label className="text-sm">Customer *<select required value={customerId} onChange={e=>setCustomerId(e.target.value)} className="mt-1 w-full rounded-lg border bg-white p-2"><option value="">Select customer</option>{customers.map(c=><option key={c._id} value={c._id}>{c.name}</option>)}</select></label>
-            <label className="text-sm">Vehicle number<input value={vehicleNumber} onChange={e=>setVehicleNumber(e.target.value.toUpperCase())} className="mt-1 w-full rounded-lg border p-2"/></label>
-            <label className="text-sm">Driver name<input value={driverName} onChange={e=>setDriverName(e.target.value)} className="mt-1 w-full rounded-lg border p-2"/></label>
-          </div>
-          <div className="space-y-3"><div className="flex items-center justify-between"><h3 className="font-semibold">Items</h3><button type="button" onClick={()=>setManualItems(old=>[...old,{itemName:'',description:'',quantity:'1',unit:'Nos'}])} className="rounded-lg border px-3 py-2 text-sm">+ Add line</button></div>
-            {manualItems.map((line,index)=><div key={index} className="grid gap-2 rounded-lg border p-3 sm:grid-cols-12">
-              <input required maxLength="180" placeholder="Item / goods description *" value={line.itemName} onChange={e=>setManualItems(old=>old.map((x,i)=>i===index?{...x,itemName:e.target.value}:x))} className="rounded-lg border p-2 text-sm sm:col-span-4"/>
-              <input maxLength="500" placeholder="Additional details" value={line.description} onChange={e=>setManualItems(old=>old.map((x,i)=>i===index?{...x,description:e.target.value}:x))} className="rounded-lg border p-2 text-sm sm:col-span-4"/>
-              <input required type="number" min="0.001" step="0.001" placeholder="Qty" value={line.quantity} onChange={e=>setManualItems(old=>old.map((x,i)=>i===index?{...x,quantity:e.target.value}:x))} className="rounded-lg border p-2 text-sm sm:col-span-2"/>
-              <input required maxLength="30" placeholder="Unit" value={line.unit} onChange={e=>setManualItems(old=>old.map((x,i)=>i===index?{...x,unit:e.target.value}:x))} className="rounded-lg border p-2 text-sm sm:col-span-1"/>
-              <button type="button" disabled={manualItems.length===1} onClick={()=>setManualItems(old=>old.filter((_,i)=>i!==index))} className="rounded-lg border p-2 text-sm text-red-600 disabled:opacity-30 sm:col-span-1">Remove</button>
-            </div>)}
-          </div>
-          <button disabled={submitting} className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{submitting?'Saving…':'Save manual challan'}</button>
-        </form>
-      ) : null}
 
       {activeTab === 'new' ? (
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -309,7 +264,7 @@ export default function DispatchPage() {
                   <td className="px-5 py-4 font-medium text-slate-900">{dispatch.customerId?.name}</td>
                   <td className="px-5 py-4 text-slate-700">
                     <ul className="list-disc pl-4 space-y-1">
-                      {dispatch.sourceType === 'manual' ? (dispatch.manualItems || []).map((line, i) => <li key={i}><span className="font-medium">{line.quantity} {line.unit}</span> x {line.itemName}</li>) : (dispatch.boxes || []).map((b, i) => (
+                      {dispatch.boxes.map((b, i) => (
                         <li key={i}><span className="font-medium">{b.dispatchQuantity}</span> x {b.boxId?.itemName || 'Finished Box'}</li>
                       ))}
                     </ul>
@@ -378,9 +333,7 @@ export default function DispatchPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
-                    {selectedChallan.sourceType === 'manual' ? (selectedChallan.manualItems || []).map((line, i) => (
-                      <tr key={i}><td className="py-4 text-slate-700">{i + 1}</td><td className="py-4 font-semibold text-slate-900">{line.itemName}<div className="text-xs font-normal text-slate-500 mt-0.5">{line.description}</div></td><td className="py-4 text-slate-600">Manual entry</td><td className="py-4 text-right text-lg font-bold text-slate-900">{line.quantity} {line.unit}</td></tr>
-                    )) : (selectedChallan.boxes || []).map((b, i) => (
+                    {selectedChallan.boxes.map((b, i) => (
                       <tr key={i}>
                         <td className="py-4 text-slate-700">{i + 1}</td>
                         <td className="py-4 font-semibold text-slate-900">

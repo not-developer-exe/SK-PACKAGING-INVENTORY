@@ -8,48 +8,6 @@ const Sequence = require('../models/Sequence.model');
 const writeAuditLog = require('../utils/writeAuditLog');
 const { buildDateRangeFilter, isValidDateOnly } = require('../utils/dateFilters');
 
-
-exports.recordManualChallan = async (req, res) => {
-  const body = req.body || {};
-  if (!mongoose.isValidObjectId(body.customerId)) return res.status(400).json({ message: 'Select a valid customer.' });
-  if (!isValidDateOnly(body.dispatchDate)) return res.status(400).json({ message: 'Enter a valid challan date in YYYY-MM-DD format.' });
-  if (!Array.isArray(body.items) || !body.items.length || body.items.length > 100) return res.status(400).json({ message: 'Add between 1 and 100 manual challan lines.' });
-  const items = body.items.map((line) => ({
-    itemName: typeof line.itemName === 'string' ? line.itemName.trim() : '',
-    description: typeof line.description === 'string' ? line.description.trim() : '',
-    quantity: Number(line.quantity),
-    unit: typeof line.unit === 'string' ? line.unit.trim() : ''
-  }));
-  if (items.some((line) => !line.itemName || line.itemName.length > 180 || line.description.length > 500 || !Number.isFinite(line.quantity) || line.quantity <= 0 || !line.unit || line.unit.length > 30)) return res.status(400).json({ message: 'Each line needs an item name, positive quantity and unit.' });
-  const session = await mongoose.startSession();
-  try {
-    let challan;
-    await session.withTransaction(async () => {
-      const companyKey = req.companyKey || 'sk-packaging';
-      const customer = await Party.findOne({ _id: body.customerId, companyKey }).session(session);
-      if (!customer || customer.isActive === false || !['Customer', 'Both'].includes(customer.type)) throw Object.assign(new Error('Selected customer is not active or valid.'), { statusCode: 400 });
-      const existingCount = await Dispatch.countDocuments({ companyKey }).session(session);
-      const sequence = await Sequence.findOneAndUpdate(
-        { _id: 'dispatch-challan' },
-        [{ $set: { value: { $add: [{ $max: [{ $ifNull: ['$value', existingCount] }, existingCount] }, 1] } } }],
-        { new: true, upsert: true, session, updatePipeline: true }
-      );
-      const challanNumber = 'DC-' + String(sequence.value).padStart(6, '0');
-      [challan] = await Dispatch.create([{
-        companyKey, challanNumber, customerId: customer._id,
-        dispatchDate: new Date(body.dispatchDate + 'T00:00:00+05:30'),
-        vehicleNumber: typeof body.vehicleNumber === 'string' ? body.vehicleNumber.trim().slice(0, 40) : '',
-        driverName: typeof body.driverName === 'string' ? body.driverName.trim().slice(0, 120) : '',
-        sourceType: 'manual', manualItems: items, boxes: [], recordedBy: req.user._id
-      }], { session });
-      await writeAuditLog(req, { action: 'dispatch.manual_challan_recorded', entityType: 'Dispatch', entityId: challan._id, entityLabel: challanNumber, summary: 'Manual delivery challan recorded: ' + challanNumber, metadata: { customerId: String(customer._id), lineCount: items.length, inventoryImpact: false } }, session);
-    });
-    return res.status(201).json({ message: 'Manual challan recorded without changing inventory.', challanNumber: challan.challanNumber, dispatch: challan });
-  } catch (error) {
-    return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Unable to record manual challan. No inventory changes were committed.' });
-  } finally { await session.endSession(); }
-};
-
 exports.recordDispatch = async (req, res) => {
   const { customerId, vehicleNumber, driverName, boxes, dispatchDate } = req.body || {};
   if (dispatchDate !== undefined && !isValidDateOnly(dispatchDate)) {
