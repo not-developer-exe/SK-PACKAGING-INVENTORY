@@ -55,7 +55,7 @@ export default function InvoiceDetailPage({ company = 'sk', workspace = 'regular
         <section className="grid grid-cols-2 gap-x-4 gap-y-3">
           <div><p className="text-xs text-slate-500">Invoice number</p><p className="font-semibold">{invoice.status === 'Draft' ? 'Not yet assigned' : invoice.invoiceNumber}</p></div>
           <div><p className="text-xs text-slate-500">Invoice date</p><p className="font-semibold">{date(invoice.invoiceDate)}</p></div>
-          <div><p className="text-xs text-slate-500">Delivery challan</p><p className="font-semibold">{dispatch.challanNumber || '—'}</p></div>
+          <div><p className="text-xs text-slate-500">Delivery challan</p><p className="font-semibold">{dispatch.challanNumber || (invoice.sourceType === 'manual' ? 'Standalone manual invoice' : '—')}</p></div>
           <div><p className="text-xs text-slate-500">Place of supply</p><p className="font-semibold">{invoice.placeOfSupplyStateCode || '—'}</p></div>
         </section>
       </div>
