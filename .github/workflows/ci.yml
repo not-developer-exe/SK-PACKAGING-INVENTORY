@@ -105,5 +105,7 @@ jobs:
           path: BOX-RATE-CALCULATOR
       - name: Validate Docker Compose configuration
         run: BOX_COSTING_CONTEXT=BOX-RATE-CALCULATOR docker compose config --quiet
-      - name: Build separate calculator container
-        run: BOX_COSTING_CONTEXT=BOX-RATE-CALCULATOR docker compose build box-costing
+      - name: Build separate calculator and ERP frontend containers
+        run: BOX_COSTING_CONTEXT=BOX-RATE-CALCULATOR docker compose build box-costing client
+      - name: Validate ERP Nginx routes and owner auth gate
+        run: BOX_COSTING_CONTEXT=BOX-RATE-CALCULATOR docker compose run --rm --no-deps client nginx -t
