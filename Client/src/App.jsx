@@ -1,7 +1,7 @@
 import React from 'react';
 import { Routes, Route, Link, useLocation, Navigate, Outlet, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, Users, FileText, Package, ArrowDownToLine, Factory, ClipboardCheck,
+  LayoutDashboard, Users, FileText, Package, ArrowDownToLine, Factory, ClipboardCheck, Calculator,
   Scissors, Truck, LogOut, FilePlus2, BookOpen, Trash2, ShieldCheck, ChartNoAxesCombined, Receipt, Database, Wallet, Building2
 } from 'lucide-react';
 
@@ -86,7 +86,8 @@ function Sidebar() {
       { name: 'Product Details', path: '/admin/products', icon: ClipboardCheck }
     ] },
     { group: 'Factory', items: [
-      { name: 'Factory Work', path: '/factory', icon: Factory }
+      { name: 'Factory Work', path: '/factory', icon: Factory },
+      ...(user?.role === 'admin' ? [{ name: 'Box Costing Workspace', path: '/box-costing/', icon: Calculator, external: true }] : [])
     ] },
     ...(user?.role === 'admin' ? [{ group: 'NSB Industrial Solutions', items: [
       { name: 'NSB Overview', path: '/nsb', icon: Building2 },
@@ -112,8 +113,11 @@ function Sidebar() {
           <h2 className="mb-2 px-6 text-xs font-bold uppercase tracking-wider text-slate-500">{section.group}</h2>
           <div className="space-y-1">{section.items.map((item) => {
             const Icon = item.icon;
-            const active = item.path === '/' ? location.pathname === '/' : location.pathname === item.path || location.pathname.startsWith(item.path + '/');
-            return <Link key={item.path} to={item.path} aria-current={active ? 'page' : undefined} className={`flex items-center gap-3 px-6 py-2.5 text-sm font-medium transition-colors ${active ? 'border-r-4 border-white bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><Icon size={18} />{item.name}</Link>;
+            const active = item.external ? location.pathname.startsWith('/box-costing') : item.path === '/' ? location.pathname === '/' : location.pathname === item.path || location.pathname.startsWith(item.path + '/');
+            const linkClass = `flex items-center gap-3 px-6 py-2.5 text-sm font-medium transition-colors ${active ? 'border-r-4 border-white bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`;
+            return item.external
+              ? <a key={item.path} href={item.path} aria-current={active ? 'page' : undefined} className={linkClass}><Icon size={18} />{item.name}</a>
+              : <Link key={item.path} to={item.path} aria-current={active ? 'page' : undefined} className={linkClass}><Icon size={18} />{item.name}</Link>;
           })}</div>
         </div>)}
       </nav>
