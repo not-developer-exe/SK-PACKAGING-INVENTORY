@@ -16,7 +16,7 @@ These endpoints provide the separate Box Costing calculator with read-only SK Pa
 
 ### `GET /api/box-costing/v1/snapshot`
 
-Returns both paper rates and current reel stock in one response.
+Returns paper rates, current reel stock and current Duplex facing-sheet stock in one response.
 
 ### `GET /api/box-costing/v1/paper-rates`
 
@@ -27,6 +27,10 @@ Only posted inward receipts are considered. Draft and cancelled receipts are exc
 ### `GET /api/box-costing/v1/reel-stock`
 
 Returns current stock grouped by exact specification. Only reels with status `available` or `partial` are included. It includes reel count, remaining kilograms and weighted-average purchase and landed rates for the remaining stock.
+
+### `GET /api/box-costing/v1/duplex-stock`
+
+Returns available and partially remaining `FacingMaterialBatch` records where `materialType` is `duplex`, with batch number, sheet dimensions, remaining sheet count, remaining weight, rate per kg, inward date and supplier/job-worker label.
 
 ## Response shape
 
