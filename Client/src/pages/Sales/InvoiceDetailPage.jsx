@@ -37,12 +37,13 @@ export default function InvoiceDetailPage({ company = 'sk', workspace = 'regular
   return <div className="mx-auto max-w-5xl space-y-4">
     <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
       <button onClick={() => navigate(routeBase)} className="rounded-lg border bg-white px-3 py-2 text-sm"><ArrowLeft className="mr-1 inline" size={16}/>Back to invoices</button>
-      <button onClick={() => window.print()} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white"><Printer className="mr-2 inline" size={16}/>Print / Save PDF</button>
+      {invoice.status !== 'Draft' && <button onClick={() => window.print()} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white"><Printer className="mr-2 inline" size={16}/>Print / Save PDF</button>}
     </div>
+    {invoice.status === 'Draft' && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm font-semibold text-amber-900 print:hidden">DRAFT — NOT AN ISSUED INVOICE. It has no official invoice number and is not posted to the customer ledger.</div>}
     <article className="invoice-paper mx-auto bg-white p-8 text-slate-900 shadow-sm sm:p-10">
       <div className="flex items-start justify-between gap-6 border-b-2 border-slate-900 pb-5">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Tax Invoice</p>
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">{invoice.status === 'Draft' ? 'Draft — Not Issued' : 'Tax Invoice'}</p>
           <h1 className="mt-2 text-2xl font-bold">{seller.legalName || 'Seller company profile required'}</h1>
           <p className="mt-2 max-w-sm whitespace-pre-line text-xs leading-5 text-slate-600">{seller.address || 'Registered business address to be configured'}</p>
           <p className="mt-1 text-xs text-slate-600">GSTIN: {seller.gstin || 'Not configured'} · Contact: {seller.phone || 'Not configured'}</p>
@@ -52,7 +53,7 @@ export default function InvoiceDetailPage({ company = 'sk', workspace = 'regular
       <div className="grid grid-cols-2 gap-6 border-b border-slate-200 py-5 text-sm">
         <section><h2 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Bill to</h2><p className="font-semibold">{buyer.name || party.name || '—'}</p><p className="mt-1 whitespace-pre-line text-xs leading-5 text-slate-600">{buyer.billingAddress || party.billingAddress || party.registeredAddress || party.address || party.city || 'Billing address not available in Party Master'}</p><p className="mt-1 text-xs text-slate-600">GSTIN: {buyer.gstin || party.gstin || '—'}</p><p className="text-xs text-slate-600">State code: {buyer.stateCode || party.stateCode || '—'}</p></section>
         <section className="grid grid-cols-2 gap-x-4 gap-y-3">
-          <div><p className="text-xs text-slate-500">Invoice number</p><p className="font-semibold">{invoice.invoiceNumber}</p></div>
+          <div><p className="text-xs text-slate-500">Invoice number</p><p className="font-semibold">{invoice.status === 'Draft' ? 'Not yet assigned' : invoice.invoiceNumber}</p></div>
           <div><p className="text-xs text-slate-500">Invoice date</p><p className="font-semibold">{date(invoice.invoiceDate)}</p></div>
           <div><p className="text-xs text-slate-500">Delivery challan</p><p className="font-semibold">{dispatch.challanNumber || '—'}</p></div>
           <div><p className="text-xs text-slate-500">Place of supply</p><p className="font-semibold">{invoice.placeOfSupplyStateCode || '—'}</p></div>

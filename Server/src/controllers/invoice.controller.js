@@ -138,7 +138,7 @@ exports.getInvoices = async (req, res) => {
       if (!mongoose.isValidObjectId(req.query.customerId)) return res.status(400).json({ message: 'Invalid customer ID.' });
       filter.customerId = req.query.customerId;
     }
-    if (req.query.status && !['Paid', 'Pending', 'Overdue', 'Cancelled'].includes(req.query.status)) return res.status(400).json({ message: 'Invalid invoice status.' });
+    if (req.query.status && !['Draft', 'Paid', 'Pending', 'Overdue', 'Cancelled'].includes(req.query.status)) return res.status(400).json({ message: 'Invalid invoice status.' });
     if (req.query.status) filter.status = req.query.status;
     const invoices = await Invoice.find(filter)
       .populate('customerId', 'name')
@@ -191,7 +191,8 @@ exports.createInvoice = async (req, res) => {
       customerId,
       dispatchId,
       items,
-      gstPercent
+      gstPercent,
+      saveAsDraft = false
     } = req.body || {};
 
     if (![customerId, dispatchId].every(mongoose.isValidObjectId)) {
@@ -302,7 +303,7 @@ exports.createInvoice = async (req, res) => {
       const { cgstAmount, sgstAmount, igstAmount, taxType } = tax;
       const grandTotal = Number((subTotal + cgstAmount + sgstAmount + igstAmount).toFixed(2));
       const workspaceKey = currentWorkspaceKey(req);
-      const invoiceNumber = await nextInvoiceNumber(companyKey, workspaceKey, invoiceDate, session);
+      const invoiceNumber = saveAsDraft ? 'DRAFT-' + new mongoose.Types.ObjectId().toString() : await nextInvoiceNumber(companyKey, workspaceKey, invoiceDate, session);
 
       const [created] = await Invoice.create([{
         companyKey,
@@ -322,12 +323,13 @@ exports.createInvoice = async (req, res) => {
         placeOfSupplyStateCode,
         grandTotal,
         balanceDue: grandTotal,
+        ...(saveAsDraft ? { status: 'Draft' } : {}),
         costOfGoods: totalCostOfGoods,
         grossProfit,
         costingStatus: costingAvailable ? 'available' : 'unavailable'
       }], { session });
 
-      customer.ledger.push({
+      if (!saveAsDraft) customer.ledger.push({
         date,
         type: 'Tax Invoice',
         workspaceKey,
@@ -336,9 +338,8 @@ exports.createInvoice = async (req, res) => {
         credit: 0,
         balance: 0
       });
-      customer.balance = recalculatePartyLedger(customer.ledger);
-      await customer.save({ session });
-      await writeAuditLog(req, { action: 'invoice.created', entityType: 'Invoice', entityId: created._id, entityLabel: invoiceNumber, summary: 'Sales invoice created: ' + invoiceNumber, metadata: { workspaceKey, customerId: String(customerId), dispatchId: String(dispatchId), subTotal, gstPercent: gst, taxType, placeOfSupplyStateCode, grandTotal, costOfGoods: totalCostOfGoods, grossProfit, costingStatus: costingAvailable ? 'available' : 'unavailable' } }, session);
+      if (!saveAsDraft) { customer.balance = recalculatePartyLedger(customer.ledger); await customer.save({ session }); }
+      await writeAuditLog(req, { action: saveAsDraft ? 'invoice.draft_created' : 'invoice.created', entityType: 'Invoice', entityId: created._id, entityLabel: invoiceNumber || 'Draft', summary: saveAsDraft ? 'Invoice draft saved' : 'Sales invoice created: ' + invoiceNumber, metadata: { workspaceKey, customerId: String(customerId), dispatchId: String(dispatchId), subTotal, gstPercent: gst, taxType, placeOfSupplyStateCode, grandTotal, costOfGoods: totalCostOfGoods, grossProfit, costingStatus: costingAvailable ? 'available' : 'unavailable' } }, session);
       createdInvoice = created;
     });
 
@@ -351,5 +352,49 @@ exports.createInvoice = async (req, res) => {
     }
   } finally {
     await session.endSession();
+  }
+};
+
+
+exports.issueDraftInvoice = async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid invoice ID.' });
+  const session = await mongoose.startSession();
+  try {
+    let issued;
+    await session.withTransaction(async () => {
+      const invoice = await Invoice.findOne({ _id: req.params.id, ...invoiceCompanyFilter(req) }).session(session);
+      if (!invoice) throw Object.assign(new Error('Invoice not found.'), { statusCode: 404 });
+      if (invoice.status !== 'Draft') throw Object.assign(new Error('Only a draft can be issued.'), { statusCode: 409 });
+      const companyKey = currentCompanyKey(req);
+      const customer = await Party.findOne({ _id: invoice.customerId, companyKey }).session(session);
+      if (!customer) throw Object.assign(new Error('Customer ledger was not found.'), { statusCode: 409 });
+      const dateOnly = new Date(new Date(invoice.invoiceDate).getTime() + 330 * 60000).toISOString().slice(0, 10);
+      const invoiceNumber = await nextInvoiceNumber(companyKey, invoice.workspaceKey || 'regular', dateOnly, session);
+      invoice.invoiceNumber = invoiceNumber;
+      invoice.status = 'Pending';
+      invoice.balanceDue = invoice.grandTotal;
+      customer.ledger.push({ date: invoice.invoiceDate, type: 'Tax Invoice', workspaceKey: invoice.workspaceKey || 'regular', ref: invoiceNumber, debit: invoice.grandTotal, credit: 0, balance: 0 });
+      customer.balance = recalculatePartyLedger(customer.ledger);
+      await customer.save({ session });
+      await invoice.save({ session });
+      await writeAuditLog(req, { action: 'invoice.issued', entityType: 'Invoice', entityId: invoice._id, entityLabel: invoiceNumber, summary: 'Invoice draft issued: ' + invoiceNumber, metadata: { workspaceKey: invoice.workspaceKey || 'regular', customerId: String(invoice.customerId), dispatchId: String(invoice.dispatchId), grandTotal: invoice.grandTotal } }, session);
+      issued = invoice;
+    });
+    return res.json({ message: 'Draft issued successfully.', invoice: issued });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Unable to issue draft invoice.' });
+  } finally { await session.endSession(); }
+};
+
+exports.deleteDraftInvoice = async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid invoice ID.' });
+  try {
+    const draft = await Invoice.findOne({ _id: req.params.id, ...invoiceCompanyFilter(req), status: 'Draft' });
+    if (!draft) return res.status(404).json({ message: 'Draft not found. Only drafts can be deleted.' });
+    await writeAuditLog(req, { action: 'invoice.draft_deleted', entityType: 'Invoice', entityId: draft._id, entityLabel: 'Draft', summary: 'Invoice draft deleted', metadata: { workspaceKey: draft.workspaceKey || 'regular', customerId: String(draft.customerId), dispatchId: String(draft.dispatchId), grandTotal: draft.grandTotal } });
+    await draft.deleteOne();
+    return res.json({ message: 'Draft deleted. No invoice number was consumed.' });
+  } catch (error) {
+    return res.status(500).json({ message: 'Unable to delete invoice draft.' });
   }
 };

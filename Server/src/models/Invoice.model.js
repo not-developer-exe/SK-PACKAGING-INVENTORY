@@ -44,7 +44,7 @@ const invoiceSchema = new mongoose.Schema({
   costingStatus: { type: String, enum: ['available', 'unavailable'], default: 'unavailable' },
   payments: { type: [invoicePaymentSchema], default: [] },
   
-  status: { type: String, enum: ['Paid', 'Pending', 'Overdue', 'Cancelled'], default: 'Pending' }
+  status: { type: String, enum: ['Draft', 'Paid', 'Pending', 'Overdue', 'Cancelled'], default: 'Pending' }
 }, { timestamps: true });
 
 invoiceSchema.index({ invoiceDate: -1, customerId: 1, companyKey: 1, workspaceKey: 1 });
