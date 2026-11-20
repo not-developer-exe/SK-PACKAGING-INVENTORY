@@ -43,6 +43,10 @@ const finishedBoxSchema = new mongoose.Schema({
   costPerBox: { type: Number, default: 0, min: 0 },
   costingStatus: { type: String, enum: ['available', 'unavailable'], default: 'unavailable' },
   
+  qualityStatus: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending', index: true },
+  qualityCheckedAt: { type: Date },
+  qualityCheckedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  qualityNotes: { type: String, trim: true, maxlength: 500 },
   status: { type: String, enum: ['available', 'dispatched'], default: 'available' },
   manufacturedAt: { type: Date, default: Date.now },
   recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }

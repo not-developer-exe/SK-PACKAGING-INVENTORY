@@ -63,6 +63,11 @@ exports.recordDispatch = async (req, res) => {
           error.statusCode = 400;
           throw error;
         }
+        if (box.qualityStatus !== 'approved') {
+          const error = new Error(`Batch ${box.batchNumber} has not passed finished-goods quality inspection.`);
+          error.statusCode = 409;
+          throw error;
+        }
         if (box.quantityAvailable < dispatchQuantity) {
           const error = new Error(`Insufficient stock for ${box.itemName}. Available: ${box.quantityAvailable}, requested: ${dispatchQuantity}`);
           error.statusCode = 409;
@@ -225,7 +230,7 @@ exports.markDelivered = async (req, res) => {
 
 exports.getAvailableBoxes = async (req, res) => {
   try {
-    const boxes = await FinishedBox.find({ quantityAvailable: { $gt: 0 } })
+    const boxes = await FinishedBox.find({ quantityAvailable: { $gt: 0 }, qualityStatus: 'approved' })
       .populate('customerId', 'name')
       .sort({ createdAt: 1 })
       .lean();
@@ -253,5 +258,28 @@ exports.getDispatches = async (req, res) => {
   } catch (error) {
     console.error('[DISPATCH] Dispatch history query failed:', error.message);
     return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Unable to fetch dispatch history' });
+  }
+};
+
+
+exports.updateFinishedGoodsQuality = async (req, res) => {
+  const { qualityStatus, qualityNotes = '' } = req.body || {};
+  if (!['approved', 'rejected'].includes(qualityStatus)) return res.status(400).json({ message: 'Quality status must be approved or rejected.' });
+  if (typeof qualityNotes !== 'string' || qualityNotes.trim().length > 500) return res.status(400).json({ message: 'Quality notes must be 500 characters or fewer.' });
+  if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid finished-goods batch ID.' });
+  try {
+    const box = await FinishedBox.findOne({ _id: req.params.id });
+    if (!box) return res.status(404).json({ message: 'Finished-goods batch not found.' });
+    if (box.status === 'dispatched' || box.quantityAvailable !== box.quantityProduced) return res.status(409).json({ message: 'Quality status cannot be changed after any quantity has been dispatched.' });
+    box.qualityStatus = qualityStatus;
+    box.qualityNotes = qualityNotes.trim();
+    box.qualityCheckedAt = new Date();
+    box.qualityCheckedBy = req.user._id;
+    await box.save();
+    await writeAuditLog(req, { action: 'finished_goods.quality_checked', entityType: 'FinishedBox', entityId: box._id, entityLabel: box.batchNumber, summary: 'Finished goods quality marked ' + qualityStatus + ': ' + box.batchNumber, metadata: { qualityStatus, qualityNotes: box.qualityNotes } });
+    return res.json({ message: 'Finished-goods quality status updated.', box });
+  } catch (error) {
+    console.error('[FINISHED GOODS] Quality update failed:', error.message);
+    return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Unable to update finished-goods quality status.' });
   }
 };

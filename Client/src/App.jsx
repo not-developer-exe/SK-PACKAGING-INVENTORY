@@ -19,6 +19,7 @@ import ProductionPage from './pages/Production/ProductionPage';
 import ConversionPage from './pages/Conversion/ConversionPage';
 import SheetPastingPage from './pages/Production/SheetPastingPage';
 import DispatchPage from './pages/Operations/DispatchPage';
+import FinishedGoodsPage from './pages/Operations/FinishedGoodsPage';
 import JobWorkPage from './pages/Operations/JobWorkPage';
 import ReelCuttingPage from './pages/Operations/ReelCuttingPage';
 import StockLedgerPage from './pages/Reports/StockLedgerPage';
@@ -74,7 +75,7 @@ function Sidebar() {
       { name: 'Raw Material Stock', path: '/inventory/raw-materials', icon: ArrowDownToLine },
       { name: 'Stock Register', path: '/inventory/ledger', icon: BookOpen },
       { name: 'Inventory Valuation', path: '/reports/inventory-valuation', icon: ChartNoAxesCombined },
-      { name: 'Finished Goods Stock', path: '/operations/dispatch', icon: Package }
+      { name: 'Finished Goods Stock', path: '/operations/finished-goods', icon: Package }
     ] },
     { group: 'Reports & Administration', items: [
       { name: 'Opening Stock', path: '/admin/opening-stock', icon: ShieldCheck },
@@ -186,6 +187,7 @@ export default function App() {
           <Route path="operations/production-intelligence" element={<ProductionIntelligencePage />} />
           <Route path="operations/conversion" element={<ConversionPage />} />
           <Route path="operations/dispatch" element={<DispatchPage />} />
+          <Route path="operations/finished-goods" element={<FinishedGoodsPage />} />
           <Route path="operations/reel-cutting" element={<ReelCuttingPage />} />
           <Route path="operations/job-work" element={<JobWorkPage />} />
           <Route path="operations/waste" element={<WasteRegisterPage />} />
