@@ -14,6 +14,10 @@ These endpoints provide the separate Box Costing calculator with read-only SK Pa
 
 ## Endpoints
 
+### `GET /api/box-costing/v1/access`
+
+Owner-only access probe for the static calculator route. Returns HTTP 204 for the designated administrator; unauthenticated users receive 401 and accountant users receive 403. It returns no business data.
+
 ### `GET /api/box-costing/v1/snapshot`
 
 Returns paper rates, current reel stock and current Duplex facing-sheet stock in one response.
