@@ -1,4 +1,5 @@
 const ReelUnit = require('../models/ReelUnit.model');
+const FacingMaterialBatch = require('../models/FacingMaterialBatch.model');
 
 const companyFilter = { $or: [{ companyKey: 'sk-packaging' }, { companyKey: { $exists: false } }] };
 
@@ -91,17 +92,46 @@ const reelStockPipeline = [
   { $sort: { width: 1, bf: 1, gsm: 1, quality: 1 } }
 ];
 
+async function getDuplexStockRows() {
+  const batches = await FacingMaterialBatch.find({
+    ...companyFilter,
+    materialType: 'duplex',
+    status: { $in: ['available', 'partial'] },
+    remainingSheets: { $gt: 0 },
+    remainingWeightKg: { $gt: 0 }
+  })
+    .select('batchNumber materialType lengthInches widthInches remainingSheets remainingWeightKg ratePerKg inwardDate supplierName jobWorkerName status')
+    .sort({ inwardDate: -1, createdAt: -1 })
+    .lean();
+
+  return batches.map((batch) => ({
+    batchNumber: batch.batchNumber,
+    materialType: batch.materialType,
+    lengthInches: Number(batch.lengthInches),
+    widthInches: Number(batch.widthInches),
+    remainingSheets: Number(batch.remainingSheets),
+    remainingWeightKg: Number(batch.remainingWeightKg?.toString?.() || batch.remainingWeightKg || 0),
+    ratePerKg: Number(batch.ratePerKg?.toString?.() || batch.ratePerKg || 0),
+    inwardDate: batch.inwardDate,
+    supplierName: batch.supplierName || '',
+    jobWorkerName: batch.jobWorkerName || '',
+    status: batch.status
+  }));
+}
+
 async function buildSnapshot() {
-  const [paperRates, reelStock] = await Promise.all([
+  const [paperRates, reelStock, duplexStock] = await Promise.all([
     ReelUnit.aggregate(paperRatesPipeline),
-    ReelUnit.aggregate(reelStockPipeline)
+    ReelUnit.aggregate(reelStockPipeline),
+    getDuplexStockRows()
   ]);
   return {
     source: 'SK Packaging ERP',
     companyKey: 'sk-packaging',
     generatedAt: new Date().toISOString(),
     paperRates,
-    reelStock
+    reelStock,
+    duplexStock
   };
 }
 
@@ -123,6 +153,17 @@ exports.getPaperRates = async (req, res) => {
   } catch (error) {
     console.error('[BOX COSTING API] Paper rates failed:', error.message);
     return res.status(500).json({ message: 'Unable to fetch latest paper rates.' });
+  }
+};
+
+exports.getDuplexStock = async (req, res) => {
+  try {
+    res.set('Cache-Control', 'no-store');
+    const duplexStock = await getDuplexStockRows();
+    return res.json({ generatedAt: new Date().toISOString(), duplexStock });
+  } catch (error) {
+    console.error('[BOX COSTING API] Duplex stock failed:', error.message);
+    return res.status(500).json({ message: 'Unable to fetch duplex sheet stock.' });
   }
 };
 
