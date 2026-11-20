@@ -64,6 +64,20 @@ Returns available and partially remaining `FacingMaterialBatch` records where `m
       "weightedAverageLandedRatePerKg": 41.8,
       "weightedAveragePurchaseRatePerKg": 40.9
     }
+  ],
+  "duplexStock": [
+    {
+      "batchNumber": "DUP-0001",
+      "materialType": "duplex",
+      "lengthInches": 24,
+      "widthInches": 18,
+      "remainingSheets": 850,
+      "remainingWeightKg": 210,
+      "ratePerKg": 62,
+      "inwardDate": "2026-11-19T00:00:00.000Z",
+      "supplierName": "Example Supplier",
+      "status": "partial"
+    }
   ]
 }
 ```
