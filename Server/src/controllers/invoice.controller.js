@@ -138,7 +138,7 @@ exports.getInvoices = async (req, res) => {
       if (!mongoose.isValidObjectId(req.query.customerId)) return res.status(400).json({ message: 'Invalid customer ID.' });
       filter.customerId = req.query.customerId;
     }
-    if (req.query.status && !['Paid', 'Pending', 'Overdue', 'Cancelled'].includes(req.query.status)) return res.status(400).json({ message: 'Invalid invoice status.' });
+    if (req.query.status && !['Draft', 'Paid', 'Pending', 'Overdue', 'Cancelled'].includes(req.query.status)) return res.status(400).json({ message: 'Invalid invoice status.' });
     if (req.query.status) filter.status = req.query.status;
     const invoices = await Invoice.find(filter)
       .populate('customerId', 'name')
@@ -191,7 +191,8 @@ exports.createInvoice = async (req, res) => {
       customerId,
       dispatchId,
       items,
-      gstPercent
+      gstPercent,
+      saveAsDraft = false
     } = req.body || {};
 
     if (![customerId, dispatchId].every(mongoose.isValidObjectId)) {
@@ -302,12 +303,12 @@ exports.createInvoice = async (req, res) => {
       const { cgstAmount, sgstAmount, igstAmount, taxType } = tax;
       const grandTotal = Number((subTotal + cgstAmount + sgstAmount + igstAmount).toFixed(2));
       const workspaceKey = currentWorkspaceKey(req);
-      const invoiceNumber = await nextInvoiceNumber(companyKey, workspaceKey, invoiceDate, session);
+      const invoiceNumber = saveAsDraft ? undefined : await nextInvoiceNumber(companyKey, workspaceKey, invoiceDate, session);
 
       const [created] = await Invoice.create([{
         companyKey,
         workspaceKey,
-        invoiceNumber,
+        ...(invoiceNumber ? { invoiceNumber } : {}),
         sellerSnapshot: await buildSellerSnapshot(companyKey, session),
         invoiceDate: date,
         customerId,
@@ -322,12 +323,13 @@ exports.createInvoice = async (req, res) => {
         placeOfSupplyStateCode,
         grandTotal,
         balanceDue: grandTotal,
+        ...(saveAsDraft ? { status: 'Draft' } : {}),
         costOfGoods: totalCostOfGoods,
         grossProfit,
         costingStatus: costingAvailable ? 'available' : 'unavailable'
       }], { session });
 
-      customer.ledger.push({
+      if (!saveAsDraft) customer.ledger.push({
         date,
         type: 'Tax Invoice',
         workspaceKey,
@@ -336,9 +338,8 @@ exports.createInvoice = async (req, res) => {
         credit: 0,
         balance: 0
       });
-      customer.balance = recalculatePartyLedger(customer.ledger);
-      await customer.save({ session });
-      await writeAuditLog(req, { action: 'invoice.created', entityType: 'Invoice', entityId: created._id, entityLabel: invoiceNumber, summary: 'Sales invoice created: ' + invoiceNumber, metadata: { workspaceKey, customerId: String(customerId), dispatchId: String(dispatchId), subTotal, gstPercent: gst, taxType, placeOfSupplyStateCode, grandTotal, costOfGoods: totalCostOfGoods, grossProfit, costingStatus: costingAvailable ? 'available' : 'unavailable' } }, session);
+      if (!saveAsDraft) { customer.balance = recalculatePartyLedger(customer.ledger); await customer.save({ session }); }
+      await writeAuditLog(req, { action: saveAsDraft ? 'invoice.draft_created' : 'invoice.created', entityType: 'Invoice', entityId: created._id, entityLabel: invoiceNumber || 'Draft', summary: saveAsDraft ? 'Invoice draft saved' : 'Sales invoice created: ' + invoiceNumber, metadata: { workspaceKey, customerId: String(customerId), dispatchId: String(dispatchId), subTotal, gstPercent: gst, taxType, placeOfSupplyStateCode, grandTotal, costOfGoods: totalCostOfGoods, grossProfit, costingStatus: costingAvailable ? 'available' : 'unavailable' } }, session);
       createdInvoice = created;
     });
 
