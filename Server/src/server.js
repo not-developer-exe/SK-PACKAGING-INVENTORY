@@ -33,6 +33,7 @@ const rawMaterialRoutes = require('./routes/rawMaterial.routes');
 const jobWorkRoutes = require('./routes/jobWork.routes');
 const reelCuttingRoutes = require('./routes/reelCutting.routes');
 const boxCostingRoutes = require('./routes/boxCosting.routes');
+const openingStockSnapshotRoutes = require('./routes/openingStockSnapshot.routes');
 
 const app = express();
 const allowedOrigins = (process.env.CLIENT_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174')
@@ -69,6 +70,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/parties', (req, res, next) => { req.companyKey = 'sk-packaging'; next(); }, partyRoutes);
 app.use('/api/inward', inwardRoutes);
 app.use('/api/inventory', inventoryRoutes);
+app.use('/api/opening-stock-snapshot', openingStockSnapshotRoutes);
 app.use('/api/raw-materials', (req, res, next) => { req.companyKey = 'sk-packaging'; next(); }, rawMaterialRoutes);
 app.use('/api/job-work', (req, res, next) => { req.companyKey = 'sk-packaging'; next(); }, jobWorkRoutes);
 app.use('/api/reel-cutting', (req, res, next) => { req.companyKey = 'sk-packaging'; next(); }, reelCuttingRoutes);

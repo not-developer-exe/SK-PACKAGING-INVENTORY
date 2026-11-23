@@ -27,6 +27,7 @@ import ReelCuttingPage from './pages/Operations/ReelCuttingPage';
 import StockLedgerPage from './pages/Reports/StockLedgerPage';
 import WasteRegisterPage from './pages/Reports/WasteRegisterPage';
 import OpeningStockPage from './pages/Reports/OpeningStockPage';
+import OpeningStockSnapshotPage from './pages/Reports/OpeningStockSnapshotPage';
 import UserManagementPage from './pages/Reports/UserManagementPage';
 import StockReconciliationPage from './pages/Reports/StockReconciliationPage';
 import ProfitLossPage from './pages/Reports/ProfitLossPage';
@@ -74,6 +75,7 @@ function Sidebar() {
     ] },
     { group: 'Stock', items: [
       { name: 'Reel Stock', path: '/inventory/reels', icon: Package },
+      { name: 'Workbook Opening Baseline', path: '/inventory/opening-baseline', icon: BookOpen },
       { name: 'Raw Material Stock', path: '/inventory/raw-materials', icon: ArrowDownToLine },
       { name: 'Stock Register', path: '/inventory/ledger', icon: BookOpen },
       { name: 'Inventory Valuation', path: '/reports/inventory-valuation', icon: ChartNoAxesCombined },
@@ -181,6 +183,7 @@ export default function App() {
           <Route path="finance" element={<FinancePage />} />
           <Route path="settings/company" element={user?.role === 'admin' ? <CompanyProfilePage /> : <Navigate to="/" replace />} />
           <Route path="inventory/reels" element={<ReelStockPage />} />
+          <Route path="inventory/opening-baseline" element={<OpeningStockSnapshotPage />} />
           <Route path="inventory/inward" element={<StockInwardPage />} />
           <Route path="inventory/raw-materials" element={<RawMaterialPage />} />
           <Route path="inventory/inwards" element={<Navigate to="/inventory/inward" replace />} />
