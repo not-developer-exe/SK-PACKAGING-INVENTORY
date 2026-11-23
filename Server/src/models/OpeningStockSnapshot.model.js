@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const openingStockSnapshotSchema = new mongoose.Schema({
   companyKey: { type: String, enum: ['sk-packaging', 'nsb-industrial-solutions'], required: true, index: true },
-  stockDate: { type: Date, required: true, index: true },
+  stockDate: { type: String, required: true, index: true },
   sourceWorkbook: { type: String, required: true },
   sourceSheet: { type: String, required: true },
   category: { type: String, required: true },
