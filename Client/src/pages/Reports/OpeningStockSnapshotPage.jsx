@@ -80,7 +80,7 @@ export default function OpeningStockSnapshotPage() {
                 <td className="px-4 py-3 text-right">{number(row.totalQuantity)}</td>
                 <td className="px-4 py-3 text-right">{number(row.totalWeightKg)}</td>
                 <td className="px-4 py-3 text-right">{money(row.totalAmount)}</td>
-                <td className="px-4 py-3">{row.importStatus === 'detailed' ? `Detailed · ${rows.length} rows` : 'Summary only'}</td>
+                <td className="px-4 py-3">{row.importStatus === 'detailed' ? `Imported · ${rows.length} rows` : 'Summary only'}</td>
               </tr>
               {rows.length > 0 && <tr>
                 <td colSpan={6} className="bg-slate-50 px-4 py-3">
