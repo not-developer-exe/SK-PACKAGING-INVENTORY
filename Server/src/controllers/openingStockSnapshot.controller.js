@@ -4,7 +4,7 @@ exports.getOpeningStockSnapshot = async (req, res) => {
   try {
     const companyKey = req.query.company === 'nsb' ? 'nsb-industrial-solutions' : 'sk-packaging';
     const requestedDate = req.query.date || '2026-11-01';
-    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(requestedDate)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(requestedDate)) {
       return res.status(400).json({ message: 'Invalid stock date. Use YYYY-MM-DD.' });
     }
 
