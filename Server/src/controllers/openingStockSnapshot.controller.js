@@ -3,8 +3,14 @@ const OpeningStockSnapshot = require('../models/OpeningStockSnapshot.model');
 exports.getOpeningStockSnapshot = async (req, res) => {
   try {
     const companyKey = req.query.company === 'nsb' ? 'nsb-industrial-solutions' : 'sk-packaging';
-    const stockDate = new Date(req.query.date || '2026-11-01T00:00:00.000Z');
-    if (Number.isNaN(stockDate.getTime())) return res.status(400).json({ message: 'Invalid stock date.' });
+    const requestedDate = req.query.date || '2026-11-01';
+    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(requestedDate)) {
+      return res.status(400).json({ message: 'Invalid stock date. Use YYYY-MM-DD.' });
+    }
+
+    // Opening baseline imports store the workbook date as an ISO string.
+    // Keep the query type identical so MongoDB can match the imported records.
+    const stockDate = requestedDate + 'T00:00:00.000Z';
     const records = await OpeningStockSnapshot.find({ companyKey, stockDate }).sort({ categoryLabel: 1 }).lean();
     const totals = records.reduce((acc, item) => {
       acc.totalAmount += Number(item.totalAmount || 0);
