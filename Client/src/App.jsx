@@ -11,6 +11,7 @@ import Overview from './pages/Overview';
 import PartyMasterPage from './pages/Parties/PartyMasterPage';
 import SalesInvoicesPage from './pages/Sales/SalesInvoicesPage';
 import CreateInvoicePage from './pages/Sales/CreateInvoicePage';
+import ManualInvoicePage from './pages/Sales/ManualInvoicePage';
 import InvoiceDetailPage from './pages/Sales/InvoiceDetailPage';
 import ReelStockPage from './pages/ReelStock/ReelStockPage';
 import StockInwardPage from './pages/StockInward/StockInwardPage';
@@ -159,14 +160,17 @@ export default function App() {
           <Route path="nsb/settings/company" element={user?.role === 'admin' ? <CompanyProfilePage company="nsb" /> : <Navigate to="/" replace />} />
           <Route path="nsb/sales" element={user?.role === 'admin' ? <SalesInvoicesPage company="nsb" /> : <Navigate to="/" replace />} />
           <Route path="nsb/sales/new" element={user?.role === 'admin' ? <CreateInvoicePage company="nsb" /> : <Navigate to="/" replace />} />
+          <Route path="nsb/sales/manual-new" element={user?.role === 'admin' ? <ManualInvoicePage company="nsb" /> : <Navigate to="/" replace />} />
           <Route path="nsb/sales/:id" element={user?.role === 'admin' ? <InvoiceDetailPage company="nsb" /> : <Navigate to="/" replace />} />
           <Route path="nsb/parties" element={user?.role === 'admin' ? <PartyMasterPage company="nsb" /> : <Navigate to="/" replace />} />
           <Route path="parties" element={<PartyMasterPage />} />
           <Route path="sales" element={<SalesInvoicesPage />} />
           <Route path="sales/new" element={<CreateInvoicePage />} />
+          <Route path="sales/manual-new" element={<ManualInvoicePage />} />
           <Route path="sales/:id" element={<InvoiceDetailPage />} />
           <Route path="b-sales" element={<SalesInvoicesPage workspace="sk-b-sales" />} />
           <Route path="b-sales/new" element={<CreateInvoicePage workspace="sk-b-sales" />} />
+          <Route path="b-sales/manual-new" element={<ManualInvoicePage workspace="sk-b-sales" />} />
           <Route path="b-sales/:id" element={<InvoiceDetailPage workspace="sk-b-sales" />} />
           <Route path="reports/profit-loss" element={<ProfitLossPage />} />
           <Route path="reports/financial-health" element={<FinancialHealthPage />} />
