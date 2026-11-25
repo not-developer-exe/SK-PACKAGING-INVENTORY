@@ -7,6 +7,8 @@ const thakEntrySchema = new mongoose.Schema({
   entryDate: { type: Date, required: true, default: Date.now },
   entryType: { type: String, enum: ['production', 'opening_balance'], default: 'production', index: true },
   weightKg: { type: Number, required: true, min: 0.001 },
+  ratePerKg: { type: Number, default: 0, min: 0 },
+  totalValue: { type: Number, default: 0, min: 0 },
   notes: { type: String, trim: true, maxlength: 500, default: '' },
   recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
