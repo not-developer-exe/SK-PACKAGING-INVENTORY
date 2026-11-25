@@ -40,6 +40,7 @@ exports.getLiveReelStock = async (req, res) => {
           reels: { $sum: 1 },
           // Convert Decimal128 to standard JavaScript numbers for safe JSON sending
           weight: { $sum: { $toDouble: "$remainingWeightKg" } },
+          weightSources: { $addToSet: { $ifNull: ["$weightSource", "verified"] } },
           // Grab the date of the newest reel in this category
           lastAdded: { $max: "$stockReceivedAt" },
         },
@@ -65,6 +66,7 @@ exports.getLiveReelStock = async (req, res) => {
           quality: "$_id.quality",
           reels: 1,
           weight: 1,
+          weightSource: { $cond: [{ $in: ["estimated", "$weightSources"] }, "estimated", "verified"] },
           dateAdded: "$lastAdded",
         },
       },
