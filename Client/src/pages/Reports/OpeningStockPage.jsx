@@ -4,7 +4,7 @@ import DateRangeFilter from '../../components/DateRangeFilter';
 
 const blankLine = () => ({
   reelWidthInches: '', bf: '', gsm: '', quality: 'Natural',
-  reelWeightsText: '', ratePerKg: ''
+  reelWeightsText: '', ratePerKg: '', weightSource: 'verified'
 });
 
 export default function OpeningStockPage() {
@@ -55,7 +55,8 @@ export default function OpeningStockPage() {
       gsm: Number(line.gsm),
       quality: line.quality,
       reelWeightsKg: line.reelWeightsText.split(',').map(value => Number(value.trim())),
-      ratePerKg: Number(line.ratePerKg)
+      ratePerKg: Number(line.ratePerKg),
+      weightSource: line.weightSource
     }));
     if (payloadLines.some(line => !line.reelWeightsKg.length || line.reelWeightsKg.some(weight => !Number.isFinite(weight) || weight <= 0))) {
       setError('Enter each physical reel weight in kg, separated by commas. Example: 185.5, 192, 177.25');
@@ -126,7 +127,7 @@ export default function OpeningStockPage() {
                 <input required value={line.reelWeightsText} onChange={e => updateLine(index,'reelWeightsText',e.target.value)} placeholder="185.5, 192, 177.25" className="mt-1 w-full rounded-lg border px-2 py-2 text-sm" />
               </label>
             </div>
-            <p className="mt-2 text-xs text-slate-500">Enter every reel weight individually, comma-separated. This preserves actual reel-level stock and valuation.</p>
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2"><p className="text-xs text-slate-500">Enter every reel weight individually, comma-separated. Estimated values are clearly flagged in stock records.</p><label className="flex items-center gap-2 text-xs font-medium text-slate-700"><input type="checkbox" checked={line.weightSource === 'estimated'} onChange={e => updateLine(index,'weightSource',e.target.checked ? 'estimated' : 'verified')} /> These weights are estimated</label></div>
           </section>
         ))}
 
