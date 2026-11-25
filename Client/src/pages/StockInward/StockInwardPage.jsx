@@ -24,7 +24,7 @@ export default function StockInwardPage() {
   
   // Line items state
   const [lines, setLines] = useState([
-    { reelWidthInches: '', bf: '', gsm: '', quality: 'Natural', reelCount: '', totalWeightKg: '', ratePerKg: '', freightCharges: 0, otherCharges: 0, supplierBatchRef: '', reelWeightsKg: '' }
+    { reelWidthInches: '', bf: '', gsm: '', quality: 'Natural', reelCount: '', totalWeightKg: '', ratePerKg: '', freightCharges: 0, otherCharges: 0, supplierBatchRef: '', reelWeightsKg: '', useIndividualWeights: false }
   ]);
 
   const fetchData = async (dateParams = {}) => {
@@ -49,7 +49,7 @@ export default function StockInwardPage() {
   }, []);
 
   const handleAddLine = () => {
-    setLines([...lines, { reelWidthInches: '', bf: '', gsm: '', quality: 'Natural', reelCount: '', totalWeightKg: '', ratePerKg: '', freightCharges: 0, otherCharges: 0, supplierBatchRef: '', reelWeightsKg: '' }]);
+    setLines([...lines, { reelWidthInches: '', bf: '', gsm: '', quality: 'Natural', reelCount: '', totalWeightKg: '', ratePerKg: '', freightCharges: 0, otherCharges: 0, supplierBatchRef: '', reelWeightsKg: '', useIndividualWeights: false }]);
   };
 
   const handleLineChange = (index, field, value) => {
@@ -91,14 +91,14 @@ export default function StockInwardPage() {
           ratePerKg: Number(l.ratePerKg),
           freightCharges: Number(l.freightCharges || 0),
           otherCharges: Number(l.otherCharges || 0),
-          reelWeightsKg: l.reelWeightsKg.trim() ? l.reelWeightsKg.split(',').map(value => Number(value.trim())) : []
+          reelWeightsKg: l.useIndividualWeights && l.reelWeightsKg.trim() ? l.reelWeightsKg.split(',').map(value => Number(value.trim())) : []
         }))
       });
 
       setShowModal(false);
       setInvoiceReference('');
       setNotes('');
-      setLines([{ reelWidthInches: '', bf: '', gsm: '', quality: 'Natural', reelCount: '', totalWeightKg: '', ratePerKg: '', freightCharges: 0, otherCharges: 0, supplierBatchRef: '', reelWeightsKg: '' }]);
+      setLines([{ reelWidthInches: '', bf: '', gsm: '', quality: 'Natural', reelCount: '', totalWeightKg: '', ratePerKg: '', freightCharges: 0, otherCharges: 0, supplierBatchRef: '', reelWeightsKg: '', useIndividualWeights: false }]);
       fetchData();
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Failed to create draft');
@@ -301,10 +301,38 @@ export default function StockInwardPage() {
                       <label className="mb-1 block text-xs font-medium text-slate-600">Other charges (₹)</label>
                       <input type="number" min="0" step="any" value={line.otherCharges} onChange={(e) => handleLineChange(idx, 'otherCharges', e.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm" />
                     </div>
-                    <div className="sm:col-span-6">
-                      <label className="mb-1 block text-xs font-medium text-slate-600">Individual reel weights in kg (optional, comma-separated)</label>
-                      <input type="text" value={line.reelWeightsKg} onChange={(e) => handleLineChange(idx, 'reelWeightsKg', e.target.value)} placeholder="150.5, 148.2, 151.3" className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm" />
-                      <p className="mt-1 text-[11px] text-slate-500">Enter one weight per reel. Their sum must match Total Wt. If left blank, the total is divided equally and flagged as estimated.</p>
+                    <div className="sm:col-span-6 rounded-xl border border-slate-200 bg-white p-3">
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-800">Individual reel weights</p>
+                          <p className="mt-0.5 text-xs text-slate-500">Turn on to enter the verified weight of each reel. Otherwise, total weight is split equally and marked estimated.</p>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={line.useIndividualWeights}
+                          onClick={() => {
+                            handleLineChange(idx, 'useIndividualWeights', !line.useIndividualWeights);
+                            handleLineChange(idx, 'reelWeightsKg', '');
+                          }}
+                          className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${line.useIndividualWeights ? 'bg-blue-700' : 'bg-slate-300'}`}
+                        >
+                          <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${line.useIndividualWeights ? 'translate-x-6' : 'translate-x-1'}`} />
+                        </button>
+                      </div>
+                      <div className="mt-2 flex items-center gap-2 text-xs">
+                        <span className={`rounded-full px-2 py-1 font-semibold ${line.useIndividualWeights ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                          {line.useIndividualWeights ? 'Verified weights' : 'Estimated weights'}
+                        </span>
+                        <span className="text-slate-500">{line.useIndividualWeights ? 'Enter one value per reel below.' : 'Average weight will be calculated automatically.'}</span>
+                      </div>
+                      {line.useIndividualWeights && (
+                        <div className="mt-3">
+                          <label className="mb-1 block text-xs font-medium text-slate-600">Weights in kg (comma-separated) *</label>
+                          <input type="text" value={line.reelWeightsKg} onChange={(e) => handleLineChange(idx, 'reelWeightsKg', e.target.value)} placeholder="150.5, 148.2, 151.3" required className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm" />
+                          <p className="mt-1 text-[11px] text-slate-500">Enter exactly {line.reelCount || 'the reel count'} weights. Their sum must match Total Wt within 0.01 kg.</p>
+                        </div>
+                      )}
                     </div>
                     <div className="sm:col-span-3 flex items-end">
                       {lines.length > 1 && (
