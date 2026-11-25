@@ -59,7 +59,9 @@ exports.recordThakEntry = async (req, res) => {
   }
   const entryDate = rawEntryDate ? new Date(rawEntryDate + 'T00:00:00+05:30') : new Date();
   const weightKg = Number(req.body?.weightKg);
+  const entryType = req.body?.entryType === 'opening_balance' ? 'opening_balance' : 'production';
   const notes = typeof req.body?.notes === 'string' ? req.body.notes.trim() : '';
+  if (entryType === 'opening_balance' && req.user?.role !== 'admin') return res.status(403).json({ message: 'Only an admin can post opening Thak stock.' });
   if (!Number.isFinite(weightKg) || weightKg <= 0 || notes.length > 500) {
     return res.status(400).json({ message: 'Enter a positive Thak weight and notes no longer than 500 characters.' });
   }
@@ -68,16 +70,20 @@ exports.recordThakEntry = async (req, res) => {
   try {
     let createdEntry;
     await session.withTransaction(async () => {
+      const companyKey = req.companyKey || 'sk-packaging';
+      if (entryType === 'opening_balance' && await ThakEntry.exists({ companyKey, entryType: 'opening_balance' }).session(session)) {
+        const error = new Error('Opening Thak stock has already been posted for this company.'); error.statusCode = 409; throw error;
+      }
       await WasteInventory.findOneAndUpdate(
         { _id: 'waste-stock' }, { $inc: { revision: 1 } },
         { upsert: true, new: true, setDefaultsOnInsert: true, session }
       );
-      const [entry] = await ThakEntry.create([{ entryDate, weightKg, notes, recordedBy: req.user._id }], { session });
+      const [entry] = await ThakEntry.create([{ companyKey, entryDate, entryType, weightKg, notes: entryType === 'opening_balance' ? (notes || 'Opening Thak stock imported from STOCK oct.(3).xlsx') : notes, recordedBy: req.user._id }], { session });
       await writeAuditLog(req, {
-        action: 'thak.stock_recorded', entityType: 'ThakEntry', entityId: entry._id,
+        action: entryType === 'opening_balance' ? 'thak.opening_stock_recorded' : 'thak.stock_recorded', entityType: 'ThakEntry', entityId: entry._id,
         entityLabel: 'Thak ' + weightKg.toFixed(2) + ' kg',
-        summary: 'Recorded moisture-damaged paper (Thak): ' + weightKg.toFixed(2) + ' kg',
-        metadata: { weightKg, entryDate, notes }
+        summary: (entryType === 'opening_balance' ? 'Opening Thak balance recorded: ' : 'Recorded moisture-damaged paper (Thak): ') + weightKg.toFixed(2) + ' kg',
+        metadata: { weightKg, entryDate, entryType, notes }
       }, session);
       createdEntry = entry;
     });
