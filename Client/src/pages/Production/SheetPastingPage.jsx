@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import axiosClient from '../../api/axiosClient';
 import { pastingService } from '../../services/pastingService';
 import { conversionService } from '../../services/conversionService';
-import { Loader2, Layers, PackagePlus, RefreshCw } from 'lucide-react';
+import { Loader2, Layers, RefreshCw } from 'lucide-react';
 
 const today = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0,10); };
 const kg = (v) => Number(v?.$numberDecimal || v || 0);
@@ -46,7 +46,7 @@ export default function SheetPastingPage() {
   const field = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm';
   const label = 'mb-1 block text-xs font-semibold text-slate-600';
   return <div className="mx-auto max-w-6xl space-y-6">
-    <div className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-2xl font-bold text-slate-900">Sheet Cutting & Pasting</h1><p className="mt-1 text-sm text-slate-500">Worker 2 · Issue 2-ply intermediate sheets and pre-cut facing material to create constructed 3-ply sheets.</p></div><button onClick={refresh} className="flex items-center gap-2 rounded-lg border bg-white px-3 py-2 text-sm"><RefreshCw size={15}/> Refresh</button></div>
+    <div className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-2xl font-bold text-slate-900">Sheet Pasting</h1><p className="mt-1 text-sm text-slate-500">Worker 2 · Issue 2-ply sheets and Duplex stock received through Stock Inward to create 3-ply sheets.</p></div><button onClick={refresh} className="flex items-center gap-2 rounded-lg border bg-white px-3 py-2 text-sm"><RefreshCw size={15}/> Refresh</button></div>
     {error && <div role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>}
     {success && <div role="status" className="rounded-lg bg-green-50 p-3 text-sm text-green-700">{success}</div>}
     <section className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-5 space-y-3">
