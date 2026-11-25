@@ -68,12 +68,12 @@ exports.recordMovement = async (req, res) => {
       const isIn = movementType === 'opening' || movementType === 'inward' || movementType === 'adjustment_in';
       const delta = isIn ? quantity : -quantity;
       const updated = await RawMaterial.findOneAndUpdate(
-        { _id: material._id, ...companyFilter(req), ...(delta < 0 ? { currentQty: { $gte: quantity } } : {}) },
+        { _id: material._id, ...companyFilter(req), ...(movementType === 'opening' ? { openingQty: 0, currentQty: 0 } : delta < 0 ? { currentQty: { $gte: quantity } } : {}) },
         { $inc: { currentQty: delta, ...(movementType === 'opening' ? { openingQty: quantity } : {}) },
           ...((movementType === 'opening' || movementType === 'inward') && rate > 0 ? { $set: { averageRate: rate } } : {}) },
         { new: true, session }
       );
-      if (!updated) { const e = new Error('Insufficient stock. Issue quantity exceeds available balance.'); e.statusCode = 409; throw e; }
+      if (!updated) { const e = new Error(movementType === 'opening' ? 'Opening balance already exists or this material has moved. Refresh and review the register.' : 'Insufficient stock. Issue quantity exceeds available balance.'); e.statusCode = 409; throw e; }
       const [movement] = await RawMaterialMovement.create([{
         companyKey: req.companyKey || 'sk-packaging', materialId: material._id, movementDate, movementType,
         quantity, rate, amount: Math.round(quantity * rate * 100) / 100,
