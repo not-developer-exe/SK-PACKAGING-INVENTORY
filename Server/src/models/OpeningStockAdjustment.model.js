@@ -7,6 +7,7 @@ const openingStockLineSchema = new mongoose.Schema({
   gsm: { type: Number, required: true },
   quality: { type: String, enum: ['Natural', 'GY'], required: true },
   reelWeightsKg: [{ type: Number, required: true, min: 0.001 }],
+  weightSource: { type: String, enum: ['estimated', 'verified'], default: 'verified' },
   ratePerKg: { type: mongoose.Schema.Types.Decimal128, required: true },
   reelIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'ReelUnit' }]
 });
