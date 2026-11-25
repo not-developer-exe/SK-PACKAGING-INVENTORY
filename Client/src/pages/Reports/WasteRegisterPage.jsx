@@ -70,6 +70,7 @@ export default function WasteRegisterPage() {
       await wasteService.recordThakEntry({ entryDate: thakEntryDate, entryType: thakEntryType, weightKg: thakWeightKg, ratePerKg: thakRatePerKg, notes: thakNotes });
       setThakWeightKg('');
       setThakRatePerKg('0');
+      setThakEntryType('production');
       setThakNotes('');
       await refreshPeriod();
     } catch (error) {
