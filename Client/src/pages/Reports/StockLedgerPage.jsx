@@ -18,6 +18,23 @@ const materialLabel = value => ({
   khaki: 'Khaki',
   duplex: 'Duplex'
 }[value] || String(value || 'Other').replaceAll('_', ' '));
+const snapshotRows = snapshot => (snapshot.sourceRows || []).flatMap(entry => {
+  if (Array.isArray(entry.columns) && Array.isArray(entry.rows)) {
+    return entry.rows.map(values => Object.fromEntries(entry.columns.map((column, index) => [column, values[index] ?? null])));
+  }
+  return [entry];
+});
+const displaySnapshotValue = (value, key) => {
+  if (value === null || value === undefined || value === '') return '—';
+  if (Array.isArray(value)) return value.join(', ');
+  if (typeof value === 'object') return JSON.stringify(value);
+  if (typeof value === 'number') {
+    const formatted = value.toLocaleString('en-IN', { maximumFractionDigits: 3 });
+    return /(amount|rate|tax|cost)/i.test(key) ? '₹' + formatted : formatted;
+  }
+  return String(value);
+};
+const snapshotColumnLabel = key => String(key).replace(/([A-Z])/g, ' $1').replaceAll('_', ' ').replace(/^./, value => value.toUpperCase());
 const groupBy = (rows, keyFor, labelFor) => {
   const grouped = new Map();
   rows.forEach(row => {
@@ -36,6 +53,7 @@ export default function StockLedgerPage() {
   const [search, setSearch] = useState('');
   const [expandedSections, setExpandedSections] = useState({});
   const [expandedGroups, setExpandedGroups] = useState({});
+  const [expandedBaseline, setExpandedBaseline] = useState({});
   const [movements, setMovements] = useState([]);
   const [movementLoading, setMovementLoading] = useState(false);
   const [movementLoaded, setMovementLoaded] = useState(false);
@@ -232,6 +250,13 @@ export default function StockLedgerPage() {
     );
   };
 
+  const baselineSnapshots = (stock.openingBaseline || []).map(snapshot => {
+    const rows = snapshotRows(snapshot).filter(row => !query || Object.entries(row).some(([key, value]) => (String(key) + ' ' + String(value ?? '')).toLowerCase().includes(query)));
+    const allRows = snapshotRows(snapshot);
+    const columns = Array.from(new Set(allRows.flatMap(row => Object.keys(row))));
+    return { ...snapshot, rows, allRows, columns };
+  }).filter(snapshot => !query || snapshot.rows.length > 0 || [snapshot.categoryLabel, snapshot.category, snapshot.sourceSheet, snapshot.notes].some(value => String(value || '').toLowerCase().includes(query)));
+
   const movementFilteredSearch = movementFiltered.filter(row => !query || [
     row.specificationSummary, row.notes, row.itemType, row.movementType, row.performedBy?.name
   ].some(value => String(value || '').toLowerCase().includes(query)));
@@ -256,6 +281,7 @@ export default function StockLedgerPage() {
 
       <div className="flex gap-2 border-b border-slate-200">
         <button type="button" onClick={() => setTab('stock')} className={'border-b-2 px-4 py-3 text-sm font-semibold transition ' + (tab === 'stock' ? 'border-blue-700 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-800')}><PackageOpen size={15} className="mr-2 inline"/>Stock on hand</button>
+        <button type="button" onClick={() => setTab('baseline')} className={'border-b-2 px-4 py-3 text-sm font-semibold transition ' + (tab === 'baseline' ? 'border-blue-700 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-800')}><FileSpreadsheet size={15} className="mr-2 inline"/>Opening baseline <span className="ml-1 text-xs text-slate-400">{stock.openingBaseline?.length || 0}</span></button>
         <button type="button" onClick={() => setTab('movements')} className={'border-b-2 px-4 py-3 text-sm font-semibold transition ' + (tab === 'movements' ? 'border-blue-700 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-800')}><BookOpen size={15} className="mr-2 inline"/>Movement history</button>
       </div>
 
@@ -309,6 +335,39 @@ export default function StockLedgerPage() {
           })}
           <p className="text-xs text-slate-400">Only live remaining quantities are shown here. Opening workbook snapshots remain available separately as historical baseline references.</p>
         </>
+      ) : tab === 'baseline' ? (
+        <div className="space-y-5">
+          <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
+            <p className="font-semibold text-amber-950">Historical opening stock · 1 November 2026</p>
+            <p className="mt-1 text-xs leading-5 text-amber-900">These are source-workbook opening balances preserved for reference. They are kept separate from live stock-on-hand until the detailed opening-stock migration is posted. Do not add these figures to current live balances manually.</p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {baselineSnapshots.map(snapshot => {
+              const opened = Boolean(expandedBaseline[snapshot._id]);
+              const quantity = snapshot.totalQuantity === null || snapshot.totalQuantity === undefined ? '—' : qty(snapshot.totalQuantity);
+              const totalWeight = snapshot.totalWeightKg === null || snapshot.totalWeightKg === undefined ? 'Not stated' : weight(snapshot.totalWeightKg) + ' kg';
+              return <section key={snapshot._id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <button type="button" onClick={() => setExpandedBaseline(current => ({ ...current, [snapshot._id]: !current[snapshot._id] }))} className="w-full p-4 text-left transition hover:bg-slate-50">
+                  <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-slate-900">{snapshot.categoryLabel}</p><p className="mt-1 text-xs text-slate-500">{snapshot.sourceSheet || 'Opening worksheet'} · {snapshot.importStatus === 'detailed' ? 'Detailed rows preserved' : 'Summary only'}</p></div><span className="text-slate-400">{opened ? <ChevronDown size={18}/> : <ChevronRight size={18}/>}</span></div>
+                  <div className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3">
+                    <div><p className="text-[11px] text-slate-500">Workbook quantity</p><p className="mt-1 text-lg font-bold tabular-nums text-slate-900">{quantity}</p></div>
+                    <div><p className="text-[11px] text-slate-500">Workbook weight</p><p className="mt-1 text-sm font-semibold tabular-nums text-slate-800">{totalWeight}</p></div>
+                    <div><p className="text-[11px] text-slate-500">Workbook value</p><p className="mt-1 text-sm font-semibold tabular-nums text-slate-800">{snapshot.totalAmount === null || snapshot.totalAmount === undefined ? '—' : '₹' + qty(snapshot.totalAmount)}</p></div>
+                    <div><p className="text-[11px] text-slate-500">Detail rows</p><p className="mt-1 text-sm font-semibold tabular-nums text-slate-800">{snapshot.allRows.length}</p></div>
+                  </div>
+                </button>
+                {opened && <div className="border-t border-slate-100">
+                  {snapshot.notes && <p className="border-b border-slate-100 bg-amber-50/60 px-4 py-3 text-xs leading-5 text-amber-900">{snapshot.notes}</p>}
+                  {snapshot.rows.length && snapshot.columns.length ? <div className="max-h-[420px] overflow-auto"><table className="w-full min-w-max text-left text-xs">
+                    <thead className="sticky top-0 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500"><tr>{snapshot.columns.map(column => <th key={column} className="whitespace-nowrap px-3 py-2.5">{snapshotColumnLabel(column)}</th>)}</tr></thead>
+                    <tbody className="divide-y divide-slate-100">{snapshot.rows.map((row, index) => <tr key={index} className="hover:bg-slate-50">{snapshot.columns.map(column => <td key={column} className="whitespace-nowrap px-3 py-2.5 text-slate-700">{displaySnapshotValue(row[column], column)}</td>)}</tr>)}</tbody>
+                  </table></div> : <p className="px-4 py-8 text-center text-xs text-slate-500">{snapshot.allRows.length ? 'No rows match this search.' : 'No item-level rows were recorded in this worksheet.'}</p>}
+                </div>}
+              </section>;
+            })}
+            {!baselineSnapshots.length && <div className="rounded-2xl border border-slate-200 bg-white px-5 py-12 text-center text-sm text-slate-500 sm:col-span-2 xl:col-span-3">No opening-baseline rows match this search.</div>}
+          </div>
+        </div>
       ) : (
         <div className="space-y-5">
           <DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => loadMovements({ from, to })} onReset={() => { setFrom(''); setTo(''); loadMovements({}); }} loading={movementLoading} label="Stock movement date range"/>
