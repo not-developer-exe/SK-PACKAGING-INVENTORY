@@ -4,6 +4,7 @@ const CutSheetBatch = require("../models/CutSheetBatch.model");
 const FacingMaterialBatch = require("../models/FacingMaterialBatch.model");
 const FinishedBox = require("../models/FinishedBox.model");
 const RawMaterial = require("../models/RawMaterial.model");
+const OpeningStockSnapshot = require("../models/OpeningStockSnapshot.model");
 
 const companyFilter = (req) => req.companyKey === 'nsb-industrial-solutions'
   ? { companyKey: 'nsb-industrial-solutions' }
@@ -116,7 +117,7 @@ exports.getPhysicalReels = async (req, res) => {
 exports.getStockRegisterOverview = async (req, res) => {
   try {
     const scope = companyFilter(req);
-    const [reels, corrugatedSheets, cutSheetBatches, facingMaterials, finishedGoods, rawMaterials] = await Promise.all([
+    const [reels, corrugatedSheets, cutSheetBatches, facingMaterials, finishedGoods, rawMaterials, openingBaseline] = await Promise.all([
       ReelUnit.find({ ...scope, status: { $in: ['available', 'partial'] }, remainingWeightKg: { $gt: 0 } })
         .populate('supplierId', 'name')
         .populate('inwardReceiptId', 'receiptNumber invoiceReference receiptDate')
@@ -133,7 +134,8 @@ exports.getStockRegisterOverview = async (req, res) => {
       FinishedBox.find({ ...scope, quantityAvailable: { $gt: 0 } })
         .populate('customerId', 'name')
         .sort({ manufacturedAt: -1, createdAt: -1 }).lean(),
-      RawMaterial.find({ ...scope, isActive: true }).sort({ category: 1, name: 1 }).lean()
+      RawMaterial.find({ ...scope, isActive: true }).sort({ category: 1, name: 1 }).lean(),
+      OpeningStockSnapshot.find({ ...scope }).sort({ stockDate: 1, categoryLabel: 1 }).lean()
     ]);
 
     return res.json({
@@ -143,7 +145,8 @@ exports.getStockRegisterOverview = async (req, res) => {
         cutSheetBatches,
         facingMaterials,
         finishedGoods,
-        rawMaterials
+        rawMaterials,
+        openingBaseline
       },
       generatedAt: new Date().toISOString()
     });
