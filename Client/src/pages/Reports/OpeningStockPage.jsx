@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import axiosClient from '../../api/axiosClient';
 import DateRangeFilter from '../../components/DateRangeFilter';
 
@@ -86,8 +87,31 @@ export default function OpeningStockPage() {
     <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-bold text-slate-900">Opening Stock & Audit</h1>
-        <p className="mt-1 text-sm text-slate-500">Bring existing physical reels into the system without inventing a supplier purchase or party balance.</p>
+        <p className="mt-1 text-sm text-slate-500">Opening balances are posted into their own stock registers. This form posts individual reels only; raw materials and Thak have dedicated opening-entry paths.</p>
       </header>
+
+      <section className="grid gap-3 md:grid-cols-3">
+        <div className="rounded-2xl border border-blue-200 bg-blue-50/50 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Reel stock · This page</p>
+          <h2 className="mt-1 font-semibold text-slate-900">Individual reel opening</h2>
+          <p className="mt-1 text-xs leading-5 text-slate-600">Width, BF, GSM, quality, rate and each physical reel weight. Reels are created as opening-balance units, not purchases.</p>
+        </div>
+        <Link to="/inventory/raw-materials" className="rounded-2xl border border-slate-200 bg-white p-4 transition hover:border-blue-300 hover:bg-slate-50">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Dedicated register</p>
+          <h2 className="mt-1 font-semibold text-slate-900">Raw material opening</h2>
+          <p className="mt-1 text-xs leading-5 text-slate-600">Post material quantities and rates into Raw Material Stock. Unspecified units remain flagged until confirmed.</p>
+          <span className="mt-3 inline-flex text-xs font-semibold text-blue-700">Open Raw Material Stock →</span>
+        </Link>
+        <Link to="/operations/waste" className="rounded-2xl border border-slate-200 bg-white p-4 transition hover:border-orange-300 hover:bg-slate-50">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Dedicated register</p>
+          <h2 className="mt-1 font-semibold text-slate-900">Thak opening</h2>
+          <p className="mt-1 text-xs leading-5 text-slate-600">Record the existing weighed Thak balance separately from normal scrap and new daily Thak entries.</p>
+          <span className="mt-3 inline-flex text-xs font-semibold text-orange-700">Open Thak Register →</span>
+        </Link>
+      </section>
+      <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 text-sm text-amber-900">
+        <strong>Not all workbook categories are live-postable yet.</strong> Paper, Duplex, corrugation rolls, ply/pasting sheets, printed materials and finished goods need their own validated opening-stock mapping before import. The preserved workbook baseline remains reference-only until those modules are ready.
+      </div>
 
       <form onSubmit={submit} className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="grid gap-4 sm:grid-cols-2">
