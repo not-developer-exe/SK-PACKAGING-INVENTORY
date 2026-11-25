@@ -1,6 +1,10 @@
 import axiosClient from '../api/axiosClient';
 
 export const inventoryService = {
+  async getStockRegisterOverview() {
+    const { data } = await axiosClient.get("/inventory/register");
+    return data.stock;
+  },
   async getReelStock() {
     const { data } = await axiosClient.get('/inventory/reels');
     return data.stock;
