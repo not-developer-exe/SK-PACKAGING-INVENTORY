@@ -32,6 +32,11 @@ async function consumeRawMaterials({ req, session, consumptions = [], movementDa
       error.statusCode = 409;
       throw error;
     }
+    if (material.uom === 'pending') {
+      const error = new Error('Unit of measure for ' + material.name + ' is not verified. Confirm its unit before production consumption.');
+      error.statusCode = 409;
+      throw error;
+    }
     const rate = Number(material.averageRate || 0);
     const amount = Number((quantity * rate).toFixed(2));
     const updated = await RawMaterial.findOneAndUpdate(
