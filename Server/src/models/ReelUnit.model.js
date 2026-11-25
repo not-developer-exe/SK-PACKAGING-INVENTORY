@@ -13,6 +13,7 @@ const reelUnitSchema = new mongoose.Schema({
   openingStockAdjustmentId: { type: mongoose.Schema.Types.ObjectId, ref: 'OpeningStockAdjustment', default: null },
   sourceType: { type: String, enum: ['inward', 'opening_balance'], default: 'inward' },
   batchReference: { type: String, trim: true },
+  weightSource: { type: String, enum: ['estimated', 'verified'], default: 'verified' },
   originalWeightKg: { type: mongoose.Schema.Types.Decimal128, required: true },
   remainingWeightKg: { type: mongoose.Schema.Types.Decimal128, required: true },
   ratePerKg: { type: mongoose.Schema.Types.Decimal128, required: true },
