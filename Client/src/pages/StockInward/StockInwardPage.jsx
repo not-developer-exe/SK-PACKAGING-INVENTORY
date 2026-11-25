@@ -1,360 +1,284 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Plus, RefreshCw, X, Package, Layers, ArrowDownToLine, FileText, Loader2 } from 'lucide-react';
 import { inwardService } from '../../services/inwardService';
+import { pastingService } from '../../services/pastingService';
 import { partiesService } from '../../services/partiesService';
 import DateRangeFilter from '../../components/DateRangeFilter';
 import { toLocalDateInput } from '../../lib/date';
-import { ArrowDownToLine, Plus, ShieldCheck, CheckCircle2, FileText, Loader2, X } from 'lucide-react';
+
+const blankReelLine = () => ({ reelWidthInches: '', bf: '', gsm: '', quality: 'Natural', reelCount: '', totalWeightKg: '', ratePerKg: '', freightCharges: 0, otherCharges: 0, supplierBatchRef: '', reelWeightsKg: '' });
+const blankDuplex = () => ({ lengthInches: '', widthInches: '', sheetCount: '', totalWeightKg: '', ratePerKg: '', supplierName: '', inwardDate: toLocalDateInput(), notes: '' });
+const kg = value => Number(value?.$numberDecimal ?? value ?? 0);
 
 export default function StockInwardPage() {
   const [receipts, setReceipts] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
+  const [duplexBatches, setDuplexBatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [mode, setMode] = useState('reel');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [supplierFilter, setSupplierFilter] = useState('');
-
-  // Form state
   const [supplierId, setSupplierId] = useState('');
   const [invoiceReference, setInvoiceReference] = useState('');
   const [receiptDate, setReceiptDate] = useState(toLocalDateInput());
   const [notes, setNotes] = useState('');
-  
-  // Line items state
-  const [lines, setLines] = useState([
-    { reelWidthInches: '', bf: '', gsm: '', quality: 'Natural', reelCount: '', totalWeightKg: '', ratePerKg: '', freightCharges: 0, otherCharges: 0, supplierBatchRef: '', reelWeightsKg: '', useIndividualWeights: false }
-  ]);
+  const [lines, setLines] = useState([blankReelLine()]);
+  const [duplex, setDuplex] = useState(blankDuplex());
 
-  const fetchData = async (dateParams = {}) => {
+  const load = async (dateParams = {}) => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const [recData, supData] = await Promise.all([
+      const [recData, supData, batches] = await Promise.all([
         inwardService.getReceipts(dateParams),
-        partiesService.getSuppliers()
+        partiesService.getSuppliers(),
+        pastingService.getFacingMaterial()
       ]);
-      setReceipts(recData);
-      setSuppliers(supData);
-      if (supData.length > 0) setSupplierId(supData[0]._id);
+      setReceipts(recData || []);
+      setSuppliers(supData || []);
+      setDuplexBatches((batches || []).filter(batch => batch.materialType === 'duplex'));
+      setSupplierId(current => current || supData?.[0]?._id || '');
     } catch (err) {
-      console.error('Error loading inward data:', err);
+      setError(err.response?.data?.message || err.message || 'Unable to load stock inward data.');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { load(); }, []);
 
-  const handleAddLine = () => {
-    setLines([...lines, { reelWidthInches: '', bf: '', gsm: '', quality: 'Natural', reelCount: '', totalWeightKg: '', ratePerKg: '', freightCharges: 0, otherCharges: 0, supplierBatchRef: '', reelWeightsKg: '', useIndividualWeights: false }]);
+  const totalDuplexKg = useMemo(
+    () => duplexBatches.reduce((sum, batch) => sum + kg(batch.remainingWeightKg), 0),
+    [duplexBatches]
+  );
+  const totalDuplexSheets = useMemo(
+    () => duplexBatches.reduce((sum, batch) => sum + Number(batch.remainingSheets || 0), 0),
+    [duplexBatches]
+  );
+
+  const updateLine = (index, field, value) => {
+    setLines(current => current.map((line, i) => i === index ? { ...line, [field]: value } : line));
   };
 
-  const handleLineChange = (index, field, value) => {
-    const updated = [...lines];
-    updated[index][field] = value;
-    setLines(updated);
-  };
-
-  const handleRemoveLine = (index) => {
-    if (lines.length === 1) return;
-    setLines(lines.filter((_, i) => i !== index));
-  };
-
-  const handleSubmitDraft = async (e) => {
-    e.preventDefault();
+  const closeModal = () => {
+    setShowModal(false);
     setError('');
-    setSubmitting(true);
+  };
 
+  const submitReel = async event => {
+    event.preventDefault();
+    setSubmitting(true);
+    setError('');
+    setSuccess('');
     try {
-      // Validate lines
+      if (!supplierId) throw new Error('Select a supplier before saving the reel receipt.');
+      if (!invoiceReference.trim()) throw new Error('Enter the supplier invoice reference.');
       for (const line of lines) {
         if (!line.reelWidthInches || !line.bf || !line.gsm || !line.reelCount || !line.totalWeightKg || !line.ratePerKg) {
-          throw new Error('Please fill in all required fields for every line item.');
+          throw new Error('Complete all required fields in each reel specification.');
         }
       }
-
       await inwardService.createDraft({
         supplierId,
         invoiceReference,
         receiptDate,
         notes,
-        lines: lines.map(l => ({
-          ...l,
-          reelWidthInches: Number(l.reelWidthInches),
-          bf: Number(l.bf),
-          gsm: Number(l.gsm),
-          reelCount: Number(l.reelCount),
-          totalWeightKg: Number(l.totalWeightKg),
-          ratePerKg: Number(l.ratePerKg),
-          freightCharges: Number(l.freightCharges || 0),
-          otherCharges: Number(l.otherCharges || 0),
-          reelWeightsKg: l.useIndividualWeights && l.reelWeightsKg.trim() ? l.reelWeightsKg.split(',').map(value => Number(value.trim())) : []
+        lines: lines.map(line => ({
+          ...line,
+          reelWidthInches: Number(line.reelWidthInches),
+          bf: Number(line.bf),
+          gsm: Number(line.gsm),
+          reelCount: Number(line.reelCount),
+          totalWeightKg: Number(line.totalWeightKg),
+          ratePerKg: Number(line.ratePerKg),
+          freightCharges: Number(line.freightCharges || 0),
+          otherCharges: Number(line.otherCharges || 0),
+          reelWeightsKg: line.reelWeightsKg.trim() ? line.reelWeightsKg.split(',').map(value => Number(value.trim())) : []
         }))
       });
-
-      setShowModal(false);
+      setSuccess('Reel inward saved as a draft. Post the receipt to add the reels to live stock.');
       setInvoiceReference('');
       setNotes('');
-      setLines([{ reelWidthInches: '', bf: '', gsm: '', quality: 'Natural', reelCount: '', totalWeightKg: '', ratePerKg: '', freightCharges: 0, otherCharges: 0, supplierBatchRef: '', reelWeightsKg: '', useIndividualWeights: false }]);
-      fetchData();
+      setLines([blankReelLine()]);
+      closeModal();
+      await load({ from, to, supplierId: supplierFilter });
     } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Failed to create draft');
+      setError(err.response?.data?.message || err.message || 'Unable to save reel inward.');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handlePostReceipt = async (id) => {
-    if (!window.confirm('Are you sure you want to post this receipt? This will atomically generate physical reel units and update the stock ledger. This action cannot be undone.')) {
-      return;
-    }
-
+  const submitDuplex = async event => {
+    event.preventDefault();
+    setSubmitting(true);
+    setError('');
+    setSuccess('');
     try {
-      await inwardService.postReceipt(id);
-      fetchData();
+      const payload = {
+        materialType: 'duplex',
+        lengthInches: Number(duplex.lengthInches),
+        widthInches: Number(duplex.widthInches),
+        sheetCount: Number(duplex.sheetCount),
+        totalWeightKg: Number(duplex.totalWeightKg),
+        ratePerKg: Number(duplex.ratePerKg),
+        supplierName: duplex.supplierName.trim(),
+        inwardDate: duplex.inwardDate,
+        notes: duplex.notes.trim()
+      };
+      if (!payload.lengthInches || !payload.widthInches || !payload.sheetCount || !payload.totalWeightKg || duplex.ratePerKg === '') {
+        throw new Error('Complete the Duplex size, quantity, weight and rate.');
+      }
+      const batch = await pastingService.receiveFacingMaterial(payload);
+      setSuccess('Duplex received into stock as batch ' + batch.batchNumber + '.');
+      setDuplex(blankDuplex());
+      closeModal();
+      await load({ from, to, supplierId: supplierFilter });
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to post receipt');
+      setError(err.response?.data?.message || err.message || 'Unable to receive Duplex stock.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Stock Inward</h1>
-          <p className="mt-1 text-sm text-slate-500">Record supplier paper purchases, manage drafts, and post receipts to inventory.</p>
-        </div>
+  const postReceipt = async id => {
+    if (!window.confirm('Post this reel receipt? This creates individual reel units and updates the stock ledger.')) return;
+    setError('');
+    try {
+      await inwardService.postReceipt(id);
+      setSuccess('Reel receipt posted. Individual reels are now available in Reel Stock.');
+      await load({ from, to, supplierId: supplierFilter });
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to post reel receipt.');
+    }
+  };
 
-        <button
-          type="button"
-          onClick={() => setShowModal(true)}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-800"
-        >
-          <Plus size={17} />
-          New inward receipt
+  const field = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
+  const label = 'mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500';
+  const button = 'rounded-xl px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60';
+
+  return (
+    <div className="mx-auto max-w-7xl space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-widest text-blue-700">Inventory · Incoming materials</p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">Stock Inward</h1>
+          <p className="mt-1 max-w-2xl text-sm text-slate-500">Receive paper reels and pre-cut Duplex into their respective live stock registers.</p>
+        </div>
+        <button type="button" onClick={() => { setError(''); setMode('reel'); setShowModal(true); }} className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-800">
+          <Plus size={17} /> New inward
         </button>
       </div>
 
-      <div className="flex flex-wrap items-end gap-3"><div className="min-w-56"><label className="mb-1 block text-xs font-medium text-slate-600">Supplier</label><select value={supplierFilter} onChange={e => setSupplierFilter(e.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"><option value="">All suppliers</option>{suppliers.map(supplier => <option key={supplier._id} value={supplier._id}>{supplier.name}</option>)}</select></div><div className="flex-1"><DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => fetchData({ from, to, supplierId: supplierFilter })} onReset={() => { setFrom(''); setTo(''); setSupplierFilter(''); fetchData({}); }} loading={loading} label="Inward receipt date range" /></div></div>
+      {error && !showModal && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+      {success && <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{success}</div>}
 
-      {/* Receipts Table */}
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-        <div className="border-b border-slate-100 p-5">
-          <h2 className="text-base font-semibold text-slate-900">Receipt history</h2>
-          <p className="text-sm text-slate-500">All draft and posted paper receipts from suppliers.</p>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-3"><span className="rounded-xl bg-blue-50 p-2.5 text-blue-700"><Package size={20}/></span><div><p className="text-xs font-medium text-slate-500">Reel receipts</p><p className="text-2xl font-bold tabular-nums text-slate-900">{receipts.length}</p></div></div>
+          <p className="mt-3 text-xs text-slate-500">Draft and posted supplier receipts</p>
         </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-5 py-3 font-semibold">Receipt #</th>
-                <th className="px-5 py-3 font-semibold">Date</th>
-                <th className="px-5 py-3 font-semibold">Supplier</th>
-                <th className="px-5 py-3 font-semibold">Invoice Ref</th>
-                <th className="px-5 py-3 text-right font-semibold">Lines</th>
-                <th className="px-5 py-3 font-semibold">Status</th>
-                <th className="px-5 py-3 text-right font-semibold">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {receipts.map((rec) => (
-                <tr key={rec._id} className="hover:bg-slate-50">
-                  <td className="px-5 py-4 font-medium text-slate-900">{rec.receiptNumber}</td>
-                  <td className="px-5 py-4 text-slate-700">{new Date(rec.receiptDate).toLocaleDateString('en-IN')}</td>
-                  <td className="px-5 py-4 font-medium text-slate-800">{rec.supplierId?.name || 'Unknown Supplier'}</td>
-                  <td className="px-5 py-4 text-slate-700">{rec.invoiceReference}</td>
-                  <td className="px-5 py-4 text-right tabular-nums text-slate-700">{rec.lines.length}</td>
-                  <td className="px-5 py-4">
-                    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${rec.status === 'posted' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                      {rec.status.toUpperCase()}
-                    </span>
-                  </td>
-                  <td className="px-5 py-4 text-right">
-                    {rec.status === 'draft' ? (
-                      <button
-                        onClick={() => handlePostReceipt(rec._id)}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
-                      >
-                        <CheckCircle2 size={14} /> Post Receipt
-                      </button>
-                    ) : (
-                      <span className="text-xs font-medium text-slate-400">Locked / Posted</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {receipts.length === 0 && !loading && (
-                <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center text-slate-500">
-                    No inward receipts recorded yet. Click "New inward receipt" to begin.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-3"><span className="rounded-xl bg-violet-50 p-2.5 text-violet-700"><Layers size={20}/></span><div><p className="text-xs font-medium text-slate-500">Duplex sheets available</p><p className="text-2xl font-bold tabular-nums text-slate-900">{totalDuplexSheets.toLocaleString('en-IN')}</p></div></div>
+          <p className="mt-3 text-xs text-slate-500">{duplexBatches.length} batches · {totalDuplexKg.toLocaleString('en-IN', { maximumFractionDigits: 2 })} kg remaining</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-3"><span className="rounded-xl bg-amber-50 p-2.5 text-amber-700"><FileText size={20}/></span><div><p className="text-xs font-medium text-slate-500">Pending reel drafts</p><p className="text-2xl font-bold tabular-nums text-slate-900">{receipts.filter(receipt => receipt.status === 'draft').length}</p></div></div>
+          <p className="mt-3 text-xs text-slate-500">Drafts do not affect available reel stock until posted</p>
         </div>
       </div>
 
-      {/* Modal Form */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/50 p-4">
-          <div className="my-auto w-full max-w-4xl rounded-2xl bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-100 p-5">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-900">New Inward Receipt (Draft)</h2>
-                <p className="mt-1 text-sm text-slate-500">Record paper reel purchases from verified suppliers.</p>
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-col gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div><h2 className="font-semibold text-slate-900">Duplex stock</h2><p className="mt-1 text-xs text-slate-500">Received here; issued to sheet pasting from this stock balance.</p></div>
+          <button type="button" onClick={() => load({ from, to, supplierId: supplierFilter })} className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"><RefreshCw size={14}/> Refresh</button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] text-left text-sm">
+            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-3">Batch</th><th className="px-5 py-3">Received</th><th className="px-5 py-3">Size (in)</th><th className="px-5 py-3 text-right">Sheets left</th><th className="px-5 py-3 text-right">Kg left</th><th className="px-5 py-3 text-right">Rate / kg</th><th className="px-5 py-3">Supplier</th><th className="px-5 py-3">Status</th></tr></thead>
+            <tbody className="divide-y divide-slate-100">
+              {duplexBatches.map(batch => <tr key={batch._id} className="hover:bg-slate-50"><td className="px-5 py-3 font-semibold text-slate-800">{batch.batchNumber}</td><td className="px-5 py-3">{new Date(batch.inwardDate).toLocaleDateString('en-IN')}</td><td className="px-5 py-3">{batch.lengthInches} × {batch.widthInches}</td><td className="px-5 py-3 text-right tabular-nums">{Number(batch.remainingSheets).toLocaleString('en-IN')}</td><td className="px-5 py-3 text-right tabular-nums">{kg(batch.remainingWeightKg).toFixed(2)}</td><td className="px-5 py-3 text-right tabular-nums">₹{kg(batch.ratePerKg).toFixed(2)}</td><td className="px-5 py-3">{batch.supplierName || '—'}</td><td className="px-5 py-3"><span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">{batch.status}</span></td></tr>)}
+              {!duplexBatches.length && <tr><td colSpan={8} className="px-5 py-10 text-center text-sm text-slate-500">No Duplex stock received yet. Use New inward → Duplex to add a batch.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-100 p-5"><h2 className="font-semibold text-slate-900">Reel receipt history</h2><p className="mt-1 text-xs text-slate-500">Reel receipts remain draft until posted to create individual reel records.</p></div>
+        <div className="flex flex-wrap items-end gap-3 border-b border-slate-100 p-4">
+          <div className="min-w-52"><label className={label}>Supplier filter</label><select value={supplierFilter} onChange={event => setSupplierFilter(event.target.value)} className={field}><option value="">All suppliers</option>{suppliers.map(supplier => <option key={supplier._id} value={supplier._id}>{supplier.name}</option>)}</select></div>
+          <div className="min-w-[280px] flex-1"><DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => load({ from, to, supplierId: supplierFilter })} onReset={() => { setFrom(''); setTo(''); setSupplierFilter(''); load({}); }} loading={loading} label="Receipt date range"/></div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[850px] text-left text-sm">
+            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-3">Receipt #</th><th className="px-5 py-3">Date</th><th className="px-5 py-3">Supplier</th><th className="px-5 py-3">Invoice ref</th><th className="px-5 py-3 text-right">Lines</th><th className="px-5 py-3">Status</th><th className="px-5 py-3 text-right">Action</th></tr></thead>
+            <tbody className="divide-y divide-slate-100">
+              {receipts.map(receipt => <tr key={receipt._id} className="hover:bg-slate-50"><td className="px-5 py-4 font-semibold text-slate-900">{receipt.receiptNumber}</td><td className="px-5 py-4">{new Date(receipt.receiptDate).toLocaleDateString('en-IN')}</td><td className="px-5 py-4">{receipt.supplierId?.name || '—'}</td><td className="px-5 py-4">{receipt.invoiceReference}</td><td className="px-5 py-4 text-right tabular-nums">{receipt.lines?.length || 0}</td><td className="px-5 py-4"><span className={receipt.status === 'posted' ? 'rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700' : 'rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700'}>{receipt.status}</span></td><td className="px-5 py-4 text-right">{receipt.status === 'draft' ? <button type="button" onClick={() => postReceipt(receipt._id)} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700">Post receipt</button> : <span className="text-xs text-slate-400">Posted</span>}</td></tr>)}
+              {!receipts.length && !loading && <tr><td colSpan={7} className="px-5 py-10 text-center text-slate-500">No reel receipts match these filters.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {showModal && <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/50 p-3 sm:p-6">
+        <div className="my-auto max-h-[94vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
+          <div className="sticky top-0 z-10 flex items-start justify-between border-b border-slate-100 bg-white p-5"><div><h2 className="text-lg font-bold text-slate-900">New stock inward</h2><p className="mt-1 text-sm text-slate-500">Choose the material category, then enter its purchase details.</p></div><button type="button" onClick={closeModal} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100" aria-label="Close"><X size={19}/></button></div>
+          <div className="space-y-5 p-5">
+            <div><p className={label}>Material type</p><div role="group" aria-label="Choose inward material type" className="grid max-w-md grid-cols-2 rounded-xl bg-slate-100 p-1">
+              <button type="button" aria-pressed={mode === 'reel'} onClick={() => { setMode('reel'); setError(''); }} className={mode === 'reel' ? 'rounded-lg bg-white px-4 py-3 text-sm font-bold text-blue-700 shadow-sm ring-1 ring-slate-200' : 'rounded-lg px-4 py-3 text-sm font-semibold text-slate-500 hover:text-slate-800'}><Package size={16} className="mr-2 inline"/>Reel</button>
+              <button type="button" aria-pressed={mode === 'duplex'} onClick={() => { setMode('duplex'); setError(''); }} className={mode === 'duplex' ? 'rounded-lg bg-white px-4 py-3 text-sm font-bold text-violet-700 shadow-sm ring-1 ring-slate-200' : 'rounded-lg px-4 py-3 text-sm font-semibold text-slate-500 hover:text-slate-800'}><Layers size={16} className="mr-2 inline"/>Duplex</button>
+            </div></div>
+            {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+            {mode === 'reel' ? <form onSubmit={submitReel} className="space-y-5">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div><label className={label}>Supplier *</label><select required value={supplierId} onChange={event => setSupplierId(event.target.value)} className={field}><option value="">Select supplier</option>{suppliers.map(supplier => <option key={supplier._id} value={supplier._id}>{supplier.name}</option>)}</select></div>
+                <div><label className={label}>Invoice reference *</label><input required value={invoiceReference} onChange={event => setInvoiceReference(event.target.value)} placeholder="Supplier invoice number" className={field}/></div>
+                <div><label className={label}>Receipt date *</label><input required type="date" value={receiptDate} onChange={event => setReceiptDate(event.target.value)} className={field}/></div>
               </div>
-              <button onClick={() => setShowModal(false)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100">
-                <X size={20} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmitDraft} className="space-y-6 p-6">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-700">Supplier *</label>
-                  <select
-                    value={supplierId}
-                    onChange={(e) => setSupplierId(e.target.value)}
-                    required
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-400"
-                  >
-                    {suppliers.map(sup => (
-                      <option key={sup._id} value={sup._id}>{sup.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-700">Invoice Reference *</label>
-                  <input
-                    type="text"
-                    value={invoiceReference}
-                    onChange={(e) => setInvoiceReference(e.target.value)}
-                    placeholder="e.g. INV-2026-884"
-                    required
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-700">Receipt Date *</label>
-                  <input
-                    type="date"
-                    value={receiptDate}
-                    onChange={(e) => setReceiptDate(e.target.value)}
-                    required
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400"
-                  />
-                </div>
-              </div>
-
-              {/* Line Items */}
-              <div className="space-y-4 border-t border-slate-100 pt-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-slate-900">Receipt Line Items (Reel Specifications)</h3>
-                  <button type="button" onClick={handleAddLine} className="text-xs font-semibold text-blue-700 hover:text-blue-900">+ Add another line</button>
-                </div>
-
-                {lines.map((line, idx) => (
-                  <div key={idx} className="grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-slate-50/50 p-4 sm:grid-cols-6">
-                    <div>
-                      <label className="mb-1 block text-xs font-medium text-slate-600">Width (in) *</label>
-                      <input type="number" step="any" value={line.reelWidthInches} onChange={(e) => handleLineChange(idx, 'reelWidthInches', e.target.value)} placeholder="36" required className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm" />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs font-medium text-slate-600">BF *</label>
-                      <input type="number" step="any" value={line.bf} onChange={(e) => handleLineChange(idx, 'bf', e.target.value)} placeholder="18" required className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm" />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs font-medium text-slate-600">GSM *</label>
-                      <input type="number" step="any" value={line.gsm} onChange={(e) => handleLineChange(idx, 'gsm', e.target.value)} placeholder="140" required className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm" />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs font-medium text-slate-600">Quality *</label>
-                      <select value={line.quality} onChange={(e) => handleLineChange(idx, 'quality', e.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm">
-                        <option value="Natural">Natural</option>
-                        <option value="GY">Golden Yellow (GY)</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs font-medium text-slate-600">Reels Qty *</label>
-                      <input type="number" min="1" value={line.reelCount} onChange={(e) => handleLineChange(idx, 'reelCount', e.target.value)} placeholder="5" required className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm" />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs font-medium text-slate-600">Total Wt (kg) *</label>
-                      <input type="number" step="any" value={line.totalWeightKg} onChange={(e) => handleLineChange(idx, 'totalWeightKg', e.target.value)} placeholder="450" required className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm" />
-                    </div>
-                    <div className="sm:col-span-2">
-                      <label className="mb-1 block text-xs font-medium text-slate-600">Rate per kg (₹) *</label>
-                      <input type="number" step="any" value={line.ratePerKg} onChange={(e) => handleLineChange(idx, 'ratePerKg', e.target.value)} placeholder="42.50" required className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm" />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs font-medium text-slate-600">Freight (₹)</label>
-                      <input type="number" min="0" step="any" value={line.freightCharges} onChange={(e) => handleLineChange(idx, 'freightCharges', e.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm" />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs font-medium text-slate-600">Other charges (₹)</label>
-                      <input type="number" min="0" step="any" value={line.otherCharges} onChange={(e) => handleLineChange(idx, 'otherCharges', e.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm" />
-                    </div>
-                    <div className="sm:col-span-6 rounded-xl border border-slate-200 bg-white p-3">
-                      <div className="flex items-center justify-between gap-4">
-                        <div>
-                          <p className="text-sm font-semibold text-slate-800">Individual reel weights</p>
-                          <p className="mt-0.5 text-xs text-slate-500">Turn on to enter the verified weight of each reel. Otherwise, total weight is split equally and marked estimated.</p>
-                        </div>
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={line.useIndividualWeights}
-                          onClick={() => {
-                            handleLineChange(idx, 'useIndividualWeights', !line.useIndividualWeights);
-                            handleLineChange(idx, 'reelWeightsKg', '');
-                          }}
-                          className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${line.useIndividualWeights ? 'bg-blue-700' : 'bg-slate-300'}`}
-                        >
-                          <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${line.useIndividualWeights ? 'translate-x-6' : 'translate-x-1'}`} />
-                        </button>
-                      </div>
-                      <div className="mt-2 flex items-center gap-2 text-xs">
-                        <span className={`rounded-full px-2 py-1 font-semibold ${line.useIndividualWeights ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
-                          {line.useIndividualWeights ? 'Verified weights' : 'Estimated weights'}
-                        </span>
-                        <span className="text-slate-500">{line.useIndividualWeights ? 'Enter one value per reel below.' : 'Average weight will be calculated automatically.'}</span>
-                      </div>
-                      {line.useIndividualWeights && (
-                        <div className="mt-3">
-                          <label className="mb-1 block text-xs font-medium text-slate-600">Weights in kg (comma-separated) *</label>
-                          <input type="text" value={line.reelWeightsKg} onChange={(e) => handleLineChange(idx, 'reelWeightsKg', e.target.value)} placeholder="150.5, 148.2, 151.3" required className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm" />
-                          <p className="mt-1 text-[11px] text-slate-500">Enter exactly {line.reelCount || 'the reel count'} weights. Their sum must match Total Wt within 0.01 kg.</p>
-                        </div>
-                      )}
-                    </div>
-                    <div className="sm:col-span-3 flex items-end">
-                      {lines.length > 1 && (
-                        <button type="button" onClick={() => handleRemoveLine(idx)} className="text-xs font-medium text-red-600 hover:text-red-800">Remove line</button>
-                      )}
-                    </div>
+              <div className="space-y-3 border-t border-slate-100 pt-4">
+                <div className="flex items-center justify-between"><div><h3 className="font-semibold text-slate-900">Reel specifications</h3><p className="mt-1 text-xs text-slate-500">Each row represents reels with the same width, BF, GSM, quality and rate.</p></div><button type="button" onClick={() => setLines(current => [...current, blankReelLine()])} className="rounded-lg border border-blue-200 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50">+ Add specification</button></div>
+                {lines.map((line, index) => <div key={index} className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                  <div className="mb-3 flex items-center justify-between"><span className="text-xs font-bold uppercase tracking-wide text-slate-500">Specification {index + 1}</span>{lines.length > 1 && <button type="button" onClick={() => setLines(current => current.filter((_, i) => i !== index))} className="text-xs font-semibold text-red-600">Remove</button>}</div>
+                  <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                    <div><label className={label}>Width (in) *</label><input required type="number" min="0.01" step="any" value={line.reelWidthInches} onChange={event => updateLine(index, 'reelWidthInches', event.target.value)} placeholder="36" className={field}/></div>
+                    <div><label className={label}>BF *</label><input required type="number" min="0.01" step="any" value={line.bf} onChange={event => updateLine(index, 'bf', event.target.value)} placeholder="18" className={field}/></div>
+                    <div><label className={label}>GSM *</label><input required type="number" min="0.01" step="any" value={line.gsm} onChange={event => updateLine(index, 'gsm', event.target.value)} placeholder="140" className={field}/></div>
+                    <div><label className={label}>Quality *</label><select value={line.quality} onChange={event => updateLine(index, 'quality', event.target.value)} className={field}><option value="Natural">Natural</option><option value="GY">Golden Yellow</option></select></div>
+                    <div><label className={label}>Reel qty *</label><input required type="number" min="1" step="1" value={line.reelCount} onChange={event => updateLine(index, 'reelCount', event.target.value)} placeholder="5" className={field}/></div>
+                    <div><label className={label}>Total kg *</label><input required type="number" min="0.001" step="any" value={line.totalWeightKg} onChange={event => updateLine(index, 'totalWeightKg', event.target.value)} placeholder="450" className={field}/></div>
+                    <div className="sm:col-span-2"><label className={label}>Rate / kg (₹) *</label><input required type="number" min="0" step="any" value={line.ratePerKg} onChange={event => updateLine(index, 'ratePerKg', event.target.value)} placeholder="42.50" className={field}/></div>
+                    <div><label className={label}>Freight (₹)</label><input type="number" min="0" step="any" value={line.freightCharges} onChange={event => updateLine(index, 'freightCharges', event.target.value)} className={field}/></div>
+                    <div><label className={label}>Other (₹)</label><input type="number" min="0" step="any" value={line.otherCharges} onChange={event => updateLine(index, 'otherCharges', event.target.value)} className={field}/></div>
+                    <div className="sm:col-span-2"><label className={label}>Reel batch ref</label><input value={line.supplierBatchRef} onChange={event => updateLine(index, 'supplierBatchRef', event.target.value)} placeholder="Optional" className={field}/></div>
+                    <div className="sm:col-span-6"><label className={label}>Individual reel weights (optional)</label><input value={line.reelWeightsKg} onChange={event => updateLine(index, 'reelWeightsKg', event.target.value)} placeholder="150.5, 148.2, 151.3" className={field}/><p className="mt-1 text-xs text-slate-500">Enter one weight per reel. Leave blank to divide the total equally and mark the weights as estimated.</p></div>
                   </div>
-                ))}
+                </div>)}
               </div>
-
-              {error && <div className="rounded-xl bg-red-50 p-3 text-sm text-red-600">{error}</div>}
-
-              <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
-                <button type="button" onClick={() => setShowModal(false)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
-                <button type="submit" disabled={submitting} className="rounded-xl bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-70">
-                  {submitting ? <Loader2 className="animate-spin" size={18} /> : 'Save as draft'}
-                </button>
+              <div><label className={label}>Receipt notes</label><textarea rows="2" value={notes} onChange={event => setNotes(event.target.value)} className={field} placeholder="Optional notes for this receipt"/></div>
+              <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onClick={closeModal} className={button + ' border border-slate-200 text-slate-700 hover:bg-slate-50'}>Cancel</button><button disabled={submitting} className={button + ' inline-flex items-center gap-2 bg-blue-700 text-white hover:bg-blue-800'}>{submitting && <Loader2 size={16} className="animate-spin"/>}Save reel draft</button></div>
+            </form> : <form onSubmit={submitDuplex} className="space-y-5">
+              <div className="rounded-xl border border-violet-100 bg-violet-50/60 p-4"><h3 className="font-semibold text-violet-950">Duplex paper inward</h3><p className="mt-1 text-xs text-violet-800">Enter pre-cut sheet dimensions and quantities. This batch will be available in Sheet Pasting for issue against production.</p></div>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div><label className={label}>Inward date *</label><input required type="date" value={duplex.inwardDate} onChange={event => setDuplex({ ...duplex, inwardDate: event.target.value })} className={field}/></div>
+                <div><label className={label}>Supplier name</label><input value={duplex.supplierName} onChange={event => setDuplex({ ...duplex, supplierName: event.target.value })} placeholder="Supplier / mill" className={field}/></div>
+                <div><label className={label}>Length (inches) *</label><input required type="number" min="0.1" step="any" value={duplex.lengthInches} onChange={event => setDuplex({ ...duplex, lengthInches: event.target.value })} placeholder="e.g. 40" className={field}/></div>
+                <div><label className={label}>Width (inches) *</label><input required type="number" min="0.1" step="any" value={duplex.widthInches} onChange={event => setDuplex({ ...duplex, widthInches: event.target.value })} placeholder="e.g. 30" className={field}/></div>
+                <div><label className={label}>Number of sheets *</label><input required type="number" min="1" step="1" value={duplex.sheetCount} onChange={event => setDuplex({ ...duplex, sheetCount: event.target.value })} placeholder="1000" className={field}/></div>
+                <div><label className={label}>Total weight (kg) *</label><input required type="number" min="0.001" step="any" value={duplex.totalWeightKg} onChange={event => setDuplex({ ...duplex, totalWeightKg: event.target.value })} placeholder="260" className={field}/></div>
+                <div><label className={label}>Purchase rate (₹ / kg) *</label><input required type="number" min="0" step="any" value={duplex.ratePerKg} onChange={event => setDuplex({ ...duplex, ratePerKg: event.target.value })} placeholder="45.00" className={field}/></div>
+                <div><label className={label}>Total purchase value</label><div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold tabular-nums text-slate-900">₹{(Number(duplex.totalWeightKg || 0) * Number(duplex.ratePerKg || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div></div>
               </div>
-            </form>
+              <div><label className={label}>Notes</label><textarea rows="2" value={duplex.notes} onChange={event => setDuplex({ ...duplex, notes: event.target.value })} className={field} placeholder="Optional purchase / batch details"/></div>
+              <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onClick={closeModal} className={button + ' border border-slate-200 text-slate-700 hover:bg-slate-50'}>Cancel</button><button disabled={submitting} className={button + ' inline-flex items-center gap-2 bg-violet-700 text-white hover:bg-violet-800'}>{submitting && <Loader2 size={16} className="animate-spin"/>}Receive Duplex stock</button></div>
+            </form>}
           </div>
         </div>
-      )}
+      </div>}
     </div>
   );
 }
