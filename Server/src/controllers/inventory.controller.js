@@ -1,4 +1,9 @@
 const ReelUnit = require("../models/ReelUnit.model");
+const CorrugatedSheet = require("../models/CorrugatedSheet.model");
+const CutSheetBatch = require("../models/CutSheetBatch.model");
+const FacingMaterialBatch = require("../models/FacingMaterialBatch.model");
+const FinishedBox = require("../models/FinishedBox.model");
+const RawMaterial = require("../models/RawMaterial.model");
 
 const companyFilter = (req) => req.companyKey === 'nsb-industrial-solutions'
   ? { companyKey: 'nsb-industrial-solutions' }
@@ -104,5 +109,46 @@ exports.getPhysicalReels = async (req, res) => {
         message: "Failed to fetch physical reels",
         error: error.message,
       });
+  }
+};
+
+
+exports.getStockRegisterOverview = async (req, res) => {
+  try {
+    const scope = companyFilter(req);
+    const [reels, corrugatedSheets, cutSheetBatches, facingMaterials, finishedGoods, rawMaterials] = await Promise.all([
+      ReelUnit.find({ ...scope, status: { $in: ['available', 'partial'] }, remainingWeightKg: { $gt: 0 } })
+        .populate('supplierId', 'name')
+        .populate('inwardReceiptId', 'receiptNumber invoiceReference receiptDate')
+        .populate('openingStockAdjustmentId', 'adjustmentDate')
+        .sort({ reelCode: 1 }).lean(),
+      CorrugatedSheet.find({ ...scope, status: 'available', sheetCount: { $gt: 0 } })
+        .populate('productionRunId', 'runNumber runDate')
+        .populate('pastingRunId', 'runNumber runDate')
+        .sort({ createdAt: -1 }).lean(),
+      CutSheetBatch.find({ ...scope, status: { $in: ['available', 'partially_used'] }, remainingSheets: { $gt: 0 } })
+        .sort({ cutDate: -1, createdAt: -1 }).lean(),
+      FacingMaterialBatch.find({ ...scope, status: { $in: ['available', 'partial'] }, remainingSheets: { $gt: 0 } })
+        .sort({ inwardDate: -1, createdAt: -1 }).lean(),
+      FinishedBox.find({ ...scope, quantityAvailable: { $gt: 0 } })
+        .populate('customerId', 'name')
+        .sort({ manufacturedAt: -1, createdAt: -1 }).lean(),
+      RawMaterial.find({ ...scope, isActive: true }).sort({ category: 1, name: 1 }).lean()
+    ]);
+
+    return res.json({
+      stock: {
+        reels,
+        corrugatedSheets,
+        cutSheetBatches,
+        facingMaterials,
+        finishedGoods,
+        rawMaterials
+      },
+      generatedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('[INVENTORY REGISTER] Overview failed:', error.message);
+    return res.status(500).json({ message: 'Unable to load the complete stock register.' });
   }
 };
