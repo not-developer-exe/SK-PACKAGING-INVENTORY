@@ -70,10 +70,10 @@ export default function ReelStockPage() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[950px] text-left text-sm">
+          <table className="w-full min-w-[1050px] text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <tr>
-                <th className="px-5 py-3 font-semibold">Specification</th><th className="px-5 py-3 font-semibold">BF</th><th className="px-5 py-3 font-semibold">GSM</th><th className="px-5 py-3 font-semibold">Quality</th><th className="px-5 py-3 text-right font-semibold">Reels</th><th className="px-5 py-3 text-right font-semibold">Weight (kg)</th><th className="px-5 py-3 font-semibold">Last Received</th><th className="px-5 py-3 font-semibold">Status</th>
+                <th className="px-5 py-3 font-semibold">Specification</th><th className="px-5 py-3 font-semibold">BF</th><th className="px-5 py-3 font-semibold">GSM</th><th className="px-5 py-3 font-semibold">Quality</th><th className="px-5 py-3 text-right font-semibold">Reels</th><th className="px-5 py-3 text-right font-semibold">Weight (kg)</th><th className="px-5 py-3 font-semibold">Weight basis</th><th className="px-5 py-3 font-semibold">Last Received</th><th className="px-5 py-3 font-semibold">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -84,11 +84,12 @@ export default function ReelStockPage() {
                   <td className="px-5 py-4"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${item.quality === "GY" ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-700"}`}>{item.quality}</span></td>
                   <td className="px-5 py-4 text-right tabular-nums text-slate-700">{item.reels}</td>
                   <td className="px-5 py-4 text-right tabular-nums text-slate-700">{item.weight.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</td>
+                  <td className="px-5 py-4"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${item.weightSource === "estimated" ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>{item.weightSource === "estimated" ? "Estimated" : "Verified"}</span></td>
                   <td className="whitespace-nowrap px-5 py-4 text-slate-700"><span className="inline-flex items-center gap-2"><CalendarDays size={14} className="text-slate-400" />{new Date(item.dateAdded).toLocaleDateString("en-IN")}</span></td>
                   <td className="px-5 py-4"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${item.reels <= 3 ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>{item.reels <= 3 ? "Low stock" : "In stock"}</span></td>
                 </tr>
               ))}
-              {filteredReels.length === 0 && (<tr><td colSpan={8} className="px-5 py-12 text-center text-slate-500">No physical reels found. Post an Inward Receipt to add stock.</td></tr>)}
+              {filteredReels.length === 0 && (<tr><td colSpan={9} className="px-5 py-12 text-center text-slate-500">No physical reels found. Post opening stock or an Inward Receipt to add stock.</td></tr>)}
             </tbody>
           </table>
         </div>
