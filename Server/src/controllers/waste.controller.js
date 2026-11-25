@@ -59,10 +59,12 @@ exports.recordThakEntry = async (req, res) => {
   }
   const entryDate = rawEntryDate ? new Date(rawEntryDate + 'T00:00:00+05:30') : new Date();
   const weightKg = Number(req.body?.weightKg);
+  const ratePerKg = Number(req.body?.ratePerKg || 0);
+  const totalValue = Math.round(weightKg * ratePerKg * 100) / 100;
   const entryType = req.body?.entryType === 'opening_balance' ? 'opening_balance' : 'production';
   const notes = typeof req.body?.notes === 'string' ? req.body.notes.trim() : '';
   if (entryType === 'opening_balance' && req.user?.role !== 'admin') return res.status(403).json({ message: 'Only an admin can post opening Thak stock.' });
-  if (!Number.isFinite(weightKg) || weightKg <= 0 || notes.length > 500) {
+  if (!Number.isFinite(weightKg) || weightKg <= 0 || !Number.isFinite(ratePerKg) || ratePerKg < 0 || notes.length > 500) {
     return res.status(400).json({ message: 'Enter a positive Thak weight and notes no longer than 500 characters.' });
   }
 
@@ -78,12 +80,12 @@ exports.recordThakEntry = async (req, res) => {
         { _id: 'waste-stock' }, { $inc: { revision: 1 } },
         { upsert: true, new: true, setDefaultsOnInsert: true, session }
       );
-      const [entry] = await ThakEntry.create([{ companyKey, entryDate, entryType, weightKg, notes: entryType === 'opening_balance' ? (notes || 'Opening Thak stock imported from STOCK oct.(3).xlsx') : notes, recordedBy: req.user._id }], { session });
+      const [entry] = await ThakEntry.create([{ companyKey, entryDate, entryType, weightKg, ratePerKg, totalValue, notes: entryType === 'opening_balance' ? (notes || 'Opening Thak stock imported from STOCK oct.(3).xlsx') : notes, recordedBy: req.user._id }], { session });
       await writeAuditLog(req, {
         action: entryType === 'opening_balance' ? 'thak.opening_stock_recorded' : 'thak.stock_recorded', entityType: 'ThakEntry', entityId: entry._id,
         entityLabel: 'Thak ' + weightKg.toFixed(2) + ' kg',
         summary: (entryType === 'opening_balance' ? 'Opening Thak balance recorded: ' : 'Recorded moisture-damaged paper (Thak): ') + weightKg.toFixed(2) + ' kg',
-        metadata: { weightKg, entryDate, entryType, notes }
+        metadata: { weightKg, ratePerKg, totalValue, entryDate, entryType, notes }
       }, session);
       createdEntry = entry;
     });
