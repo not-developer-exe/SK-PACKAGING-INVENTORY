@@ -229,9 +229,12 @@ export default function StockInwardPage() {
         <div className="my-auto max-h-[94vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
           <div className="sticky top-0 z-10 flex items-start justify-between border-b border-slate-100 bg-white p-5"><div><h2 className="text-lg font-bold text-slate-900">New stock inward</h2><p className="mt-1 text-sm text-slate-500">Choose the material category, then enter its purchase details.</p></div><button type="button" onClick={closeModal} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100" aria-label="Close"><X size={19}/></button></div>
           <div className="space-y-5 p-5">
-            <div><p className={label}>Material type</p><div role="group" aria-label="Choose inward material type" className="grid max-w-md grid-cols-2 rounded-xl bg-slate-100 p-1">
-              <button type="button" aria-pressed={mode === 'reel'} onClick={() => { setMode('reel'); setError(''); }} className={mode === 'reel' ? 'rounded-lg bg-white px-4 py-3 text-sm font-bold text-blue-700 shadow-sm ring-1 ring-slate-200' : 'rounded-lg px-4 py-3 text-sm font-semibold text-slate-500 hover:text-slate-800'}><Package size={16} className="mr-2 inline"/>Reel</button>
-              <button type="button" aria-pressed={mode === 'duplex'} onClick={() => { setMode('duplex'); setError(''); }} className={mode === 'duplex' ? 'rounded-lg bg-white px-4 py-3 text-sm font-bold text-violet-700 shadow-sm ring-1 ring-slate-200' : 'rounded-lg px-4 py-3 text-sm font-semibold text-slate-500 hover:text-slate-800'}><Layers size={16} className="mr-2 inline"/>Duplex</button>
+            <div><p className={label}>Material type</p><div className="flex items-center gap-3">
+              <span className={mode === 'reel' ? 'text-sm font-bold text-blue-700' : 'text-sm font-medium text-slate-400'}>Reel</span>
+              <button type="button" role="switch" aria-label="Switch between Reel and Duplex inward" aria-checked={mode === 'duplex'} onClick={() => { setMode(mode === 'reel' ? 'duplex' : 'reel'); setError(''); }} className={'relative inline-flex h-8 w-14 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ' + (mode === 'duplex' ? 'bg-violet-700' : 'bg-blue-700')}>
+                <span className={'inline-block h-6 w-6 transform rounded-full bg-white shadow-md transition-transform ' + (mode === 'duplex' ? 'translate-x-7' : 'translate-x-1')}/>
+              </button>
+              <span className={mode === 'duplex' ? 'text-sm font-bold text-violet-700' : 'text-sm font-medium text-slate-400'}>Duplex</span>
             </div></div>
             {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
             {mode === 'reel' ? <form onSubmit={submitReel} className="space-y-5">
