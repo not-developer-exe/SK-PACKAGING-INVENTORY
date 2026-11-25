@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../middlewares/auth.middleware');
-const { listMaterials, createMaterial, recordMovement, getMovements } = require('../controllers/rawMaterial.controller');
+const { listMaterials, createMaterial, recordMovement, getMovements, updateMaterialUnit } = require('../controllers/rawMaterial.controller');
 router.use(protect);
 router.get('/', listMaterials);
 router.post('/', createMaterial);
+router.patch('/:id/uom', updateMaterialUnit);
 router.get('/movements', getMovements);
 router.post('/movements', recordMovement);
 module.exports = router;
