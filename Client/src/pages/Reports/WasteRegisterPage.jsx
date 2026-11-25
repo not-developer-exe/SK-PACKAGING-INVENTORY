@@ -24,6 +24,7 @@ export default function WasteRegisterPage() {
   const [saleDate, setSaleDate] = useState(localToday);
   const [thakEntryType, setThakEntryType] = useState('production');
   const [thakWeightKg, setThakWeightKg] = useState('');
+  const [thakRatePerKg, setThakRatePerKg] = useState('0');
   const [thakNotes, setThakNotes] = useState('');
   const [thakEntryDate, setThakEntryDate] = useState(localToday);
 
@@ -66,8 +67,9 @@ export default function WasteRegisterPage() {
     event.preventDefault();
     setSubmitting(true);
     try {
-      await wasteService.recordThakEntry({ entryDate: thakEntryDate, entryType: thakEntryType, weightKg: thakWeightKg, notes: thakNotes });
+      await wasteService.recordThakEntry({ entryDate: thakEntryDate, entryType: thakEntryType, weightKg: thakWeightKg, ratePerKg: thakRatePerKg, notes: thakNotes });
       setThakWeightKg('');
+      setThakRatePerKg('0');
       setThakNotes('');
       await refreshPeriod();
     } catch (error) {
@@ -106,11 +108,12 @@ export default function WasteRegisterPage() {
         <p className="mb-4 text-xs text-slate-500">Post the opening balance once, then record each newly weighed Thak entry separately.</p>
         <div className="mb-4 inline-flex rounded-xl bg-orange-100 p-1">
           <button type="button" onClick={() => setThakEntryType('production')} className={'rounded-lg px-3 py-2 text-xs font-semibold ' + (thakEntryType === 'production' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600')}>New weighed entry</button>
-          <button type="button" onClick={() => { setThakEntryType('opening_balance'); setThakEntryDate('2026-11-01'); setThakNotes('Opening Thak stock imported from STOCK oct.(3).xlsx'); setThakWeightKg('300'); }} className={'rounded-lg px-3 py-2 text-xs font-semibold ' + (thakEntryType === 'opening_balance' ? 'bg-white text-orange-800 shadow-sm' : 'text-slate-600')}>Opening balance</button>
+          <button type="button" onClick={() => { setThakEntryType('opening_balance'); setThakEntryDate('2026-11-01'); setThakNotes('Opening Thak stock imported from STOCK oct.(3).xlsx'); setThakWeightKg('300'); setThakRatePerKg('22'); }} className={'rounded-lg px-3 py-2 text-xs font-semibold ' + (thakEntryType === 'opening_balance' ? 'bg-white text-orange-800 shadow-sm' : 'text-slate-600')}>Opening balance</button>
         </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-5">
           <input type="date" required aria-label="Thak entry date" value={thakEntryDate} onChange={event => setThakEntryDate(event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" />
           <input type="number" min="0.01" step="0.01" required placeholder="Thak weight (kg)" value={thakWeightKg} onChange={event => setThakWeightKg(event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" />
+          <input type="number" min="0" step="0.01" aria-label="Thak opening rate per kg" placeholder="Rate / kg (₹)" value={thakRatePerKg} onChange={event => setThakRatePerKg(event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" />
           <input type="text" maxLength="500" placeholder="Notes (optional)" value={thakNotes} onChange={event => setThakNotes(event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" />
           <button type="submit" disabled={submitting} className="rounded-xl bg-orange-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60">{submitting ? 'Saving…' : thakEntryType === 'opening_balance' ? 'Post opening Thak' : 'Add Thak Stock'}</button>
         </div>
@@ -137,8 +140,8 @@ export default function WasteRegisterPage() {
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
         {activeTab === 'thak' ? (
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-3">Date</th><th className="px-5 py-3">Entry type</th><th className="px-5 py-3 text-right">Thak weighed (kg)</th><th className="px-5 py-3">Notes</th></tr></thead>
-            <tbody className="divide-y divide-slate-100">{(data.thakEntries || []).map(entry => <tr key={entry._id}><td className="px-5 py-4">{new Date(entry.entryDate || entry.createdAt).toLocaleDateString('en-IN')}</td><td className="px-5 py-4">{entry.entryType === 'opening_balance' ? 'Opening balance' : 'Weighed entry'}</td><td className="px-5 py-4 text-right font-medium">{Number(entry.weightKg).toFixed(2)}</td><td className="px-5 py-4">{entry.notes || '—'}</td></tr>)}{!(data.thakEntries || []).length && <tr><td colSpan={4} className="p-6 text-center text-slate-500">No Thak stock entries recorded.</td></tr>}</tbody>
+            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-3">Date</th><th className="px-5 py-3">Entry type</th><th className="px-5 py-3 text-right">Thak weighed (kg)</th><th className="px-5 py-3 text-right">Rate/kg</th><th className="px-5 py-3 text-right">Value</th><th className="px-5 py-3">Notes</th></tr></thead>
+            <tbody className="divide-y divide-slate-100">{(data.thakEntries || []).map(entry => <tr key={entry._id}><td className="px-5 py-4">{new Date(entry.entryDate || entry.createdAt).toLocaleDateString('en-IN')}</td><td className="px-5 py-4">{entry.entryType === 'opening_balance' ? 'Opening balance' : 'Weighed entry'}</td><td className="px-5 py-4 text-right font-medium">{Number(entry.weightKg).toFixed(2)}</td><td className="px-5 py-4 text-right">₹{Number(entry.ratePerKg || 0).toFixed(2)}</td><td className="px-5 py-4 text-right">₹{Number(entry.totalValue || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td><td className="px-5 py-4">{entry.notes || '—'}</td></tr>)}{!(data.thakEntries || []).length && <tr><td colSpan={6} className="p-6 text-center text-slate-500">No Thak stock entries recorded.</td></tr>}</tbody>
           </table>
         ) : (
           <table className="w-full text-left text-sm">
