@@ -23,8 +23,8 @@ exports.createMaterial = async (req, res) => {
   const category = req.body?.category || 'consumable';
   const uom = req.body?.uom;
   const reorderLevel = Number(req.body?.reorderLevel || 0);
-  if (!code || !name || !['adhesive','packing','printing','consumable','other'].includes(category) ||
-      !['kg','g','litre','ml','pcs','roll','box','bundle'].includes(uom) ||
+  if (!code || !name || !['adhesive','packing','printing','consumable','colour','other'].includes(category) ||
+      !['kg','g','litre','ml','pcs','roll','box','bundle','pending'].includes(uom) ||
       !Number.isFinite(reorderLevel) || reorderLevel < 0) {
     return res.status(400).json({ message: 'Enter a code, name, valid category, unit and non-negative reorder level.' });
   }
@@ -42,7 +42,7 @@ exports.recordMovement = async (req, res) => {
   const quantity = Number(req.body?.quantity);
   const rate = Number(req.body?.rate || 0);
   const rawDate = req.body?.movementDate;
-  if (!mongoose.isValidObjectId(materialId) || !['inward','issue','adjustment_in','adjustment_out'].includes(movementType) ||
+  if (!mongoose.isValidObjectId(materialId) || !['opening','inward','issue','adjustment_in','adjustment_out'].includes(movementType) ||
       !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(rate) || rate < 0 ||
       (rawDate !== undefined && !isValidDateOnly(rawDate))) {
     return res.status(400).json({ message: 'Select a material, movement type, positive quantity and valid rate/date.' });
@@ -54,11 +54,23 @@ exports.recordMovement = async (req, res) => {
     await session.withTransaction(async () => {
       const material = await RawMaterial.findOne({ _id: materialId, ...companyFilter(req), isActive: true }).session(session);
       if (!material) { const e = new Error('Material not found or inactive.'); e.statusCode = 404; throw e; }
-      const isIn = movementType === 'inward' || movementType === 'adjustment_in';
+      if (material.uom === 'pending' && movementType !== 'opening') {
+        const e = new Error('This material unit is not verified yet. Confirm its unit before recording inward, issue or adjustments.');
+        e.statusCode = 409; throw e;
+      }
+      if (movementType === 'opening') {
+        const priorMovement = await RawMaterialMovement.exists({ materialId: material._id, movementType: 'opening' }).session(session);
+        if (priorMovement || Number(material.openingQty || 0) > 0 || Number(material.currentQty || 0) > 0) {
+          const e = new Error('An opening balance has already been posted or this material already has stock movements.');
+          e.statusCode = 409; throw e;
+        }
+      }
+      const isIn = movementType === 'opening' || movementType === 'inward' || movementType === 'adjustment_in';
       const delta = isIn ? quantity : -quantity;
       const updated = await RawMaterial.findOneAndUpdate(
         { _id: material._id, ...companyFilter(req), ...(delta < 0 ? { currentQty: { $gte: quantity } } : {}) },
-        { $inc: { currentQty: delta }, ...(movementType === 'inward' && rate > 0 ? { $set: { averageRate: rate } } : {}) },
+        { $inc: { currentQty: delta, ...(movementType === 'opening' ? { openingQty: quantity } : {}) },
+          ...((movementType === 'opening' || movementType === 'inward') && rate > 0 ? { $set: { averageRate: rate } } : {}) },
         { new: true, session }
       );
       if (!updated) { const e = new Error('Insufficient stock. Issue quantity exceeds available balance.'); e.statusCode = 409; throw e; }
@@ -76,6 +88,26 @@ exports.recordMovement = async (req, res) => {
     return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Unable to record material movement.' });
   } finally {
     await session.endSession();
+  }
+};
+
+exports.updateMaterialUnit = async (req, res) => {
+  const { id } = req.params;
+  const uom = req.body?.uom;
+  if (!mongoose.isValidObjectId(id) || !['kg','g','litre','ml','pcs','roll','box','bundle'].includes(uom)) {
+    return res.status(400).json({ message: 'Select a valid unit of measure.' });
+  }
+  try {
+    const material = await RawMaterial.findOneAndUpdate(
+      { _id: id, ...companyFilter(req), isActive: true, uom: 'pending' },
+      { $set: { uom } }, { new: true, runValidators: true }
+    );
+    if (!material) return res.status(409).json({ message: 'Material not found or its unit has already been confirmed.' });
+    await writeAuditLog(req, { action: 'raw_material.unit_confirmed', entityType: 'RawMaterial', entityId: material._id,
+      entityLabel: material.name, summary: 'Confirmed unit for ' + material.name + ': ' + uom, metadata: { uom } });
+    return res.json({ material });
+  } catch (error) {
+    return res.status(500).json({ message: 'Unable to update material unit.' });
   }
 };
 
