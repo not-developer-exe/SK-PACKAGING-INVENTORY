@@ -55,7 +55,8 @@ exports.createOpeningStockAdjustment = async (req, res) => {
     }
     normalizedLines.push({
       reelWidthInches: width, bf, gsm, quality: line.quality,
-      ratePerKg: rate, reelWeightsKg: weights.map(number)
+      ratePerKg: rate, reelWeightsKg: weights.map(number),
+      weightSource: line.weightSource === 'estimated' ? 'estimated' : 'verified'
     });
   }
 
@@ -104,6 +105,7 @@ exports.createOpeningStockAdjustment = async (req, res) => {
             inwardReceiptId: null,
             openingStockAdjustmentId: adjustment._id,
             sourceType: 'opening_balance',
+            weightSource: line.weightSource,
             batchReference: adjustmentNumber,
             originalWeightKg: weight,
             remainingWeightKg: weight,
@@ -149,6 +151,7 @@ exports.createOpeningStockAdjustment = async (req, res) => {
             gsm: line.gsm,
             quality: line.quality,
             reelWeightsKg: line.reelWeightsKg,
+            weightSource: line.weightSource,
             ratePerKg: line.ratePerKg
           }))
         }
